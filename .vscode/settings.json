@@ -1,0 +1,27 @@
+{
+	"editor.formatOnSave": true,
+	"files.exclude": {
+		"app/**/go.mod": true
+	},
+	"go.testOnSave": true,
+	"go.coverOnSave": true,
+	"go.coverageDecorator": {
+		"type": "gutter",
+		"coveredGutterStyle": "slashgreen",
+		"uncoveredGutterStyle": "slashred"
+	},
+	"go.inlayHints.assignVariableTypes": true,
+	"go.inlayHints.compositeLiteralFields": true,
+	"go.inlayHints.compositeLiteralTypes": true,
+	"go.inlayHints.constantValues": true,
+	"go.inlayHints.functionTypeParameters": true,
+	"go.inlayHints.ignoredError": true,
+	"go.inlayHints.parameterNames": false,
+	"go.inlayHints.rangeVariableTypes": true,
+	"gopls": {
+		"ui.semanticTokens": true
+	},
+	"editor.rulers": [
+		120
+	]
+}
