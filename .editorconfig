@@ -1,0 +1,9 @@
+# ======================================================================================================================
+# == LICENSE:                 Copyright (c) 2026 Kevin De Coninck.
+# == SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+# ======================================================================================================================
+
+# Configuration for ALL files.
+[*]
+insert_final_newline = true
+max_line_length = 120
