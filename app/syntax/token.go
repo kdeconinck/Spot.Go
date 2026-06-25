@@ -26,6 +26,9 @@ const (
 
 	// TokenRightBrace marks the end of a section block.
 	TokenRightBrace
+
+	// TokenString marks a double-quoted string literal.
+	TokenString
 )
 
 // Token is a lexical token from a Spot DSL source file.

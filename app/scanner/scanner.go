@@ -39,6 +39,9 @@ func (scanner *Scanner) Next() syntax.Token {
 	start := scanner.offset
 
 	switch scanner.src[scanner.offset] {
+	case '"':
+		return scanner.scanString(start)
+
 	case '{':
 		scanner.offset++
 
@@ -110,6 +113,46 @@ func (scanner *Scanner) scanIdentifier(start int) syntax.Token {
 	}
 
 	return scanner.token(kind, start, scanner.offset)
+}
+
+func (scanner *Scanner) scanString(start int) syntax.Token {
+	scanner.offset++
+
+	for scanner.offset < len(scanner.src) {
+		switch scanner.src[scanner.offset] {
+		case '"':
+			scanner.offset++
+
+			return scanner.token(syntax.TokenString, start, scanner.offset)
+
+		case '\\':
+			if !scanner.hasValidStringEscape() {
+				scanner.offset++
+
+				return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+			}
+
+			scanner.offset += 2
+
+		case '\n', '\r':
+			return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+
+		default:
+			scanner.offset++
+		}
+	}
+
+	return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+}
+
+func (scanner Scanner) hasValidStringEscape() bool {
+	switch scanner.peek(1) {
+	case '\\', '"', 'n', 'r', 't':
+		return true
+
+	default:
+		return false
+	}
 }
 
 func (scanner Scanner) token(kind syntax.TokenKind, start, end int) syntax.Token {

@@ -61,6 +61,44 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 19, 19),
 			},
 		},
+		"When scanning a string literal, a string token is returned.": {
+			inSource: "\"**/*.go\"",
+			want: []syntax.Token{
+				token(syntax.TokenString, "\"**/*.go\"", 0, 9),
+				token(syntax.TokenEOF, "", 9, 9),
+			},
+		},
+		"When scanning a string literal with valid escapes, a string token is returned.": {
+			inSource: `"` + `\\` + `\"` + `\n` + `\r` + `\t` + `"`,
+			want: []syntax.Token{
+				token(syntax.TokenString, `"`+`\\`+`\"`+`\n`+`\r`+`\t`+`"`, 0, 12),
+				token(syntax.TokenEOF, "", 12, 12),
+			},
+		},
+		"When scanning a string literal with an invalid escape, an invalid token is returned.": {
+			inSource: "\"\\x\"",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "\"\\", 0, 2),
+				token(syntax.TokenInvalid, "x", 2, 3),
+				token(syntax.TokenInvalid, "\"", 3, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		"When scanning a string literal without a closing quote, an invalid token is returned.": {
+			inSource: "\"abc",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "\"abc", 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		"When scanning a string literal with a newline, an invalid token is returned.": {
+			inSource: "\"abc\n\"",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "\"abc", 0, 4),
+				token(syntax.TokenInvalid, "\"", 5, 6),
+				token(syntax.TokenEOF, "", 6, 6),
+			},
+		},
 		"When scanning unknown text, an invalid token is returned.": {
 			inSource: "x",
 			want: []syntax.Token{
