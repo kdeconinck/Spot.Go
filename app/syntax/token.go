@@ -27,8 +27,35 @@ const (
 	// TokenTokens marks the 'tokens' section keyword.
 	TokenTokens
 
+	// TokenRules marks the 'rules' section keyword.
+	TokenRules
+
 	// TokenSkip marks a skipped token declaration.
 	TokenSkip
+
+	// TokenRule marks a rule declaration.
+	TokenRule
+
+	// TokenMatch marks a rule token match statement.
+	TokenMatch
+
+	// TokenWhere marks a rule condition statement.
+	TokenWhere
+
+	// TokenReport marks a rule report statement.
+	TokenReport
+
+	// TokenAt marks a rule report target.
+	TokenAt
+
+	// TokenInfo marks an informational diagnostic severity.
+	TokenInfo
+
+	// TokenWarn marks a warning diagnostic severity.
+	TokenWarn
+
+	// TokenErr marks an error diagnostic severity.
+	TokenErr
 
 	// TokenInclude marks a scope include entry.
 	TokenInclude
@@ -56,6 +83,27 @@ const (
 
 	// TokenEqual marks a definition assignment.
 	TokenEqual
+
+	// TokenEqualEqual marks an equality comparison operator.
+	TokenEqualEqual
+
+	// TokenBangEqual marks an inequality comparison operator.
+	TokenBangEqual
+
+	// TokenLess marks a less-than comparison operator.
+	TokenLess
+
+	// TokenLessEqual marks a less-than-or-equal comparison operator.
+	TokenLessEqual
+
+	// TokenGreater marks a greater-than comparison operator.
+	TokenGreater
+
+	// TokenGreaterEqual marks a greater-than-or-equal comparison operator.
+	TokenGreaterEqual
+
+	// TokenDot marks a token property access operator.
+	TokenDot
 
 	// TokenDotDot marks a character range operator.
 	TokenDotDot

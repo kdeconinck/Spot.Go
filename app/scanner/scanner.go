@@ -18,6 +18,15 @@ var keywordMap = map[string]syntax.TokenKind{
 	"definitions": syntax.TokenDefinitions,
 	"tokens":      syntax.TokenTokens,
 	"skip":        syntax.TokenSkip,
+	"rules":       syntax.TokenRules,
+	"rule":        syntax.TokenRule,
+	"match":       syntax.TokenMatch,
+	"where":       syntax.TokenWhere,
+	"report":      syntax.TokenReport,
+	"info":        syntax.TokenInfo,
+	"warn":        syntax.TokenWarn,
+	"err":         syntax.TokenErr,
+	"at":          syntax.TokenAt,
 }
 
 // Scanner reads Spot DSL source text one token at a time.
@@ -59,12 +68,51 @@ func (scanner *Scanner) Next() syntax.Token {
 			return scanner.token(syntax.TokenDotDot, start, scanner.offset)
 		}
 
-		return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+		return scanner.token(syntax.TokenDot, start, scanner.offset)
 
 	case '=':
 		scanner.offset++
 
+		if scanner.offset < len(scanner.src) && scanner.src[scanner.offset] == '=' {
+			scanner.offset++
+
+			return scanner.token(syntax.TokenEqualEqual, start, scanner.offset)
+		}
+
 		return scanner.token(syntax.TokenEqual, start, scanner.offset)
+
+	case '!':
+		scanner.offset++
+
+		if scanner.offset < len(scanner.src) && scanner.src[scanner.offset] == '=' {
+			scanner.offset++
+
+			return scanner.token(syntax.TokenBangEqual, start, scanner.offset)
+		}
+
+		return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+
+	case '<':
+		scanner.offset++
+
+		if scanner.offset < len(scanner.src) && scanner.src[scanner.offset] == '=' {
+			scanner.offset++
+
+			return scanner.token(syntax.TokenLessEqual, start, scanner.offset)
+		}
+
+		return scanner.token(syntax.TokenLess, start, scanner.offset)
+
+	case '>':
+		scanner.offset++
+
+		if scanner.offset < len(scanner.src) && scanner.src[scanner.offset] == '=' {
+			scanner.offset++
+
+			return scanner.token(syntax.TokenGreaterEqual, start, scanner.offset)
+		}
+
+		return scanner.token(syntax.TokenGreater, start, scanner.offset)
 
 	case '(':
 		scanner.offset++

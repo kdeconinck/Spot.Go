@@ -355,11 +355,19 @@ func Test_Scanner_Next_ScansFixedTokens(t *testing.T) {
 			},
 		},
 		{
-			name:     "When scanning a single dot, an invalid token is returned.",
+			name:     "When scanning a dot, a dot token is returned.",
 			inSource: ".",
 			want: []syntax.Token{
-				token(syntax.TokenInvalid, ".", 0, 1),
+				token(syntax.TokenDot, ".", 0, 1),
 				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning an equality comparison operator, an equal-equal token is returned.",
+			inSource: "==",
+			want: []syntax.Token{
+				token(syntax.TokenEqualEqual, "==", 0, 2),
+				token(syntax.TokenEOF, "", 2, 2),
 			},
 		},
 		{
@@ -367,6 +375,54 @@ func Test_Scanner_Next_ScansFixedTokens(t *testing.T) {
 			inSource: "=",
 			want: []syntax.Token{
 				token(syntax.TokenEqual, "=", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning an inequality comparison operator, a bang-equal token is returned.",
+			inSource: "!=",
+			want: []syntax.Token{
+				token(syntax.TokenBangEqual, "!=", 0, 2),
+				token(syntax.TokenEOF, "", 2, 2),
+			},
+		},
+		{
+			name:     "When scanning a bang without an equal sign, an invalid token is returned.",
+			inSource: "!",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "!", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a less-than-or-equal comparison operator, a less-equal token is returned.",
+			inSource: "<=",
+			want: []syntax.Token{
+				token(syntax.TokenLessEqual, "<=", 0, 2),
+				token(syntax.TokenEOF, "", 2, 2),
+			},
+		},
+		{
+			name:     "When scanning a less-than comparison operator, a less token is returned.",
+			inSource: "<",
+			want: []syntax.Token{
+				token(syntax.TokenLess, "<", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a greater-than-or-equal comparison operator, a greater-equal token is returned.",
+			inSource: ">=",
+			want: []syntax.Token{
+				token(syntax.TokenGreaterEqual, ">=", 0, 2),
+				token(syntax.TokenEOF, "", 2, 2),
+			},
+		},
+		{
+			name:     "When scanning a greater-than comparison operator, a greater token is returned.",
+			inSource: ">",
+			want: []syntax.Token{
+				token(syntax.TokenGreater, ">", 0, 1),
 				token(syntax.TokenEOF, "", 1, 1),
 			},
 		},
@@ -508,6 +564,79 @@ func Test_Scanner_Next_ScansIdentifiers(t *testing.T) {
 			},
 		},
 		{
+			name:     "When scanning the rules keyword, a rules token is returned.",
+			inSource: "rules",
+			want: []syntax.Token{
+				token(syntax.TokenRules, "rules", 0, 5),
+				token(syntax.TokenEOF, "", 5, 5),
+			},
+		},
+		{
+			name:     "When scanning the rule keyword, a rule token is returned.",
+			inSource: "rule",
+			want: []syntax.Token{
+				token(syntax.TokenRule, "rule", 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning the match keyword, a match token is returned.",
+			inSource: "match",
+			want: []syntax.Token{
+				token(syntax.TokenMatch, "match", 0, 5),
+				token(syntax.TokenEOF, "", 5, 5),
+			},
+		},
+		{
+			name:     "When scanning the where keyword, a where token is returned.",
+			inSource: "where",
+			want: []syntax.Token{
+				token(syntax.TokenWhere, "where", 0, 5),
+				token(syntax.TokenEOF, "", 5, 5),
+			},
+		},
+		{
+			name:     "When scanning the report keyword, a report token is returned.",
+			inSource: "report",
+			want: []syntax.Token{
+				token(syntax.TokenReport, "report", 0, 6),
+				token(syntax.TokenEOF, "", 6, 6),
+			},
+		},
+		{
+			name:     "When scanning the info keyword, an info token is returned.",
+			inSource: "info",
+			want: []syntax.Token{
+				token(syntax.TokenInfo, "info", 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning the warn keyword, a warn token is returned.",
+			inSource: "warn",
+			want: []syntax.Token{
+				token(syntax.TokenWarn, "warn", 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning the err keyword, an err token is returned.",
+			inSource: "err",
+			want: []syntax.Token{
+				token(syntax.TokenErr, "err", 0, 3),
+				token(syntax.TokenEOF, "", 3, 3),
+			},
+		},
+		{
+			name:     "When scanning the at keyword, an at token is returned.",
+			inSource: "at",
+			want: []syntax.Token{
+				token(syntax.TokenAt, "at", 0, 2),
+				token(syntax.TokenEOF, "", 2, 2),
+			},
+		},
+
+		{
 			name:     "When scanning a lowercase identifier, an identifier token is returned.",
 			inSource: "letter",
 			want: []syntax.Token{
@@ -587,7 +716,7 @@ func Test_Scanner_Next_PreservesSpans(t *testing.T) {
 	}{
 		{
 			name:     "When scanning realistic DSL source, token spans are preserved.",
-			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }\ndefinitions { letter = 'a'..'z' | 'A'..'Z' }\ntokens { Whitespace = ' '+ skip }",
+			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }\ndefinitions { letter = 'a'..'z' | 'A'..'Z' }\ntokens { Whitespace = ' '+ skip }\nrules { rule PublicIdentifier { match Identifier where Identifier.text == \"public\" report warn at Identifier \"Public identifier found\" } }",
 			want: []syntax.Token{
 				token(syntax.TokenScope, "scope", 0, 5),
 				token(syntax.TokenLeftBrace, "{", 6, 7),
@@ -616,7 +745,27 @@ func Test_Scanner_Next_PreservesSpans(t *testing.T) {
 				token(syntax.TokenPlus, "+", 118, 119),
 				token(syntax.TokenSkip, "skip", 120, 124),
 				token(syntax.TokenRightBrace, "}", 125, 126),
-				token(syntax.TokenEOF, "", 126, 126),
+				token(syntax.TokenRules, "rules", 127, 132),
+				token(syntax.TokenLeftBrace, "{", 133, 134),
+				token(syntax.TokenRule, "rule", 135, 139),
+				token(syntax.TokenIdentifier, "PublicIdentifier", 140, 156),
+				token(syntax.TokenLeftBrace, "{", 157, 158),
+				token(syntax.TokenMatch, "match", 159, 164),
+				token(syntax.TokenIdentifier, "Identifier", 165, 175),
+				token(syntax.TokenWhere, "where", 176, 181),
+				token(syntax.TokenIdentifier, "Identifier", 182, 192),
+				token(syntax.TokenDot, ".", 192, 193),
+				token(syntax.TokenIdentifier, "text", 193, 197),
+				token(syntax.TokenEqualEqual, "==", 198, 200),
+				token(syntax.TokenString, "\"public\"", 201, 209),
+				token(syntax.TokenReport, "report", 210, 216),
+				token(syntax.TokenWarn, "warn", 217, 221),
+				token(syntax.TokenAt, "at", 222, 224),
+				token(syntax.TokenIdentifier, "Identifier", 225, 235),
+				token(syntax.TokenString, "\"Public identifier found\"", 236, 261),
+				token(syntax.TokenRightBrace, "}", 262, 263),
+				token(syntax.TokenRightBrace, "}", 264, 265),
+				token(syntax.TokenEOF, "", 265, 265),
 			},
 		},
 	} {
@@ -666,6 +815,9 @@ func benchmark_Scanner_Next_DSL(b *testing.B, size int) {
 			"}\n" +
 			"tokens {\n" +
 			strings.Repeat("    Whitespace = ' '+ skip\n", size) +
+			"}\n" +
+			"rules {\n" +
+			strings.Repeat("    rule PublicIdentifier { match Identifier where Identifier.text == \"public\" report warn at Identifier \"Public identifier found\" }\n", size) +
 			"}"
 
 	benchmark_Scanner_Next(b, inputData)
