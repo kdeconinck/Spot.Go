@@ -27,6 +27,9 @@ const (
 	// TokenTokens marks the 'tokens' section keyword.
 	TokenTokens
 
+	// TokenSkip marks a skipped token declaration.
+	TokenSkip
+
 	// TokenInclude marks a scope include entry.
 	TokenInclude
 

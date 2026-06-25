@@ -500,6 +500,14 @@ func Test_Scanner_Next_ScansIdentifiers(t *testing.T) {
 			},
 		},
 		{
+			name:     "When scanning the skip keyword, a skip token is returned.",
+			inSource: "skip",
+			want: []syntax.Token{
+				token(syntax.TokenSkip, "skip", 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
 			name:     "When scanning a lowercase identifier, an identifier token is returned.",
 			inSource: "letter",
 			want: []syntax.Token{
@@ -579,7 +587,7 @@ func Test_Scanner_Next_PreservesSpans(t *testing.T) {
 	}{
 		{
 			name:     "When scanning realistic DSL source, token spans are preserved.",
-			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }\ndefinitions { letter = 'a'..'z' | 'A'..'Z' }",
+			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }\ndefinitions { letter = 'a'..'z' | 'A'..'Z' }\ntokens { Whitespace = ' '+ skip }",
 			want: []syntax.Token{
 				token(syntax.TokenScope, "scope", 0, 5),
 				token(syntax.TokenLeftBrace, "{", 6, 7),
@@ -600,7 +608,15 @@ func Test_Scanner_Next_PreservesSpans(t *testing.T) {
 				token(syntax.TokenDotDot, "..", 85, 87),
 				token(syntax.TokenCharacter, "'Z'", 87, 90),
 				token(syntax.TokenRightBrace, "}", 91, 92),
-				token(syntax.TokenEOF, "", 92, 92),
+				token(syntax.TokenTokens, "tokens", 93, 99),
+				token(syntax.TokenLeftBrace, "{", 100, 101),
+				token(syntax.TokenIdentifier, "Whitespace", 102, 112),
+				token(syntax.TokenEqual, "=", 113, 114),
+				token(syntax.TokenCharacter, "' '", 115, 118),
+				token(syntax.TokenPlus, "+", 118, 119),
+				token(syntax.TokenSkip, "skip", 120, 124),
+				token(syntax.TokenRightBrace, "}", 125, 126),
+				token(syntax.TokenEOF, "", 126, 126),
 			},
 		},
 	} {
@@ -647,6 +663,9 @@ func benchmark_Scanner_Next_DSL(b *testing.B, size int) {
 			"}\n" +
 			"definitions {\n" +
 			strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    value = ('a' | 'b')+\n", size) +
+			"}\n" +
+			"tokens {\n" +
+			strings.Repeat("    Whitespace = ' '+ skip\n", size) +
 			"}"
 
 	benchmark_Scanner_Next(b, inputData)

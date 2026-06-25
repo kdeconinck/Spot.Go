@@ -17,6 +17,7 @@ var keywordMap = map[string]syntax.TokenKind{
 	"exclude":     syntax.TokenExclude,
 	"definitions": syntax.TokenDefinitions,
 	"tokens":      syntax.TokenTokens,
+	"skip":        syntax.TokenSkip,
 }
 
 // Scanner reads Spot DSL source text one token at a time.
