@@ -30,31 +30,24 @@ type parser struct {
 }
 
 func (parser *parser) parseDocument() syntax.Document {
-	scope, ok := parser.parseScopeSection()
+	diagnosticCount := len(parser.diagnostics)
+	scope := parser.parseScopeSection()
 
-	if !ok {
+	if len(parser.diagnostics) != diagnosticCount {
 		return syntax.Document{
 			Scope: scope,
 			Span:  scope.Span,
 		}
 	}
 
-	var definitions syntax.DefinitionsSection
-	endPosition := scope.Span.End
+	diagnosticCount = len(parser.diagnostics)
+	definitions := parser.parseOptionalDefinitionsSection()
 
-	if parser.current.Kind == syntax.TokenDefinitions {
-		definitions, ok = parser.parseDefinitionsSection()
-		endPosition = definitions.Span.End
-
-		if !ok {
-			return syntax.Document{
-				Scope:       scope,
-				Definitions: definitions,
-				Span: location.Span{
-					Start: scope.Span.Start,
-					End:   endPosition,
-				},
-			}
+	if len(parser.diagnostics) != diagnosticCount {
+		return syntax.Document{
+			Scope:       scope,
+			Definitions: definitions,
+			Span:        span(scope.Span.Start, definitions.Span.End),
 		}
 	}
 
@@ -63,163 +56,46 @@ func (parser *parser) parseDocument() syntax.Document {
 	return syntax.Document{
 		Scope:       scope,
 		Definitions: definitions,
-		Span: location.Span{
-			Start: scope.Span.Start,
-			End:   end.Span.End,
-		},
+		Span:        span(scope.Span.Start, end.Span.End),
 	}
 }
 
-func (parser *parser) parseDefinitionsSection() (syntax.DefinitionsSection, bool) {
-	start := parser.current
-	parser.advance()
-
-	if parser.current.Kind != syntax.TokenLeftBrace {
-		parser.addDiagnostic(syntax.TokenLeftBrace)
-
-		return syntax.DefinitionsSection{
-			Span: start.Span,
-		}, false
-	}
-
-	parser.advance()
-
-	var definitions []syntax.Definition
-
-	for parser.current.Kind == syntax.TokenIdentifier {
-		definitions = append(definitions, parser.parseDefinition())
-	}
-
-	if parser.current.Kind != syntax.TokenRightBrace {
-		if parser.current.Kind == syntax.TokenEOF {
-			parser.addDiagnostic(syntax.TokenRightBrace)
-		} else {
-			parser.addDiagnostic(syntax.TokenIdentifier)
-		}
-
-		return syntax.DefinitionsSection{
-			Definitions: definitions,
-			Span: location.Span{
-				Start: start.Span.Start,
-				End:   parser.current.Span.End,
-			},
-		}, false
-	}
-
-	end := parser.current
-	parser.advance()
-
-	return syntax.DefinitionsSection{
-		Definitions: definitions,
-		Span: location.Span{
-			Start: start.Span.Start,
-			End:   end.Span.End,
-		},
-	}, true
-}
-
-func (parser *parser) parseDefinition() syntax.Definition {
-	name := parser.current
-	parser.advance()
-	parser.expect(syntax.TokenEqual)
-	expression := parser.parseDefinitionExpression()
-
-	return syntax.Definition{
-		Name:       name,
-		Expression: expression,
-		Span: location.Span{
-			Start: name.Span.Start,
-			End:   expression.Span.End,
-		},
-	}
-}
-
-func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
-	start := parser.expect(syntax.TokenCharacter)
-
-	if parser.current.Kind != syntax.TokenDotDot {
-		return syntax.DefinitionExpression{
-			Kind:  syntax.DefinitionExpressionCharacter,
-			Start: start,
-			Span:  start.Span,
-		}
-	}
-
-	parser.advance()
-	end := parser.expect(syntax.TokenCharacter)
-
-	return syntax.DefinitionExpression{
-		Kind:  syntax.DefinitionExpressionRange,
-		Start: start,
-		End:   end,
-		Span: location.Span{
-			Start: start.Span.Start,
-			End:   end.Span.End,
-		},
-	}
-}
-
-func (parser *parser) parseScopeSection() (syntax.ScopeSection, bool) {
-	if parser.current.Kind != syntax.TokenScope {
+func (parser *parser) parseScopeSection() syntax.ScopeSection {
+	if !parser.at(syntax.TokenScope) {
 		parser.addDiagnostic(syntax.TokenScope)
 
 		return syntax.ScopeSection{
 			Span: parser.current.Span,
-		}, false
+		}
 	}
 
-	start := parser.current
-	parser.advance()
+	start := parser.expect(syntax.TokenScope)
 
-	if parser.current.Kind != syntax.TokenLeftBrace {
-		parser.addDiagnostic(syntax.TokenLeftBrace)
-
+	if !parser.match(syntax.TokenLeftBrace) {
 		return syntax.ScopeSection{
 			Span: start.Span,
-		}, false
+		}
 	}
-
-	parser.advance()
 
 	var entries []syntax.ScopeEntry
 
-	for parser.current.Kind == syntax.TokenInclude || parser.current.Kind == syntax.TokenExclude {
+	for parser.at(syntax.TokenInclude) || parser.at(syntax.TokenExclude) {
 		entries = append(entries, parser.parseScopeEntry())
 	}
 
-	if parser.current.Kind != syntax.TokenRightBrace {
-		if parser.current.Kind == syntax.TokenEOF {
-			parser.addDiagnostic(syntax.TokenRightBrace)
-		} else {
-			parser.addDiagnostic(syntax.TokenInclude)
-		}
-
-		return syntax.ScopeSection{
-			Entries: entries,
-			Span: location.Span{
-				Start: start.Span.Start,
-				End:   parser.current.Span.End,
-			},
-		}, false
-	}
-
-	end := parser.current
-	parser.advance()
+	end := parser.expectSectionEnd(syntax.TokenInclude)
 
 	return syntax.ScopeSection{
 		Entries: entries,
-		Span: location.Span{
-			Start: start.Span.Start,
-			End:   end.Span.End,
-		},
-	}, true
+		Span:    span(start.Span.Start, end.Span.End),
+	}
 }
 
 func (parser *parser) parseScopeEntry() syntax.ScopeEntry {
 	start := parser.current
 	kind := syntax.ScopeEntryInclude
 
-	if start.Kind == syntax.TokenExclude {
+	if parser.at(syntax.TokenExclude) {
 		kind = syntax.ScopeEntryExclude
 	}
 
@@ -229,15 +105,90 @@ func (parser *parser) parseScopeEntry() syntax.ScopeEntry {
 	return syntax.ScopeEntry{
 		Kind:    kind,
 		Pattern: pattern,
-		Span: location.Span{
-			Start: start.Span.Start,
-			End:   pattern.Span.End,
-		},
+		Span:    span(start.Span.Start, pattern.Span.End),
 	}
 }
 
+func (parser *parser) parseOptionalDefinitionsSection() syntax.DefinitionsSection {
+	if !parser.at(syntax.TokenDefinitions) {
+		return syntax.DefinitionsSection{}
+	}
+
+	return parser.parseDefinitionsSection()
+}
+
+func (parser *parser) parseDefinitionsSection() syntax.DefinitionsSection {
+	start := parser.expect(syntax.TokenDefinitions)
+
+	if !parser.match(syntax.TokenLeftBrace) {
+		return syntax.DefinitionsSection{
+			Span: start.Span,
+		}
+	}
+
+	var definitions []syntax.Definition
+
+	for parser.at(syntax.TokenIdentifier) {
+		definitions = append(definitions, parser.parseDefinition())
+	}
+
+	end := parser.expectSectionEnd(syntax.TokenIdentifier)
+
+	return syntax.DefinitionsSection{
+		Definitions: definitions,
+		Span:        span(start.Span.Start, end.Span.End),
+	}
+}
+
+func (parser *parser) parseDefinition() syntax.Definition {
+	name := parser.expect(syntax.TokenIdentifier)
+	parser.expect(syntax.TokenEqual)
+	expression := parser.parseDefinitionExpression()
+
+	return syntax.Definition{
+		Name:       name,
+		Expression: expression,
+		Span:       span(name.Span.Start, expression.Span.End),
+	}
+}
+
+func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
+	start := parser.expect(syntax.TokenCharacter)
+
+	if !parser.consume(syntax.TokenDotDot) {
+		return syntax.DefinitionExpression{
+			Kind:  syntax.DefinitionExpressionCharacter,
+			Start: start,
+			Span:  start.Span,
+		}
+	}
+
+	end := parser.expect(syntax.TokenCharacter)
+
+	return syntax.DefinitionExpression{
+		Kind:  syntax.DefinitionExpressionRange,
+		Start: start,
+		End:   end,
+		Span:  span(start.Span.Start, end.Span.End),
+	}
+}
+
+func (parser *parser) expectSectionEnd(entryKind syntax.TokenKind) syntax.Token {
+	if parser.at(syntax.TokenRightBrace) {
+		return parser.expect(syntax.TokenRightBrace)
+	}
+
+	if parser.at(syntax.TokenEOF) {
+		parser.addDiagnostic(syntax.TokenRightBrace)
+	} else {
+		parser.addDiagnostic(entryKind)
+	}
+
+	return parser.current
+}
+
 func (parser *parser) expect(kind syntax.TokenKind) syntax.Token {
-	if parser.current.Kind == kind {
+	if parser.at(kind) {
 		token := parser.current
 		parser.advance()
 
@@ -250,6 +201,32 @@ func (parser *parser) expect(kind syntax.TokenKind) syntax.Token {
 	return token
 }
 
+func (parser *parser) match(kind syntax.TokenKind) bool {
+	if !parser.at(kind) {
+		parser.addDiagnostic(kind)
+
+		return false
+	}
+
+	parser.advance()
+
+	return true
+}
+
+func (parser *parser) consume(kind syntax.TokenKind) bool {
+	if !parser.at(kind) {
+		return false
+	}
+
+	parser.advance()
+
+	return true
+}
+
+func (parser *parser) at(kind syntax.TokenKind) bool {
+	return parser.current.Kind == kind
+}
+
 func (parser *parser) addDiagnostic(kind syntax.TokenKind) {
 	parser.diagnostics = append(parser.diagnostics, Diagnostic{
 		Message: "Expected '" + kind.String() + "', found '" + parser.current.Kind.String() + "'.",
@@ -259,4 +236,11 @@ func (parser *parser) addDiagnostic(kind syntax.TokenKind) {
 
 func (parser *parser) advance() {
 	parser.current = parser.scanner.Next()
+}
+
+func span(start, end location.Position) location.Span {
+	return location.Span{
+		Start: start,
+		End:   end,
+	}
 }
