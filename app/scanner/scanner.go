@@ -48,6 +48,17 @@ func (scanner *Scanner) Next() syntax.Token {
 	case '\'':
 		return scanner.scanCharacter(start)
 
+	case '.':
+		scanner.offset++
+
+		if scanner.offset < len(scanner.src) && scanner.src[scanner.offset] == '.' {
+			scanner.offset++
+
+			return scanner.token(syntax.TokenDotDot, start, scanner.offset)
+		}
+
+		return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+
 	case '=':
 		scanner.offset++
 

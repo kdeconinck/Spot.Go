@@ -45,6 +45,9 @@ const (
 	// TokenEqual marks a definition assignment.
 	TokenEqual
 
+	// TokenDotDot marks a character range operator.
+	TokenDotDot
+
 	// TokenCharacter marks a single-quoted character literal.
 	TokenCharacter
 )

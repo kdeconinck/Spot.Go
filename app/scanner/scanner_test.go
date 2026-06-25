@@ -56,6 +56,20 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 28, 28),
 			},
 		},
+		"When scanning a definitions block with a character range, the expected tokens are returned.": {
+			inSource: "definitions { letter = 'a'..'z' }",
+			want: []syntax.Token{
+				token(syntax.TokenDefinitions, "definitions", 0, 11),
+				token(syntax.TokenLeftBrace, "{", 12, 13),
+				token(syntax.TokenIdentifier, "letter", 14, 20),
+				token(syntax.TokenEqual, "=", 21, 22),
+				token(syntax.TokenCharacter, "'a'", 23, 26),
+				token(syntax.TokenDotDot, "..", 26, 28),
+				token(syntax.TokenCharacter, "'z'", 28, 31),
+				token(syntax.TokenRightBrace, "}", 32, 33),
+				token(syntax.TokenEOF, "", 33, 33),
+			},
+		},
 		"When scanning a scope block with include and exclude entries, the expected tokens are returned.": {
 			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
 			want: []syntax.Token{
@@ -145,6 +159,13 @@ func Test_Scanner_Next(t *testing.T) {
 			inSource: "@",
 			want: []syntax.Token{
 				token(syntax.TokenInvalid, "@", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		"When scanning a single dot, an invalid token is returned.": {
+			inSource: ".",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, ".", 0, 1),
 				token(syntax.TokenEOF, "", 1, 1),
 			},
 		},
