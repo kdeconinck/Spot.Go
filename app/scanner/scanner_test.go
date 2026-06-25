@@ -492,6 +492,14 @@ func Test_Scanner_Next_ScansIdentifiers(t *testing.T) {
 			},
 		},
 		{
+			name:     "When scanning the tokens keyword, a tokens token is returned.",
+			inSource: "tokens",
+			want: []syntax.Token{
+				token(syntax.TokenTokens, "tokens", 0, 6),
+				token(syntax.TokenEOF, "", 6, 6),
+			},
+		},
+		{
 			name:     "When scanning a lowercase identifier, an identifier token is returned.",
 			inSource: "letter",
 			want: []syntax.Token{
