@@ -21,6 +21,12 @@ const (
 	// TokenScope marks the 'scope' section keyword.
 	TokenScope
 
+	// TokenInclude marks a scope include entry.
+	TokenInclude
+
+	// TokenExclude marks a scope exclude entry.
+	TokenExclude
+
 	// TokenLeftBrace marks the start of a section block.
 	TokenLeftBrace
 

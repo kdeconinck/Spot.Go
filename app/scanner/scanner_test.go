@@ -10,6 +10,7 @@
 package scanner_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/kdeconinck/spot/location"
@@ -32,6 +33,19 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenLeftBrace, "{", 6, 7),
 				token(syntax.TokenRightBrace, "}", 7, 8),
 				token(syntax.TokenEOF, "", 8, 8),
+			},
+		},
+		"When scanning a scope block with include and exclude entries, the expected tokens are returned.": {
+			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
+			want: []syntax.Token{
+				token(syntax.TokenScope, "scope", 0, 5),
+				token(syntax.TokenLeftBrace, "{", 6, 7),
+				token(syntax.TokenInclude, "include", 8, 15),
+				token(syntax.TokenString, "\"**/*.go\"", 16, 25),
+				token(syntax.TokenExclude, "exclude", 26, 33),
+				token(syntax.TokenString, "\"vendor/**\"", 34, 45),
+				token(syntax.TokenRightBrace, "}", 46, 47),
+				token(syntax.TokenEOF, "", 47, 47),
 			},
 		},
 		"When scanning whitespace around an empty scope block, whitespace is skipped.": {
@@ -146,6 +160,7 @@ func Test_Scanner_Next(t *testing.T) {
 
 func benchmark_Scanner_Next(b *testing.B, source string) {
 	b.Helper()
+	b.SetBytes(int64(len(source)))
 
 	for b.Loop() {
 		scan := scanner.New(source)
@@ -156,8 +171,22 @@ func benchmark_Scanner_Next(b *testing.B, source string) {
 	}
 }
 
-func Benchmark_Scanner_Next_EmptyScopeBlock(b *testing.B) {
-	benchmark_Scanner_Next(b, "scope {}")
+func Benchmark_Scanner_Next_ScopeBlock_0(b *testing.B)    { benchmark_Scanner_Next_ScopeBlock(b, 0) }
+func Benchmark_Scanner_Next_ScopeBlock_1(b *testing.B)    { benchmark_Scanner_Next_ScopeBlock(b, 1) }
+func Benchmark_Scanner_Next_ScopeBlock_10(b *testing.B)   { benchmark_Scanner_Next_ScopeBlock(b, 10) }
+func Benchmark_Scanner_Next_ScopeBlock_100(b *testing.B)  { benchmark_Scanner_Next_ScopeBlock(b, 100) }
+func Benchmark_Scanner_Next_ScopeBlock_1000(b *testing.B) { benchmark_Scanner_Next_ScopeBlock(b, 1000) }
+
+func benchmark_Scanner_Next_ScopeBlock(b *testing.B, entryPairCount int) {
+	b.Helper()
+
+	inputData :=
+		"scope {\n" +
+			strings.Repeat("    include \"**/*.go\"\n", entryPairCount) +
+			strings.Repeat("    exclude \"vendor/**\"\n", entryPairCount) +
+			"}"
+
+	benchmark_Scanner_Next(b, inputData)
 }
 
 func token(kind syntax.TokenKind, text string, start, end location.Position) syntax.Token {

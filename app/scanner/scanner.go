@@ -12,7 +12,9 @@ import (
 )
 
 var keywordMap = map[string]syntax.TokenKind{
-	"scope": syntax.TokenScope,
+	"scope":   syntax.TokenScope,
+	"include": syntax.TokenInclude,
+	"exclude": syntax.TokenExclude,
 }
 
 // Scanner reads Spot DSL source text one token at a time.
