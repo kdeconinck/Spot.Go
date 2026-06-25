@@ -35,6 +35,15 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 8, 8),
 			},
 		},
+		"When scanning an empty definitions block, the expected tokens are returned.": {
+			inSource: "definitions {}",
+			want: []syntax.Token{
+				token(syntax.TokenDefinitions, "definitions", 0, 11),
+				token(syntax.TokenLeftBrace, "{", 12, 13),
+				token(syntax.TokenRightBrace, "}", 13, 14),
+				token(syntax.TokenEOF, "", 14, 14),
+			},
+		},
 		"When scanning a scope block with include and exclude entries, the expected tokens are returned.": {
 			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
 			want: []syntax.Token{

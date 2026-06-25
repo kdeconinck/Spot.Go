@@ -21,6 +21,9 @@ const (
 	// TokenScope marks the 'scope' section keyword.
 	TokenScope
 
+	// TokenDefinitions marks the 'definitions' section keyword.
+	TokenDefinitions
+
 	// TokenInclude marks a scope include entry.
 	TokenInclude
 
