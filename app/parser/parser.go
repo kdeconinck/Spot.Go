@@ -53,11 +53,24 @@ func (parser *parser) parseDocument() syntax.Document {
 		}
 	}
 
+	diagnosticCount = len(parser.diagnostics)
+	tokens := parser.parseOptionalTokensSection()
+
+	if len(parser.diagnostics) != diagnosticCount {
+		return syntax.Document{
+			Scope:       scope,
+			Definitions: definitions,
+			Tokens:      tokens,
+			Span:        span(scope.Span.Start, tokens.Span.End),
+		}
+	}
+
 	end := parser.expect(syntax.TokenEOF)
 
 	return syntax.Document{
 		Scope:       scope,
 		Definitions: definitions,
+		Tokens:      tokens,
 		Span:        span(scope.Span.Start, end.Span.End),
 	}
 }
@@ -145,7 +158,7 @@ func (parser *parser) parseDefinitionsSection() syntax.DefinitionsSection {
 func (parser *parser) parseDefinition() syntax.Definition {
 	name := parser.expect(syntax.TokenIdentifier)
 	parser.expect(syntax.TokenEqual)
-	expression := parser.parseDefinitionExpression()
+	expression := parser.parseExpression(false)
 
 	return syntax.Definition{
 		Name:       name,
@@ -154,8 +167,59 @@ func (parser *parser) parseDefinition() syntax.Definition {
 	}
 }
 
-func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
-	first := parser.parseDefinitionConcatenation()
+func (parser *parser) parseOptionalTokensSection() syntax.TokensSection {
+	if !parser.at(syntax.TokenTokens) {
+		return syntax.TokensSection{}
+	}
+
+	return parser.parseTokensSection()
+}
+
+func (parser *parser) parseTokensSection() syntax.TokensSection {
+	start := parser.expect(syntax.TokenTokens)
+
+	if !parser.match(syntax.TokenLeftBrace) {
+		return syntax.TokensSection{
+			Span: start.Span,
+		}
+	}
+
+	var tokens []syntax.TokenDefinition
+
+	for parser.at(syntax.TokenIdentifier) {
+		tokens = append(tokens, parser.parseTokenDefinition())
+	}
+
+	end := parser.expectSectionEnd(syntax.TokenIdentifier)
+
+	return syntax.TokensSection{
+		Tokens: tokens,
+		Span:   span(start.Span.Start, end.Span.End),
+	}
+}
+
+func (parser *parser) parseTokenDefinition() syntax.TokenDefinition {
+	name := parser.expect(syntax.TokenIdentifier)
+	parser.expect(syntax.TokenEqual)
+	expression := parser.parseExpression(true)
+	end := expression.Span.End
+	var skip syntax.Token
+
+	if parser.at(syntax.TokenSkip) {
+		skip = parser.expect(syntax.TokenSkip)
+		end = skip.Span.End
+	}
+
+	return syntax.TokenDefinition{
+		Name:       name,
+		Expression: expression,
+		Skip:       skip,
+		Span:       span(name.Span.Start, end),
+	}
+}
+
+func (parser *parser) parseExpression(allowString bool) syntax.DefinitionExpression {
+	first := parser.parseConcatenation(allowString)
 
 	if !parser.at(syntax.TokenPipe) {
 		return first
@@ -166,7 +230,7 @@ func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
 	}
 
 	for parser.consume(syntax.TokenPipe) {
-		terms = append(terms, parser.parseDefinitionConcatenation())
+		terms = append(terms, parser.parseConcatenation(allowString))
 	}
 
 	return syntax.DefinitionExpression{
@@ -176,10 +240,10 @@ func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
 	}
 }
 
-func (parser *parser) parseDefinitionConcatenation() syntax.DefinitionExpression {
-	first := parser.parseDefinitionRepetition()
+func (parser *parser) parseConcatenation(allowString bool) syntax.DefinitionExpression {
+	first := parser.parseRepetition(allowString)
 
-	if !parser.atDefinitionContinuationStart() {
+	if !parser.atExpressionContinuationStart(allowString) {
 		return first
 	}
 
@@ -187,8 +251,8 @@ func (parser *parser) parseDefinitionConcatenation() syntax.DefinitionExpression
 		first,
 	}
 
-	for parser.atDefinitionContinuationStart() {
-		terms = append(terms, parser.parseDefinitionRepetition())
+	for parser.atExpressionContinuationStart(allowString) {
+		terms = append(terms, parser.parseRepetition(allowString))
 	}
 
 	return syntax.DefinitionExpression{
@@ -198,8 +262,8 @@ func (parser *parser) parseDefinitionConcatenation() syntax.DefinitionExpression
 	}
 }
 
-func (parser *parser) parseDefinitionRepetition() syntax.DefinitionExpression {
-	inner := parser.parseDefinitionPrimary()
+func (parser *parser) parseRepetition(allowString bool) syntax.DefinitionExpression {
+	inner := parser.parsePrimary(allowString)
 
 	if !parser.at(syntax.TokenQuestion) && !parser.at(syntax.TokenStar) && !parser.at(syntax.TokenPlus) {
 		return inner
@@ -216,9 +280,19 @@ func (parser *parser) parseDefinitionRepetition() syntax.DefinitionExpression {
 	}
 }
 
-func (parser *parser) parseDefinitionPrimary() syntax.DefinitionExpression {
+func (parser *parser) parsePrimary(allowString bool) syntax.DefinitionExpression {
 	if parser.at(syntax.TokenLeftParen) {
-		return parser.parseGroupedDefinitionExpression()
+		return parser.parseGroupedExpression(allowString)
+	}
+
+	if allowString && parser.at(syntax.TokenString) {
+		start := parser.expect(syntax.TokenString)
+
+		return syntax.DefinitionExpression{
+			Kind:  syntax.DefinitionExpressionString,
+			Start: start,
+			Span:  start.Span,
+		}
 	}
 
 	if parser.at(syntax.TokenIdentifier) {
@@ -251,17 +325,20 @@ func (parser *parser) parseDefinitionPrimary() syntax.DefinitionExpression {
 	}
 }
 
-func (parser *parser) atDefinitionContinuationStart() bool {
+func (parser *parser) atExpressionContinuationStart(allowString bool) bool {
 	if parser.at(syntax.TokenIdentifier) && parser.next.Kind == syntax.TokenEqual {
 		return false
 	}
 
-	return parser.at(syntax.TokenLeftParen) || parser.at(syntax.TokenIdentifier) || parser.at(syntax.TokenCharacter)
+	return parser.at(syntax.TokenLeftParen) ||
+		parser.at(syntax.TokenIdentifier) ||
+		parser.at(syntax.TokenCharacter) ||
+		allowString && parser.at(syntax.TokenString)
 }
 
-func (parser *parser) parseGroupedDefinitionExpression() syntax.DefinitionExpression {
+func (parser *parser) parseGroupedExpression(allowString bool) syntax.DefinitionExpression {
 	start := parser.expect(syntax.TokenLeftParen)
-	inner := parser.parseDefinitionExpression()
+	inner := parser.parseExpression(allowString)
 	end := parser.expect(syntax.TokenRightParen)
 
 	return syntax.DefinitionExpression{

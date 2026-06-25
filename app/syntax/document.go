@@ -16,6 +16,9 @@ type Document struct {
 	// Definitions is the parsed definitions section.
 	Definitions DefinitionsSection
 
+	// Tokens is the parsed tokens section.
+	Tokens TokensSection
+
 	// Span is the byte range covered by the document.
 	Span location.Span
 }
@@ -73,12 +76,39 @@ type Definition struct {
 	Span location.Span
 }
 
+// TokensSection is a parsed tokens section.
+type TokensSection struct {
+	// Tokens are the declarations inside the tokens section.
+	Tokens []TokenDefinition
+
+	// Span is the byte range covered by the tokens section.
+	Span location.Span
+}
+
+// TokenDefinition is a token expression declaration.
+type TokenDefinition struct {
+	// Name is the identifier token naming the emitted token.
+	Name Token
+
+	// Expression is the expression assigned to the token.
+	Expression DefinitionExpression
+
+	// Skip marks a token declaration whose matches are not emitted.
+	Skip Token
+
+	// Span is the byte range covered by the token definition.
+	Span location.Span
+}
+
 // DefinitionExpressionKind identifies the form of a definition expression.
 type DefinitionExpressionKind uint8
 
 const (
 	// DefinitionExpressionCharacter is a single character literal expression.
 	DefinitionExpressionCharacter DefinitionExpressionKind = iota
+
+	// DefinitionExpressionString is a string literal expression.
+	DefinitionExpressionString
 
 	// DefinitionExpressionRange is a character range expression.
 	DefinitionExpressionRange

@@ -333,6 +333,83 @@ func Test_Parse(t *testing.T) {
 			},
 		},
 		{
+			name:     "When parsing an empty tokens block, a document is returned.",
+			inSource: "scope {} tokens {}",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Tokens: syntax.TokensSection{
+					Span: span(9, 18),
+				},
+				Span: span(0, 18),
+			},
+		},
+		{
+			name:     "When parsing a definitions block followed by an empty tokens block, a document is returned.",
+			inSource: "scope {} definitions {} tokens {}",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Span: span(9, 23),
+				},
+				Tokens: syntax.TokensSection{
+					Span: span(24, 33),
+				},
+				Span: span(0, 33),
+			},
+		},
+		{
+			name:     "When parsing a tokens block with a reference token, a document is returned.",
+			inSource: "scope {} tokens { Identifier = letter }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Tokens: syntax.TokensSection{
+					Tokens: []syntax.TokenDefinition{
+						tokenDefinition("Identifier", 18, 28, referenceExpression("letter", 31, 37), 18, 37),
+					},
+					Span: span(9, 39),
+				},
+				Span: span(0, 39),
+			},
+		},
+		{
+			name:     "When parsing a tokens block with a string token, a document is returned.",
+			inSource: "scope {} tokens { KeywordPublic = \"public\" }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Tokens: syntax.TokensSection{
+					Tokens: []syntax.TokenDefinition{
+						tokenDefinition("KeywordPublic", 18, 31, stringExpression("\"public\"", 34, 42), 18, 42),
+					},
+					Span: span(9, 44),
+				},
+				Span: span(0, 44),
+			},
+		},
+		{
+			name:     "When parsing a tokens block with a skipped token, a document is returned.",
+			inSource: "scope {} tokens { Whitespace = (' ' | '\\t')+ skip }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Tokens: syntax.TokensSection{
+					Tokens: []syntax.TokenDefinition{
+						tokenDefinitionWithSkip("Whitespace", 18, 28, repetitionExpression(groupExpression(alternationExpression(characterExpression(syntax.TokenCharacter, "' '", 32, 35), characterExpression(syntax.TokenCharacter, "'\\t'", 38, 42)), 31, 43), syntax.TokenPlus, "+", 43, 44), 45, 49, 18, 49),
+					},
+					Span: span(9, 51),
+				},
+				Span: span(0, 51),
+			},
+		},
+		{
 			name:     "When the scope keyword is missing, a diagnostic is returned.",
 			inSource: "x",
 			wantDocument: syntax.Document{
@@ -556,6 +633,73 @@ func Test_Parse(t *testing.T) {
 				diagnostic("Expected ')', found '}'.", 42, 43),
 			},
 		},
+		{
+			name:     "When the tokens opening brace is missing, a diagnostic is returned.",
+			inSource: "scope {} tokens }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Tokens: syntax.TokensSection{
+					Span: span(9, 15),
+				},
+				Span: span(0, 15),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected '{', found '}'.", 16, 17),
+			},
+		},
+		{
+			name:     "When the tokens closing brace is missing, a diagnostic is returned.",
+			inSource: "scope {} tokens {",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Tokens: syntax.TokensSection{
+					Span: span(9, 17),
+				},
+				Span: span(0, 17),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected '}', found 'EOF'.", 17, 17),
+			},
+		},
+		{
+			name:     "When an unexpected token appears inside tokens, a diagnostic is returned.",
+			inSource: "scope {} tokens { 'a' }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Tokens: syntax.TokensSection{
+					Span: span(9, 21),
+				},
+				Span: span(0, 21),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected 'identifier', found 'character'.", 18, 21),
+			},
+		},
+		{
+			name:     "When a token is missing an expression, a diagnostic is returned.",
+			inSource: "scope {} tokens { Identifier = }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Tokens: syntax.TokensSection{
+					Tokens: []syntax.TokenDefinition{
+						tokenDefinition("Identifier", 18, 28, characterExpression(syntax.TokenRightBrace, "}", 31, 32), 18, 32),
+					},
+					Span: span(9, 32),
+				},
+				Span: span(0, 32),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected 'character', found '}'.", 31, 32),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -600,6 +744,9 @@ func dsl(size int) string {
 		"}\n" +
 		"definitions {\n" +
 		strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    identifierStart = letter | '_'\n    value = letter ('a' | 'b')+\n", size) +
+		"}\n" +
+		"tokens {\n" +
+		strings.Repeat("    Identifier = identifierStart value*\n    KeywordPublic = \"public\"\n    Whitespace = (' ' | '\\t')+ skip\n", size) +
 		"}"
 }
 
@@ -626,6 +773,35 @@ func scopeEntry(kind syntax.ScopeEntryKind, patternKind syntax.TokenKind, patter
 			Span: span(patternStart, patternEnd),
 		},
 		Span: span(entryStart, entryEnd),
+	}
+}
+
+func tokenDefinition(name string, nameStart, nameEnd location.Position, expression syntax.DefinitionExpression, definitionStart, definitionEnd location.Position) syntax.TokenDefinition {
+	return syntax.TokenDefinition{
+		Name: syntax.Token{
+			Kind: syntax.TokenIdentifier,
+			Text: name,
+			Span: span(nameStart, nameEnd),
+		},
+		Expression: expression,
+		Span:       span(definitionStart, definitionEnd),
+	}
+}
+
+func tokenDefinitionWithSkip(name string, nameStart, nameEnd location.Position, expression syntax.DefinitionExpression, skipStart, skipEnd, definitionStart, definitionEnd location.Position) syntax.TokenDefinition {
+	return syntax.TokenDefinition{
+		Name: syntax.Token{
+			Kind: syntax.TokenIdentifier,
+			Text: name,
+			Span: span(nameStart, nameEnd),
+		},
+		Expression: expression,
+		Skip: syntax.Token{
+			Kind: syntax.TokenSkip,
+			Text: "skip",
+			Span: span(skipStart, skipEnd),
+		},
+		Span: span(definitionStart, definitionEnd),
 	}
 }
 
@@ -738,6 +914,18 @@ func characterExpression(kind syntax.TokenKind, text string, start, end location
 		Kind: syntax.DefinitionExpressionCharacter,
 		Start: syntax.Token{
 			Kind: kind,
+			Text: text,
+			Span: span(start, end),
+		},
+		Span: span(start, end),
+	}
+}
+
+func stringExpression(text string, start, end location.Position) syntax.DefinitionExpression {
+	return syntax.DefinitionExpression{
+		Kind: syntax.DefinitionExpressionString,
+		Start: syntax.Token{
+			Kind: syntax.TokenString,
 			Text: text,
 			Span: span(start, end),
 		},
