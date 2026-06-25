@@ -43,6 +43,24 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 14, 14),
 			},
 		},
+		"When scanning a comment before an empty scope block, the comment is skipped.": {
+			inSource: "// comment\nscope {}",
+			want: []syntax.Token{
+				token(syntax.TokenScope, "scope", 11, 16),
+				token(syntax.TokenLeftBrace, "{", 17, 18),
+				token(syntax.TokenRightBrace, "}", 18, 19),
+				token(syntax.TokenEOF, "", 19, 19),
+			},
+		},
+		"When scanning a comment inside an empty scope block, the comment is skipped.": {
+			inSource: "scope {// comment\n}",
+			want: []syntax.Token{
+				token(syntax.TokenScope, "scope", 0, 5),
+				token(syntax.TokenLeftBrace, "{", 6, 7),
+				token(syntax.TokenRightBrace, "}", 18, 19),
+				token(syntax.TokenEOF, "", 19, 19),
+			},
+		},
 		"When scanning unknown text, an invalid token is returned.": {
 			inSource: "x",
 			want: []syntax.Token{
@@ -54,6 +72,13 @@ func Test_Scanner_Next(t *testing.T) {
 			inSource: "@",
 			want: []syntax.Token{
 				token(syntax.TokenInvalid, "@", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		"When scanning a slash that does not start a comment, an invalid token is returned.": {
+			inSource: "/",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "/", 0, 1),
 				token(syntax.TokenEOF, "", 1, 1),
 			},
 		},

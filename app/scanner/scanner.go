@@ -30,7 +30,7 @@ func New(src string) Scanner {
 
 // Next returns the next syntax token from the source text.
 func (scanner *Scanner) Next() syntax.Token {
-	scanner.skipWhitespace()
+	scanner.skipTrivia()
 
 	if scanner.offset >= len(scanner.src) {
 		return scanner.token(syntax.TokenEOF, scanner.offset, scanner.offset)
@@ -59,16 +59,41 @@ func (scanner *Scanner) Next() syntax.Token {
 	return scanner.token(syntax.TokenInvalid, start, scanner.offset)
 }
 
-func (scanner *Scanner) skipWhitespace() {
+func (scanner *Scanner) skipTrivia() {
 	for scanner.offset < len(scanner.src) {
 		switch scanner.src[scanner.offset] {
 		case ' ', '\t', '\r', '\n':
 			scanner.offset++
 
+		case '/':
+			if scanner.peek(1) != '/' {
+				return
+			}
+
+			scanner.skipLineComment()
+
 		default:
 			return
 		}
 	}
+}
+
+func (scanner *Scanner) skipLineComment() {
+	scanner.offset += 2
+
+	for scanner.offset < len(scanner.src) && scanner.src[scanner.offset] != '\n' {
+		scanner.offset++
+	}
+}
+
+func (scanner Scanner) peek(delta int) byte {
+	offset := scanner.offset + delta
+
+	if offset >= len(scanner.src) {
+		return 0
+	}
+
+	return scanner.src[offset]
 }
 
 func (scanner *Scanner) scanIdentifier(start int) syntax.Token {
