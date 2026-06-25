@@ -48,7 +48,13 @@ func Test_Parse_DSL(t *testing.T) {
 			},
 			Span: span(172, 287),
 		},
-		Span: span(0, 287),
+		Rules: syntax.RulesSection{
+			Rules: []syntax.Rule{
+				rule("PublicIdentifier", 305, 321, ruleMatch("Identifier", 338, 348, 332, 348), ruleReport(syntax.TokenWarn, "warn", 364, 368, "Identifier", 372, 382, "\"Public identifier found\"", 383, 408, 357, 408), 300, 414),
+			},
+			Span: span(288, 416),
+		},
+		Span: span(0, 416),
 	}
 
 	// Act.
@@ -88,6 +94,9 @@ func dsl(size int) string {
 		"}\n" +
 		"tokens {\n" +
 		strings.Repeat("    Identifier = identifierStart value*\n    KeywordPublic = \"public\"\n    Whitespace = (' ' | '\\t')+ skip\n", size) +
+		"}\n" +
+		"rules {\n" +
+		strings.Repeat("    rule PublicIdentifier {\n        match Identifier\n        report warn at Identifier \"Public identifier found\"\n    }\n", size) +
 		"}"
 }
 
@@ -143,6 +152,55 @@ func tokenDefinitionWithSkip(name string, nameStart, nameEnd location.Position, 
 			Span: span(skipStart, skipEnd),
 		},
 		Span: span(definitionStart, definitionEnd),
+	}
+}
+
+func rule(name string, nameStart, nameEnd location.Position, match syntax.RuleMatch, report syntax.RuleReport, ruleStart, ruleEnd location.Position) syntax.Rule {
+	return syntax.Rule{
+		Name: syntax.Token{
+			Kind: syntax.TokenIdentifier,
+			Text: name,
+			Span: span(nameStart, nameEnd),
+		},
+		Match:  match,
+		Report: report,
+		Span:   span(ruleStart, ruleEnd),
+	}
+}
+
+func ruleMatch(token string, tokenStart, tokenEnd, matchStart, matchEnd location.Position) syntax.RuleMatch {
+	return ruleMatchWithKind(syntax.TokenIdentifier, token, tokenStart, tokenEnd, matchStart, matchEnd)
+}
+
+func ruleMatchWithKind(kind syntax.TokenKind, token string, tokenStart, tokenEnd, matchStart, matchEnd location.Position) syntax.RuleMatch {
+	return syntax.RuleMatch{
+		Token: syntax.Token{
+			Kind: kind,
+			Text: token,
+			Span: span(tokenStart, tokenEnd),
+		},
+		Span: span(matchStart, matchEnd),
+	}
+}
+
+func ruleReport(severityKind syntax.TokenKind, severity string, severityStart, severityEnd location.Position, target string, targetStart, targetEnd location.Position, message string, messageStart, messageEnd, reportStart, reportEnd location.Position) syntax.RuleReport {
+	return syntax.RuleReport{
+		Severity: syntax.Token{
+			Kind: severityKind,
+			Text: severity,
+			Span: span(severityStart, severityEnd),
+		},
+		Target: syntax.Token{
+			Kind: syntax.TokenIdentifier,
+			Text: target,
+			Span: span(targetStart, targetEnd),
+		},
+		Message: syntax.Token{
+			Kind: syntax.TokenString,
+			Text: message,
+			Span: span(messageStart, messageEnd),
+		},
+		Span: span(reportStart, reportEnd),
 	}
 }
 

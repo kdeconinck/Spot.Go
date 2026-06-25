@@ -19,6 +19,9 @@ type Document struct {
 	// Tokens is the parsed tokens section.
 	Tokens TokensSection
 
+	// Rules is the parsed rules section.
+	Rules RulesSection
+
 	// Span is the byte range covered by the document.
 	Span location.Span
 }
@@ -97,6 +100,54 @@ type TokenDefinition struct {
 	Skip Token
 
 	// Span is the byte range covered by the token definition.
+	Span location.Span
+}
+
+// RulesSection is a parsed rules section.
+type RulesSection struct {
+	// Rules are the declarations inside the rules section.
+	Rules []Rule
+
+	// Span is the byte range covered by the rules section.
+	Span location.Span
+}
+
+// Rule is a diagnostic declaration over matched tokens.
+type Rule struct {
+	// Name is the identifier token naming the rule.
+	Name Token
+
+	// Match is the token match statement for the rule.
+	Match RuleMatch
+
+	// Report is the diagnostic report statement for the rule.
+	Report RuleReport
+
+	// Span is the byte range covered by the rule.
+	Span location.Span
+}
+
+// RuleMatch is a token match statement inside a rule.
+type RuleMatch struct {
+	// Token is the identifier token naming the token to match.
+	Token Token
+
+	// Span is the byte range covered by the match statement.
+	Span location.Span
+}
+
+// RuleReport is a diagnostic report statement inside a rule.
+type RuleReport struct {
+	// Severity is the diagnostic severity token.
+	Severity Token
+
+	// Target is the identifier token whose span receives the diagnostic.
+	Target Token
+
+	// Message is the string literal token containing the diagnostic text.
+	Message Token
+
+	// Span is the byte range covered by the report statement.
 	Span location.Span
 }
 

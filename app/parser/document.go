@@ -42,12 +42,26 @@ func (parser *parser) parseDocument() syntax.Document {
 		}
 	}
 
+	diagnosticCount = len(parser.diagnostics)
+	rules := parser.parseOptionalRulesSection()
+
+	if len(parser.diagnostics) != diagnosticCount {
+		return syntax.Document{
+			Scope:       scope,
+			Definitions: definitions,
+			Tokens:      tokens,
+			Rules:       rules,
+			Span:        span(scope.Span.Start, rules.Span.End),
+		}
+	}
+
 	end := parser.expect(syntax.TokenEOF)
 
 	return syntax.Document{
 		Scope:       scope,
 		Definitions: definitions,
 		Tokens:      tokens,
+		Rules:       rules,
 		Span:        span(scope.Span.Start, end.Span.End),
 	}
 }
