@@ -57,6 +57,15 @@ const (
 	// TokenPipe marks an alternation operator.
 	TokenPipe
 
+	// TokenQuestion marks zero-or-one repetition.
+	TokenQuestion
+
+	// TokenStar marks zero-or-more repetition.
+	TokenStar
+
+	// TokenPlus marks one-or-more repetition.
+	TokenPlus
+
 	// TokenCharacter marks a single-quoted character literal.
 	TokenCharacter
 )

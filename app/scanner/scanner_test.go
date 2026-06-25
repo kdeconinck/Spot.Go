@@ -104,6 +104,23 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 35, 35),
 			},
 		},
+		"When scanning a definitions block with repetition, the expected tokens are returned.": {
+			inSource: "definitions { value = 'a'? 'b'* 'c'+ }",
+			want: []syntax.Token{
+				token(syntax.TokenDefinitions, "definitions", 0, 11),
+				token(syntax.TokenLeftBrace, "{", 12, 13),
+				token(syntax.TokenIdentifier, "value", 14, 19),
+				token(syntax.TokenEqual, "=", 20, 21),
+				token(syntax.TokenCharacter, "'a'", 22, 25),
+				token(syntax.TokenQuestion, "?", 25, 26),
+				token(syntax.TokenCharacter, "'b'", 27, 30),
+				token(syntax.TokenStar, "*", 30, 31),
+				token(syntax.TokenCharacter, "'c'", 32, 35),
+				token(syntax.TokenPlus, "+", 35, 36),
+				token(syntax.TokenRightBrace, "}", 37, 38),
+				token(syntax.TokenEOF, "", 38, 38),
+			},
+		},
 		"When scanning a scope block with include and exclude entries, the expected tokens are returned.": {
 			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
 			want: []syntax.Token{

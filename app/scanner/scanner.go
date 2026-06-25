@@ -88,6 +88,21 @@ func (scanner *Scanner) Next() syntax.Token {
 		scanner.offset++
 
 		return scanner.token(syntax.TokenPipe, start, scanner.offset)
+
+	case '?':
+		scanner.offset++
+
+		return scanner.token(syntax.TokenQuestion, start, scanner.offset)
+
+	case '*':
+		scanner.offset++
+
+		return scanner.token(syntax.TokenStar, start, scanner.offset)
+
+	case '+':
+		scanner.offset++
+
+		return scanner.token(syntax.TokenPlus, start, scanner.offset)
 	}
 
 	if isIdentifierStart(scanner.src[scanner.offset]) {
