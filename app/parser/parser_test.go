@@ -140,6 +140,71 @@ func Test_Parse(t *testing.T) {
 			},
 		},
 		{
+			name:     "When parsing a definitions block with character concatenation, a document is returned.",
+			inSource: "scope {} definitions { value = 'a' 'b' }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						concatenationDefinition("value", 23, 28, 23, 38, characterExpression(syntax.TokenCharacter, "'a'", 31, 34), characterExpression(syntax.TokenCharacter, "'b'", 35, 38)),
+					},
+					Span: span(9, 40),
+				},
+				Span: span(0, 40),
+			},
+		},
+		{
+			name:     "When parsing a definitions block with repeated reference concatenation, a document is returned.",
+			inSource: "scope {} definitions { value = letter digit* }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						concatenationDefinition("value", 23, 28, 23, 44, referenceExpression("letter", 31, 37), repetitionExpression(referenceExpression("digit", 38, 43), syntax.TokenStar, "*", 43, 44)),
+					},
+					Span: span(9, 46),
+				},
+				Span: span(0, 46),
+			},
+		},
+		{
+			name:     "When parsing a definitions block with grouped repetition concatenation, a document is returned.",
+			inSource: "scope {} definitions { value = letter ('_' | digit)+ }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						concatenationDefinition("value", 23, 28, 23, 52, referenceExpression("letter", 31, 37), repetitionExpression(groupExpression(alternationExpression(characterExpression(syntax.TokenCharacter, "'_'", 39, 42), referenceExpression("digit", 45, 50)), 38, 51), syntax.TokenPlus, "+", 51, 52)),
+					},
+					Span: span(9, 54),
+				},
+				Span: span(0, 54),
+			},
+		},
+		{
+			name:     "When parsing multiple definitions after concatenation, a document is returned.",
+			inSource: "scope {} definitions { letter = 'a' value = letter digit }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						characterDefinition("letter", 23, 29, syntax.TokenCharacter, "'a'", 32, 35, 23, 35),
+						concatenationDefinition("value", 36, 41, 36, 56, referenceExpression("letter", 44, 50), referenceExpression("digit", 51, 56)),
+					},
+					Span: span(9, 58),
+				},
+				Span: span(0, 58),
+			},
+		},
+		{
 			name:     "When parsing a definitions block with character alternation, a document is returned.",
 			inSource: "scope {} definitions { value = 'a' | 'b' }",
 			wantDocument: syntax.Document{
@@ -185,6 +250,22 @@ func Test_Parse(t *testing.T) {
 					Span: span(9, 55),
 				},
 				Span: span(0, 55),
+			},
+		},
+		{
+			name:     "When parsing a definitions block with concatenation before alternation, a document is returned.",
+			inSource: "scope {} definitions { value = letter digit | '_' }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						alternationDefinition("value", 23, 28, 23, 49, concatenationExpression(referenceExpression("letter", 31, 37), referenceExpression("digit", 38, 43)), characterExpression(syntax.TokenCharacter, "'_'", 46, 49)),
+					},
+					Span: span(9, 51),
+				},
+				Span: span(0, 51),
 			},
 		},
 		{
@@ -518,7 +599,7 @@ func dsl(size int) string {
 		strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) +
 		"}\n" +
 		"definitions {\n" +
-		strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    identifierStart = letter | '_'\n    value = ('a' | 'b')+\n", size) +
+		strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    identifierStart = letter | '_'\n    value = letter ('a' | 'b')+\n", size) +
 		"}"
 }
 
@@ -612,6 +693,18 @@ func repetitionDefinition(name string, nameStart, nameEnd location.Position, exp
 	}
 }
 
+func concatenationDefinition(name string, nameStart, nameEnd, definitionStart, definitionEnd location.Position, terms ...syntax.DefinitionExpression) syntax.Definition {
+	return syntax.Definition{
+		Name: syntax.Token{
+			Kind: syntax.TokenIdentifier,
+			Text: name,
+			Span: span(nameStart, nameEnd),
+		},
+		Expression: concatenationExpression(terms...),
+		Span:       span(definitionStart, definitionEnd),
+	}
+}
+
 func alternationDefinition(name string, nameStart, nameEnd, definitionStart, definitionEnd location.Position, terms ...syntax.DefinitionExpression) syntax.Definition {
 	return syntax.Definition{
 		Name: syntax.Token{
@@ -621,6 +714,14 @@ func alternationDefinition(name string, nameStart, nameEnd, definitionStart, def
 		},
 		Expression: alternationExpression(terms...),
 		Span:       span(definitionStart, definitionEnd),
+	}
+}
+
+func concatenationExpression(terms ...syntax.DefinitionExpression) syntax.DefinitionExpression {
+	return syntax.DefinitionExpression{
+		Kind:  syntax.DefinitionExpressionConcatenation,
+		Terms: terms,
+		Span:  span(terms[0].Span.Start, terms[len(terms)-1].Span.End),
 	}
 }
 

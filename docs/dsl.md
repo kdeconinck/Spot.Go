@@ -222,6 +222,7 @@ Definitions may contain:
 * Character ranges.
 * References to earlier or later definitions.
 * Grouping.
+* Concatenation.
 * Alternation.
 * Repetition.
 
@@ -233,6 +234,18 @@ digit = '0'..'9'
 identifierStart = letter | '_'
 identifierPart = identifierStart | digit
 ```
+
+Definition expressions use the following precedence, from highest to lowest:
+
+| Precedence | Expression     | Example              |
+| ---------- | -------------- | -------------------- |
+| 1          | Grouping       | `('a' | 'b')`        |
+| 2          | Repetition     | `letter*`            |
+| 3          | Concatenation  | `letter digit`       |
+| 4          | Alternation    | `letter digit | '_'` |
+
+For example, `letter digit | '_'` is parsed as `(letter digit) | '_'`.
+Use grouping when alternation should be part of a sequence: `letter (digit | '_')`.
 
 ## Character Ranges
 

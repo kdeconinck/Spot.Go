@@ -17,7 +17,8 @@ func Parse(src string) (syntax.Document, []Diagnostic) {
 		scanner: scanner.New(src),
 	}
 
-	parser.advance()
+	parser.current = parser.scanner.Next()
+	parser.next = parser.scanner.Next()
 	document := parser.parseDocument()
 
 	return document, parser.diagnostics
@@ -26,6 +27,7 @@ func Parse(src string) (syntax.Document, []Diagnostic) {
 type parser struct {
 	scanner     scanner.Scanner
 	current     syntax.Token
+	next        syntax.Token
 	diagnostics []Diagnostic
 }
 
@@ -153,7 +155,7 @@ func (parser *parser) parseDefinition() syntax.Definition {
 }
 
 func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
-	first := parser.parseDefinitionRepetition()
+	first := parser.parseDefinitionConcatenation()
 
 	if !parser.at(syntax.TokenPipe) {
 		return first
@@ -164,11 +166,33 @@ func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
 	}
 
 	for parser.consume(syntax.TokenPipe) {
-		terms = append(terms, parser.parseDefinitionRepetition())
+		terms = append(terms, parser.parseDefinitionConcatenation())
 	}
 
 	return syntax.DefinitionExpression{
 		Kind:  syntax.DefinitionExpressionAlternation,
+		Terms: terms,
+		Span:  span(first.Span.Start, terms[len(terms)-1].Span.End),
+	}
+}
+
+func (parser *parser) parseDefinitionConcatenation() syntax.DefinitionExpression {
+	first := parser.parseDefinitionRepetition()
+
+	if !parser.atDefinitionContinuationStart() {
+		return first
+	}
+
+	terms := []syntax.DefinitionExpression{
+		first,
+	}
+
+	for parser.atDefinitionContinuationStart() {
+		terms = append(terms, parser.parseDefinitionRepetition())
+	}
+
+	return syntax.DefinitionExpression{
+		Kind:  syntax.DefinitionExpressionConcatenation,
 		Terms: terms,
 		Span:  span(first.Span.Start, terms[len(terms)-1].Span.End),
 	}
@@ -225,6 +249,14 @@ func (parser *parser) parseDefinitionPrimary() syntax.DefinitionExpression {
 		End:   end,
 		Span:  span(start.Span.Start, end.Span.End),
 	}
+}
+
+func (parser *parser) atDefinitionContinuationStart() bool {
+	if parser.at(syntax.TokenIdentifier) && parser.next.Kind == syntax.TokenEqual {
+		return false
+	}
+
+	return parser.at(syntax.TokenLeftParen) || parser.at(syntax.TokenIdentifier) || parser.at(syntax.TokenCharacter)
 }
 
 func (parser *parser) parseGroupedDefinitionExpression() syntax.DefinitionExpression {
@@ -301,7 +333,8 @@ func (parser *parser) addDiagnostic(kind syntax.TokenKind) {
 }
 
 func (parser *parser) advance() {
-	parser.current = parser.scanner.Next()
+	parser.current = parser.next
+	parser.next = parser.scanner.Next()
 }
 
 func span(start, end location.Position) location.Span {

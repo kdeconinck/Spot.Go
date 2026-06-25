@@ -86,6 +86,9 @@ const (
 	// DefinitionExpressionReference is a reference to another definition.
 	DefinitionExpressionReference
 
+	// DefinitionExpressionConcatenation is a sequence of adjacent expressions.
+	DefinitionExpressionConcatenation
+
 	// DefinitionExpressionAlternation is a list of alternative expressions.
 	DefinitionExpressionAlternation
 
@@ -110,7 +113,7 @@ type DefinitionExpression struct {
 	// Operator is the postfix operator token in a repetition expression.
 	Operator Token
 
-	// Terms are the alternative expressions in an alternation expression.
+	// Terms are the child expressions in an alternation or concatenation expression.
 	Terms []DefinitionExpression
 
 	// Inner is the expression contained in a grouped or repetition expression.
