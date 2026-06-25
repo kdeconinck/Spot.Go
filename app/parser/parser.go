@@ -153,7 +153,7 @@ func (parser *parser) parseDefinition() syntax.Definition {
 }
 
 func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
-	first := parser.parseDefinitionPrimary()
+	first := parser.parseDefinitionRepetition()
 
 	if !parser.at(syntax.TokenPipe) {
 		return first
@@ -164,13 +164,31 @@ func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
 	}
 
 	for parser.consume(syntax.TokenPipe) {
-		terms = append(terms, parser.parseDefinitionPrimary())
+		terms = append(terms, parser.parseDefinitionRepetition())
 	}
 
 	return syntax.DefinitionExpression{
 		Kind:  syntax.DefinitionExpressionAlternation,
 		Terms: terms,
 		Span:  span(first.Span.Start, terms[len(terms)-1].Span.End),
+	}
+}
+
+func (parser *parser) parseDefinitionRepetition() syntax.DefinitionExpression {
+	inner := parser.parseDefinitionPrimary()
+
+	if !parser.at(syntax.TokenQuestion) && !parser.at(syntax.TokenStar) && !parser.at(syntax.TokenPlus) {
+		return inner
+	}
+
+	operator := parser.current
+	parser.advance()
+
+	return syntax.DefinitionExpression{
+		Kind:     syntax.DefinitionExpressionRepetition,
+		Operator: operator,
+		Inner:    &inner,
+		Span:     span(inner.Span.Start, operator.Span.End),
 	}
 }
 

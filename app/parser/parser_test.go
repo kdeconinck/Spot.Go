@@ -204,6 +204,54 @@ func Test_Parse(t *testing.T) {
 			},
 		},
 		{
+			name:     "When parsing a definitions block with zero-or-one repetition, a document is returned.",
+			inSource: "scope {} definitions { value = 'a'? }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						repetitionDefinition("value", 23, 28, repetitionExpression(characterExpression(syntax.TokenCharacter, "'a'", 31, 34), syntax.TokenQuestion, "?", 34, 35), 23, 35),
+					},
+					Span: span(9, 37),
+				},
+				Span: span(0, 37),
+			},
+		},
+		{
+			name:     "When parsing a definitions block with zero-or-more repetition, a document is returned.",
+			inSource: "scope {} definitions { value = letter* }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						repetitionDefinition("value", 23, 28, repetitionExpression(referenceExpression("letter", 31, 37), syntax.TokenStar, "*", 37, 38), 23, 38),
+					},
+					Span: span(9, 40),
+				},
+				Span: span(0, 40),
+			},
+		},
+		{
+			name:     "When parsing a definitions block with one-or-more repetition, a document is returned.",
+			inSource: "scope {} definitions { value = ('a' | 'b')+ }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						repetitionDefinition("value", 23, 28, repetitionExpression(groupExpression(alternationExpression(characterExpression(syntax.TokenCharacter, "'a'", 32, 35), characterExpression(syntax.TokenCharacter, "'b'", 38, 41)), 31, 42), syntax.TokenPlus, "+", 42, 43), 23, 43),
+					},
+					Span: span(9, 45),
+				},
+				Span: span(0, 45),
+			},
+		},
+		{
 			name:     "When the scope keyword is missing, a diagnostic is returned.",
 			inSource: "x",
 			wantDocument: syntax.Document{
@@ -470,7 +518,7 @@ func dsl(size int) string {
 		strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) +
 		"}\n" +
 		"definitions {\n" +
-		strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    identifierStart = letter | '_'\n    value = ('a' | 'b')\n", size) +
+		strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    identifierStart = letter | '_'\n    value = ('a' | 'b')+\n", size) +
 		"}"
 }
 
@@ -552,6 +600,18 @@ func groupDefinition(name string, nameStart, nameEnd location.Position, expressi
 	}
 }
 
+func repetitionDefinition(name string, nameStart, nameEnd location.Position, expression syntax.DefinitionExpression, definitionStart, definitionEnd location.Position) syntax.Definition {
+	return syntax.Definition{
+		Name: syntax.Token{
+			Kind: syntax.TokenIdentifier,
+			Text: name,
+			Span: span(nameStart, nameEnd),
+		},
+		Expression: expression,
+		Span:       span(definitionStart, definitionEnd),
+	}
+}
+
 func alternationDefinition(name string, nameStart, nameEnd, definitionStart, definitionEnd location.Position, terms ...syntax.DefinitionExpression) syntax.Definition {
 	return syntax.Definition{
 		Name: syntax.Token{
@@ -589,6 +649,19 @@ func groupExpression(inner syntax.DefinitionExpression, start, end location.Posi
 		Kind:  syntax.DefinitionExpressionGroup,
 		Inner: &inner,
 		Span:  span(start, end),
+	}
+}
+
+func repetitionExpression(inner syntax.DefinitionExpression, operatorKind syntax.TokenKind, operator string, operatorStart, operatorEnd location.Position) syntax.DefinitionExpression {
+	return syntax.DefinitionExpression{
+		Kind: syntax.DefinitionExpressionRepetition,
+		Operator: syntax.Token{
+			Kind: operatorKind,
+			Text: operator,
+			Span: span(operatorStart, operatorEnd),
+		},
+		Inner: &inner,
+		Span:  span(inner.Span.Start, operatorEnd),
 	}
 }
 

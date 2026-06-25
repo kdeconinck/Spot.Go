@@ -91,6 +91,9 @@ const (
 
 	// DefinitionExpressionGroup is a parenthesized expression.
 	DefinitionExpressionGroup
+
+	// DefinitionExpressionRepetition is a repeated expression.
+	DefinitionExpressionRepetition
 )
 
 // DefinitionExpression is a parsed character-level definition expression.
@@ -104,10 +107,13 @@ type DefinitionExpression struct {
 	// End is the final character literal in a range expression.
 	End Token
 
+	// Operator is the postfix operator token in a repetition expression.
+	Operator Token
+
 	// Terms are the alternative expressions in an alternation expression.
 	Terms []DefinitionExpression
 
-	// Inner is the expression contained in a grouped expression.
+	// Inner is the expression contained in a grouped or repetition expression.
 	Inner *DefinitionExpression
 
 	// Span is the byte range covered by the expression.
