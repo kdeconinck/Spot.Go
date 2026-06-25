@@ -48,6 +48,9 @@ const (
 	// TokenDotDot marks a character range operator.
 	TokenDotDot
 
+	// TokenPipe marks an alternation operator.
+	TokenPipe
+
 	// TokenCharacter marks a single-quoted character literal.
 	TokenCharacter
 )

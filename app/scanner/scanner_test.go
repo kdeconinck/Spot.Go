@@ -70,6 +70,24 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 33, 33),
 			},
 		},
+		"When scanning a definitions block with alternation, the expected tokens are returned.": {
+			inSource: "definitions { letter = 'a'..'z' | 'A'..'Z' }",
+			want: []syntax.Token{
+				token(syntax.TokenDefinitions, "definitions", 0, 11),
+				token(syntax.TokenLeftBrace, "{", 12, 13),
+				token(syntax.TokenIdentifier, "letter", 14, 20),
+				token(syntax.TokenEqual, "=", 21, 22),
+				token(syntax.TokenCharacter, "'a'", 23, 26),
+				token(syntax.TokenDotDot, "..", 26, 28),
+				token(syntax.TokenCharacter, "'z'", 28, 31),
+				token(syntax.TokenPipe, "|", 32, 33),
+				token(syntax.TokenCharacter, "'A'", 34, 37),
+				token(syntax.TokenDotDot, "..", 37, 39),
+				token(syntax.TokenCharacter, "'Z'", 39, 42),
+				token(syntax.TokenRightBrace, "}", 43, 44),
+				token(syntax.TokenEOF, "", 44, 44),
+			},
+		},
 		"When scanning a scope block with include and exclude entries, the expected tokens are returned.": {
 			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
 			want: []syntax.Token{
