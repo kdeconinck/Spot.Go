@@ -45,6 +45,14 @@ func (scanner *Scanner) Next() syntax.Token {
 	case '"':
 		return scanner.scanString(start)
 
+	case '\'':
+		return scanner.scanCharacter(start)
+
+	case '=':
+		scanner.offset++
+
+		return scanner.token(syntax.TokenEqual, start, scanner.offset)
+
 	case '{':
 		scanner.offset++
 
@@ -112,10 +120,53 @@ func (scanner *Scanner) scanIdentifier(start int) syntax.Token {
 	kind, ok := keywordMap[scanner.src[start:scanner.offset]]
 
 	if !ok {
-		kind = syntax.TokenInvalid
+		kind = syntax.TokenIdentifier
 	}
 
 	return scanner.token(kind, start, scanner.offset)
+}
+
+func (scanner *Scanner) scanCharacter(start int) syntax.Token {
+	scanner.offset++
+
+	if scanner.offset >= len(scanner.src) {
+		return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+	}
+
+	switch scanner.src[scanner.offset] {
+	case '\\':
+		if !scanner.hasValidCharacterEscape() {
+			scanner.offset++
+
+			return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+		}
+
+		scanner.offset += 2
+
+	case '\n', '\r':
+		return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+
+	default:
+		scanner.offset++
+	}
+
+	if scanner.offset >= len(scanner.src) || scanner.src[scanner.offset] != '\'' {
+		return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+	}
+
+	scanner.offset++
+
+	return scanner.token(syntax.TokenCharacter, start, scanner.offset)
+}
+
+func (scanner Scanner) hasValidCharacterEscape() bool {
+	switch scanner.peek(1) {
+	case '\\', '\'', 'n', 'r', 't':
+		return true
+
+	default:
+		return false
+	}
 }
 
 func (scanner *Scanner) scanString(start int) syntax.Token {

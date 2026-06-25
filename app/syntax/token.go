@@ -38,6 +38,15 @@ const (
 
 	// TokenString marks a double-quoted string literal.
 	TokenString
+
+	// TokenIdentifier marks a user-defined DSL name.
+	TokenIdentifier
+
+	// TokenEqual marks a definition assignment.
+	TokenEqual
+
+	// TokenCharacter marks a single-quoted character literal.
+	TokenCharacter
 )
 
 // Token is a lexical token from a Spot DSL source file.

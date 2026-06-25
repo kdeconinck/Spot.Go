@@ -44,6 +44,18 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 14, 14),
 			},
 		},
+		"When scanning a definitions block with a character definition, the expected tokens are returned.": {
+			inSource: "definitions { letter = 'a' }",
+			want: []syntax.Token{
+				token(syntax.TokenDefinitions, "definitions", 0, 11),
+				token(syntax.TokenLeftBrace, "{", 12, 13),
+				token(syntax.TokenIdentifier, "letter", 14, 20),
+				token(syntax.TokenEqual, "=", 21, 22),
+				token(syntax.TokenCharacter, "'a'", 23, 26),
+				token(syntax.TokenRightBrace, "}", 27, 28),
+				token(syntax.TokenEOF, "", 28, 28),
+			},
+		},
 		"When scanning a scope block with include and exclude entries, the expected tokens are returned.": {
 			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
 			want: []syntax.Token{
@@ -102,7 +114,7 @@ func Test_Scanner_Next(t *testing.T) {
 			inSource: "\"\\x\"",
 			want: []syntax.Token{
 				token(syntax.TokenInvalid, "\"\\", 0, 2),
-				token(syntax.TokenInvalid, "x", 2, 3),
+				token(syntax.TokenIdentifier, "x", 2, 3),
 				token(syntax.TokenInvalid, "\"", 3, 4),
 				token(syntax.TokenEOF, "", 4, 4),
 			},
@@ -122,10 +134,10 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 6, 6),
 			},
 		},
-		"When scanning unknown text, an invalid token is returned.": {
+		"When scanning identifier text, an identifier token is returned.": {
 			inSource: "x",
 			want: []syntax.Token{
-				token(syntax.TokenInvalid, "x", 0, 1),
+				token(syntax.TokenIdentifier, "x", 0, 1),
 				token(syntax.TokenEOF, "", 1, 1),
 			},
 		},
@@ -143,11 +155,42 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 1, 1),
 			},
 		},
-		"When scanning an identifier that starts with a keyword, an invalid token is returned.": {
+		"When scanning an identifier that starts with a keyword, an identifier token is returned.": {
 			inSource: "scopex",
 			want: []syntax.Token{
-				token(syntax.TokenInvalid, "scopex", 0, 6),
+				token(syntax.TokenIdentifier, "scopex", 0, 6),
 				token(syntax.TokenEOF, "", 6, 6),
+			},
+		},
+		"When scanning a character literal with a valid escape, a character token is returned.": {
+			inSource: `'\\'`,
+			want: []syntax.Token{
+				token(syntax.TokenCharacter, `'\\'`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		"When scanning a character literal with an invalid escape, an invalid token is returned.": {
+			inSource: `'\x'`,
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, `'\`, 0, 2),
+				token(syntax.TokenIdentifier, "x", 2, 3),
+				token(syntax.TokenInvalid, `'`, 3, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		"When scanning a character literal without a closing quote, an invalid token is returned.": {
+			inSource: "'a",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "'a", 0, 2),
+				token(syntax.TokenEOF, "", 2, 2),
+			},
+		},
+		"When scanning a character literal with a newline, an invalid token is returned.": {
+			inSource: "'\n'",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "'", 0, 1),
+				token(syntax.TokenInvalid, "'", 2, 3),
+				token(syntax.TokenEOF, "", 3, 3),
 			},
 		},
 	} {
@@ -180,19 +223,22 @@ func benchmark_Scanner_Next(b *testing.B, source string) {
 	}
 }
 
-func Benchmark_Scanner_Next_ScopeBlock_0(b *testing.B)    { benchmark_Scanner_Next_ScopeBlock(b, 0) }
-func Benchmark_Scanner_Next_ScopeBlock_1(b *testing.B)    { benchmark_Scanner_Next_ScopeBlock(b, 1) }
-func Benchmark_Scanner_Next_ScopeBlock_10(b *testing.B)   { benchmark_Scanner_Next_ScopeBlock(b, 10) }
-func Benchmark_Scanner_Next_ScopeBlock_100(b *testing.B)  { benchmark_Scanner_Next_ScopeBlock(b, 100) }
-func Benchmark_Scanner_Next_ScopeBlock_1000(b *testing.B) { benchmark_Scanner_Next_ScopeBlock(b, 1000) }
+func Benchmark_Scanner_Next_DSL_0(b *testing.B)    { benchmark_Scanner_Next_DSL(b, 0, 0) }
+func Benchmark_Scanner_Next_DSL_1(b *testing.B)    { benchmark_Scanner_Next_DSL(b, 1, 1) }
+func Benchmark_Scanner_Next_DSL_10(b *testing.B)   { benchmark_Scanner_Next_DSL(b, 10, 10) }
+func Benchmark_Scanner_Next_DSL_100(b *testing.B)  { benchmark_Scanner_Next_DSL(b, 100, 100) }
+func Benchmark_Scanner_Next_DSL_1000(b *testing.B) { benchmark_Scanner_Next_DSL(b, 1000, 1000) }
 
-func benchmark_Scanner_Next_ScopeBlock(b *testing.B, entryPairCount int) {
+func benchmark_Scanner_Next_DSL(b *testing.B, scopeEntryPairCount, definitionCount int) {
 	b.Helper()
 
 	inputData :=
 		"scope {\n" +
-			strings.Repeat("    include \"**/*.go\"\n", entryPairCount) +
-			strings.Repeat("    exclude \"vendor/**\"\n", entryPairCount) +
+			strings.Repeat("    include \"**/*.go\"\n", scopeEntryPairCount) +
+			strings.Repeat("    exclude \"vendor/**\"\n", scopeEntryPairCount) +
+			"}\n" +
+			"definitions {\n" +
+			strings.Repeat("    letter = 'a'\n", definitionCount) +
 			"}"
 
 	benchmark_Scanner_Next(b, inputData)
