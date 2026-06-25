@@ -79,6 +79,35 @@ func Test_Parse(t *testing.T) {
 			},
 		},
 		{
+			name:     "When parsing an empty definitions block, a document is returned.",
+			inSource: "scope {} definitions {}",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Span: span(9, 23),
+				},
+				Span: span(0, 23),
+			},
+		},
+		{
+			name:     "When parsing a definitions block with a character definition, a document is returned.",
+			inSource: "scope {} definitions { letter = 'a' }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						definition("letter", 23, 29, syntax.TokenCharacter, "'a'", 32, 35, 23, 35),
+					},
+					Span: span(9, 37),
+				},
+				Span: span(0, 37),
+			},
+		},
+		{
 			name:     "When the scope keyword is missing, a diagnostic is returned.",
 			inSource: "x",
 			wantDocument: syntax.Document{
@@ -159,6 +188,92 @@ func Test_Parse(t *testing.T) {
 				diagnostic("Expected 'EOF', found 'identifier'.", 9, 10),
 			},
 		},
+		{
+			name:     "When the definitions opening brace is missing, a diagnostic is returned.",
+			inSource: "scope {} definitions }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Span: span(9, 20),
+				},
+				Span: span(0, 20),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected '{', found '}'.", 21, 22),
+			},
+		},
+		{
+			name:     "When the definitions closing brace is missing, a diagnostic is returned.",
+			inSource: "scope {} definitions {",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Span: span(9, 22),
+				},
+				Span: span(0, 22),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected '}', found 'EOF'.", 22, 22),
+			},
+		},
+		{
+			name:     "When an unexpected token appears inside definitions, a diagnostic is returned.",
+			inSource: "scope {} definitions { 'a' }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Span: span(9, 26),
+				},
+				Span: span(0, 26),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected 'identifier', found 'character'.", 23, 26),
+			},
+		},
+		{
+			name:     "When a definition is missing an equal sign, a diagnostic is returned.",
+			inSource: "scope {} definitions { letter 'a' }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						definition("letter", 23, 29, syntax.TokenCharacter, "'a'", 30, 33, 23, 33),
+					},
+					Span: span(9, 35),
+				},
+				Span: span(0, 35),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected '=', found 'character'.", 30, 33),
+			},
+		},
+		{
+			name:     "When a definition is missing an expression, a diagnostic is returned.",
+			inSource: "scope {} definitions { letter = }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						definition("letter", 23, 29, syntax.TokenRightBrace, "}", 32, 33, 23, 33),
+					},
+					Span: span(9, 33),
+				},
+				Span: span(0, 33),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected 'character', found '}'.", 32, 33),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -198,7 +313,12 @@ func benchmark_Parse_DSL(b *testing.B, size int) {
 }
 
 func dsl(size int) string {
-	return "scope {\n" + strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) + "}"
+	return "scope {\n" +
+		strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) +
+		"}\n" +
+		"definitions {\n" +
+		strings.Repeat("    letter = 'a'\n", size) +
+		"}"
 }
 
 func diagnostic(message string, start, end location.Position) parser.Diagnostic {
@@ -224,5 +344,21 @@ func scopeEntry(kind syntax.ScopeEntryKind, patternKind syntax.TokenKind, patter
 			Span: span(patternStart, patternEnd),
 		},
 		Span: span(entryStart, entryEnd),
+	}
+}
+
+func definition(name string, nameStart, nameEnd location.Position, expressionKind syntax.TokenKind, expression string, expressionStart, expressionEnd, definitionStart, definitionEnd location.Position) syntax.Definition {
+	return syntax.Definition{
+		Name: syntax.Token{
+			Kind: syntax.TokenIdentifier,
+			Text: name,
+			Span: span(nameStart, nameEnd),
+		},
+		Expression: syntax.Token{
+			Kind: expressionKind,
+			Text: expression,
+			Span: span(expressionStart, expressionEnd),
+		},
+		Span: span(definitionStart, definitionEnd),
 	}
 }

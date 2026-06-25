@@ -13,6 +13,9 @@ type Document struct {
 	// Scope is the parsed scope section.
 	Scope ScopeSection
 
+	// Definitions is the parsed definitions section.
+	Definitions DefinitionsSection
+
 	// Span is the byte range covered by the document.
 	Span location.Span
 }
@@ -46,5 +49,26 @@ type ScopeEntry struct {
 	Pattern Token
 
 	// Span is the byte range covered by the scope entry.
+	Span location.Span
+}
+
+// DefinitionsSection is a parsed definitions section.
+type DefinitionsSection struct {
+	// Definitions are the declarations inside the definitions section.
+	Definitions []Definition
+
+	// Span is the byte range covered by the definitions section.
+	Span location.Span
+}
+
+// Definition is a reusable character-level expression declaration.
+type Definition struct {
+	// Name is the identifier token naming the definition.
+	Name Token
+
+	// Expression is the character literal token assigned to the definition.
+	Expression Token
+
+	// Span is the byte range covered by the definition.
 	Span location.Span
 }

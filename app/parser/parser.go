@@ -39,13 +39,97 @@ func (parser *parser) parseDocument() syntax.Document {
 		}
 	}
 
+	var definitions syntax.DefinitionsSection
+	endPosition := scope.Span.End
+
+	if parser.current.Kind == syntax.TokenDefinitions {
+		definitions, ok = parser.parseDefinitionsSection()
+		endPosition = definitions.Span.End
+
+		if !ok {
+			return syntax.Document{
+				Scope:       scope,
+				Definitions: definitions,
+				Span: location.Span{
+					Start: scope.Span.Start,
+					End:   endPosition,
+				},
+			}
+		}
+	}
+
 	end := parser.expect(syntax.TokenEOF)
 
 	return syntax.Document{
-		Scope: scope,
+		Scope:       scope,
+		Definitions: definitions,
 		Span: location.Span{
 			Start: scope.Span.Start,
 			End:   end.Span.End,
+		},
+	}
+}
+
+func (parser *parser) parseDefinitionsSection() (syntax.DefinitionsSection, bool) {
+	start := parser.current
+	parser.advance()
+
+	if parser.current.Kind != syntax.TokenLeftBrace {
+		parser.addDiagnostic(syntax.TokenLeftBrace)
+
+		return syntax.DefinitionsSection{
+			Span: start.Span,
+		}, false
+	}
+
+	parser.advance()
+
+	var definitions []syntax.Definition
+
+	for parser.current.Kind == syntax.TokenIdentifier {
+		definitions = append(definitions, parser.parseDefinition())
+	}
+
+	if parser.current.Kind != syntax.TokenRightBrace {
+		if parser.current.Kind == syntax.TokenEOF {
+			parser.addDiagnostic(syntax.TokenRightBrace)
+		} else {
+			parser.addDiagnostic(syntax.TokenIdentifier)
+		}
+
+		return syntax.DefinitionsSection{
+			Definitions: definitions,
+			Span: location.Span{
+				Start: start.Span.Start,
+				End:   parser.current.Span.End,
+			},
+		}, false
+	}
+
+	end := parser.current
+	parser.advance()
+
+	return syntax.DefinitionsSection{
+		Definitions: definitions,
+		Span: location.Span{
+			Start: start.Span.Start,
+			End:   end.Span.End,
+		},
+	}, true
+}
+
+func (parser *parser) parseDefinition() syntax.Definition {
+	name := parser.current
+	parser.advance()
+	parser.expect(syntax.TokenEqual)
+	expression := parser.expect(syntax.TokenCharacter)
+
+	return syntax.Definition{
+		Name:       name,
+		Expression: expression,
+		Span: location.Span{
+			Start: name.Span.Start,
+			End:   expression.Span.End,
 		},
 	}
 }
