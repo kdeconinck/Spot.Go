@@ -17,6 +17,15 @@ const (
 
 	// TokenEOF marks the end of a token stream.
 	TokenEOF
+
+	// TokenScope marks the 'scope' section keyword.
+	TokenScope
+
+	// TokenLeftBrace marks the start of a section block.
+	TokenLeftBrace
+
+	// TokenRightBrace marks the end of a section block.
+	TokenRightBrace
 )
 
 // Token is a lexical token from a Spot DSL source file.
