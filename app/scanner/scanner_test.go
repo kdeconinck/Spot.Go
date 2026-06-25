@@ -693,6 +693,47 @@ func Test_Scanner_Next_ScansIdentifiers(t *testing.T) {
 	}
 }
 
+func Test_Scanner_Next_ScansIntegers(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name     string
+		inSource string
+		want     []syntax.Token
+	}{
+		{
+			name:     "When scanning a single digit, an integer token is returned.",
+			inSource: "1",
+			want: []syntax.Token{
+				token(syntax.TokenInteger, "1", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning multiple digits, an integer token is returned.",
+			inSource: "123",
+			want: []syntax.Token{
+				token(syntax.TokenInteger, "123", 0, 3),
+				token(syntax.TokenEOF, "", 3, 3),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange.
+			scan := scanner.New(tc.inSource)
+
+			// Act & assert.
+			for idx := range tc.want {
+				got := scan.Next()
+
+				claim.Equal(t, tc.name, tc.want[idx], got, "Token")
+			}
+		})
+	}
+}
+
 func Test_Scanner_Next_ReturnsInvalidToken(t *testing.T) {
 	t.Parallel()
 
@@ -716,7 +757,7 @@ func Test_Scanner_Next_PreservesSpans(t *testing.T) {
 	}{
 		{
 			name:     "When scanning realistic DSL source, token spans are preserved.",
-			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }\ndefinitions { letter = 'a'..'z' | 'A'..'Z' }\ntokens { Whitespace = ' '+ skip }\nrules { rule PublicIdentifier { match Identifier where Identifier.text == \"public\" report warn at Identifier \"Public identifier found\" } }",
+			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }\ndefinitions { letter = 'a'..'z' | 'A'..'Z' }\ntokens { Whitespace = ' '+ skip }\nrules { rule PublicIdentifier { match Identifier where Identifier.length > 1 report warn at Identifier \"Public identifier found\" } }",
 			want: []syntax.Token{
 				token(syntax.TokenScope, "scope", 0, 5),
 				token(syntax.TokenLeftBrace, "{", 6, 7),
@@ -755,17 +796,17 @@ func Test_Scanner_Next_PreservesSpans(t *testing.T) {
 				token(syntax.TokenWhere, "where", 176, 181),
 				token(syntax.TokenIdentifier, "Identifier", 182, 192),
 				token(syntax.TokenDot, ".", 192, 193),
-				token(syntax.TokenIdentifier, "text", 193, 197),
-				token(syntax.TokenEqualEqual, "==", 198, 200),
-				token(syntax.TokenString, "\"public\"", 201, 209),
-				token(syntax.TokenReport, "report", 210, 216),
-				token(syntax.TokenWarn, "warn", 217, 221),
-				token(syntax.TokenAt, "at", 222, 224),
-				token(syntax.TokenIdentifier, "Identifier", 225, 235),
-				token(syntax.TokenString, "\"Public identifier found\"", 236, 261),
-				token(syntax.TokenRightBrace, "}", 262, 263),
-				token(syntax.TokenRightBrace, "}", 264, 265),
-				token(syntax.TokenEOF, "", 265, 265),
+				token(syntax.TokenIdentifier, "length", 193, 199),
+				token(syntax.TokenGreater, ">", 200, 201),
+				token(syntax.TokenInteger, "1", 202, 203),
+				token(syntax.TokenReport, "report", 204, 210),
+				token(syntax.TokenWarn, "warn", 211, 215),
+				token(syntax.TokenAt, "at", 216, 218),
+				token(syntax.TokenIdentifier, "Identifier", 219, 229),
+				token(syntax.TokenString, "\"Public identifier found\"", 230, 255),
+				token(syntax.TokenRightBrace, "}", 256, 257),
+				token(syntax.TokenRightBrace, "}", 258, 259),
+				token(syntax.TokenEOF, "", 259, 259),
 			},
 		},
 	} {
@@ -817,7 +858,7 @@ func benchmark_Scanner_Next_DSL(b *testing.B, size int) {
 			strings.Repeat("    Whitespace = ' '+ skip\n", size) +
 			"}\n" +
 			"rules {\n" +
-			strings.Repeat("    rule PublicIdentifier { match Identifier where Identifier.text == \"public\" report warn at Identifier \"Public identifier found\" }\n", size) +
+			strings.Repeat("    rule PublicIdentifier { match Identifier where Identifier.length > 1 report warn at Identifier \"Public identifier found\" }\n", size) +
 			"}"
 
 	benchmark_Scanner_Next(b, inputData)

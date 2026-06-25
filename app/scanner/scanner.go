@@ -159,6 +159,10 @@ func (scanner *Scanner) Next() syntax.Token {
 		return scanner.scanIdentifier(start)
 	}
 
+	if isDigit(scanner.src[scanner.offset]) {
+		return scanner.scanInteger(start)
+	}
+
 	scanner.offset++
 
 	return scanner.token(syntax.TokenInvalid, start, scanner.offset)
@@ -215,6 +219,16 @@ func (scanner *Scanner) scanIdentifier(start int) syntax.Token {
 	}
 
 	return scanner.token(kind, start, scanner.offset)
+}
+
+func (scanner *Scanner) scanInteger(start int) syntax.Token {
+	scanner.offset++
+
+	for scanner.offset < len(scanner.src) && isDigit(scanner.src[scanner.offset]) {
+		scanner.offset++
+	}
+
+	return scanner.token(syntax.TokenInteger, start, scanner.offset)
 }
 
 func (scanner *Scanner) scanCharacter(start int) syntax.Token {
@@ -317,4 +331,8 @@ func isIdentifierStart(ch byte) bool {
 
 func isIdentifierPart(ch byte) bool {
 	return isIdentifierStart(ch) || ('0' <= ch && ch <= '9') || ch == '_'
+}
+
+func isDigit(ch byte) bool {
+	return '0' <= ch && ch <= '9'
 }

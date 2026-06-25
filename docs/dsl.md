@@ -145,6 +145,18 @@ Supported escapes are:
 
 String literals are used for exact text matches and diagnostic messages.
 
+## Integer Literals
+
+Integer literals use decimal digits.
+
+```spot
+0
+1
+123
+```
+
+Integer literals are used for numeric rule conditions, such as token length comparisons.
+
 # Scope Section
 
 The `scope` section defines which files are analyzed.

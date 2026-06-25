@@ -78,6 +78,9 @@ const (
 	// TokenString marks a double-quoted string literal.
 	TokenString
 
+	// TokenInteger marks a decimal integer literal.
+	TokenInteger
+
 	// TokenIdentifier marks a user-defined DSL name.
 	TokenIdentifier
 
