@@ -53,6 +53,38 @@ func Test_Parse_Rules(t *testing.T) {
 			},
 		},
 		{
+			name:     "When parsing a rules block with a string condition, a document is returned.",
+			inSource: "scope {} rules { rule PublicIdentifier { match Identifier where Identifier.text == \"public\" report warn at Identifier \"Public identifier found\" } }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Rules: syntax.RulesSection{
+					Rules: []syntax.Rule{
+						ruleWithWhere("PublicIdentifier", 22, 38, ruleMatch("Identifier", 47, 57, 41, 57), ruleCondition("Identifier", 64, 74, "text", 75, 79, syntax.TokenEqualEqual, "==", 80, 82, syntax.TokenString, "\"public\"", 83, 91, 58, 91), ruleReport(syntax.TokenWarn, "warn", 99, 103, "Identifier", 107, 117, "\"Public identifier found\"", 118, 143, 92, 143), 17, 145),
+					},
+					Span: span(9, 147),
+				},
+				Span: span(0, 147),
+			},
+		},
+		{
+			name:     "When parsing a rules block with an integer condition, a document is returned.",
+			inSource: "scope {} rules { rule LongIdentifier { match Identifier where Identifier.length > 3 report warn at Identifier \"Long identifier found\" } }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Rules: syntax.RulesSection{
+					Rules: []syntax.Rule{
+						ruleWithWhere("LongIdentifier", 22, 36, ruleMatch("Identifier", 45, 55, 39, 55), ruleCondition("Identifier", 62, 72, "length", 73, 79, syntax.TokenGreater, ">", 80, 81, syntax.TokenInteger, "3", 82, 83, 56, 83), ruleReport(syntax.TokenWarn, "warn", 91, 95, "Identifier", 99, 109, "\"Long identifier found\"", 110, 133, 84, 133), 17, 135),
+					},
+					Span: span(9, 137),
+				},
+				Span: span(0, 137),
+			},
+		},
+		{
 			name:     "When the rules opening brace is missing, a diagnostic is returned.",
 			inSource: "scope {} rules }",
 			wantDocument: syntax.Document{
@@ -158,6 +190,63 @@ func Test_Parse_Rules(t *testing.T) {
 				diagnostic("Expected 'warn', found 'at'.", 65, 67),
 			},
 		},
+		{
+			name:     "When a where property is missing, a diagnostic is returned.",
+			inSource: "scope {} rules { rule PublicIdentifier { match Identifier where Identifier. == \"public\" report warn at Identifier \"x\" } }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Rules: syntax.RulesSection{
+					Rules: []syntax.Rule{
+						ruleWithWhere("PublicIdentifier", 22, 38, ruleMatch("Identifier", 47, 57, 41, 57), ruleConditionWithKinds("Identifier", syntax.TokenIdentifier, 64, 74, "==", syntax.TokenEqualEqual, 76, 78, "==", syntax.TokenEqualEqual, 76, 78, "\"public\"", syntax.TokenString, 79, 87, 58, 87), ruleReport(syntax.TokenWarn, "warn", 95, 99, "Identifier", 103, 113, "\"x\"", 114, 117, 88, 117), 17, 119),
+					},
+					Span: span(9, 121),
+				},
+				Span: span(0, 121),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected 'identifier', found '=='.", 76, 78),
+			},
+		},
+		{
+			name:     "When a where operator is missing, a diagnostic is returned.",
+			inSource: "scope {} rules { rule PublicIdentifier { match Identifier where Identifier.text \"public\" report warn at Identifier \"x\" } }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Rules: syntax.RulesSection{
+					Rules: []syntax.Rule{
+						ruleWithWhere("PublicIdentifier", 22, 38, ruleMatch("Identifier", 47, 57, 41, 57), ruleCondition("Identifier", 64, 74, "text", 75, 79, syntax.TokenString, "\"public\"", 80, 88, syntax.TokenString, "\"public\"", 80, 88, 58, 88), ruleReport(syntax.TokenWarn, "warn", 96, 100, "Identifier", 104, 114, "\"x\"", 115, 118, 89, 118), 17, 120),
+					},
+					Span: span(9, 122),
+				},
+				Span: span(0, 122),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected '==', found 'string'.", 80, 88),
+			},
+		},
+		{
+			name:     "When a where literal is missing, a diagnostic is returned.",
+			inSource: "scope {} rules { rule PublicIdentifier { match Identifier where Identifier.text == report warn at Identifier \"x\" } }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Rules: syntax.RulesSection{
+					Rules: []syntax.Rule{
+						ruleWithWhere("PublicIdentifier", 22, 38, ruleMatch("Identifier", 47, 57, 41, 57), ruleCondition("Identifier", 64, 74, "text", 75, 79, syntax.TokenEqualEqual, "==", 80, 82, syntax.TokenReport, "report", 83, 89, 58, 89), ruleReport(syntax.TokenWarn, "warn", 90, 94, "Identifier", 98, 108, "\"x\"", 109, 112, 83, 112), 17, 114),
+					},
+					Span: span(9, 116),
+				},
+				Span: span(0, 116),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected 'string', found 'report'.", 83, 89),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -194,6 +283,6 @@ func rulesDSL(size int) string {
 		"    Identifier = \"identifier\"\n" +
 		"}\n" +
 		"rules {\n" +
-		strings.Repeat("    rule PublicIdentifier {\n        match Identifier\n        report warn at Identifier \"Public identifier found\"\n    }\n", size) +
+		strings.Repeat("    rule PublicIdentifier {\n        match Identifier\n        where Identifier.text == \"public\"\n        report warn at Identifier \"Public identifier found\"\n    }\n", size) +
 		"}"
 }

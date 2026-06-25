@@ -120,6 +120,9 @@ type Rule struct {
 	// Match is the token match statement for the rule.
 	Match RuleMatch
 
+	// Where is the optional condition statement for the rule.
+	Where RuleCondition
+
 	// Report is the diagnostic report statement for the rule.
 	Report RuleReport
 
@@ -133,6 +136,24 @@ type RuleMatch struct {
 	Token Token
 
 	// Span is the byte range covered by the match statement.
+	Span location.Span
+}
+
+// RuleCondition is a comparison condition inside a rule.
+type RuleCondition struct {
+	// Subject is the identifier token naming the token being inspected.
+	Subject Token
+
+	// Property is the identifier token naming the inspected token property.
+	Property Token
+
+	// Operator is the comparison operator token.
+	Operator Token
+
+	// Value is the literal token compared against the property.
+	Value Token
+
+	// Span is the byte range covered by the where statement.
 	Span location.Span
 }
 

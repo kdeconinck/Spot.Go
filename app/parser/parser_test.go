@@ -50,11 +50,11 @@ func Test_Parse_DSL(t *testing.T) {
 		},
 		Rules: syntax.RulesSection{
 			Rules: []syntax.Rule{
-				rule("PublicIdentifier", 305, 321, ruleMatch("Identifier", 338, 348, 332, 348), ruleReport(syntax.TokenWarn, "warn", 364, 368, "Identifier", 372, 382, "\"Public identifier found\"", 383, 408, 357, 408), 300, 414),
+				ruleWithWhere("PublicIdentifier", 305, 321, ruleMatch("Identifier", 338, 348, 332, 348), ruleCondition("Identifier", 363, 373, "text", 374, 378, syntax.TokenEqualEqual, "==", 379, 381, syntax.TokenString, "\"public\"", 382, 390, 357, 390), ruleReport(syntax.TokenWarn, "warn", 406, 410, "Identifier", 414, 424, "\"Public identifier found\"", 425, 450, 399, 450), 300, 456),
 			},
-			Span: span(288, 416),
+			Span: span(288, 458),
 		},
-		Span: span(0, 416),
+		Span: span(0, 458),
 	}
 
 	// Act.
@@ -96,7 +96,7 @@ func dsl(size int) string {
 		strings.Repeat("    Identifier = identifierStart value*\n    KeywordPublic = \"public\"\n    Whitespace = (' ' | '\\t')+ skip\n", size) +
 		"}\n" +
 		"rules {\n" +
-		strings.Repeat("    rule PublicIdentifier {\n        match Identifier\n        report warn at Identifier \"Public identifier found\"\n    }\n", size) +
+		strings.Repeat("    rule PublicIdentifier {\n        match Identifier\n        where Identifier.text == \"public\"\n        report warn at Identifier \"Public identifier found\"\n    }\n", size) +
 		"}"
 }
 
@@ -156,6 +156,10 @@ func tokenDefinitionWithSkip(name string, nameStart, nameEnd location.Position, 
 }
 
 func rule(name string, nameStart, nameEnd location.Position, match syntax.RuleMatch, report syntax.RuleReport, ruleStart, ruleEnd location.Position) syntax.Rule {
+	return ruleWithWhere(name, nameStart, nameEnd, match, syntax.RuleCondition{}, report, ruleStart, ruleEnd)
+}
+
+func ruleWithWhere(name string, nameStart, nameEnd location.Position, match syntax.RuleMatch, where syntax.RuleCondition, report syntax.RuleReport, ruleStart, ruleEnd location.Position) syntax.Rule {
 	return syntax.Rule{
 		Name: syntax.Token{
 			Kind: syntax.TokenIdentifier,
@@ -163,6 +167,7 @@ func rule(name string, nameStart, nameEnd location.Position, match syntax.RuleMa
 			Span: span(nameStart, nameEnd),
 		},
 		Match:  match,
+		Where:  where,
 		Report: report,
 		Span:   span(ruleStart, ruleEnd),
 	}
@@ -180,6 +185,36 @@ func ruleMatchWithKind(kind syntax.TokenKind, token string, tokenStart, tokenEnd
 			Span: span(tokenStart, tokenEnd),
 		},
 		Span: span(matchStart, matchEnd),
+	}
+}
+
+func ruleCondition(subject string, subjectStart, subjectEnd location.Position, property string, propertyStart, propertyEnd location.Position, operatorKind syntax.TokenKind, operator string, operatorStart, operatorEnd location.Position, valueKind syntax.TokenKind, value string, valueStart, valueEnd, conditionStart, conditionEnd location.Position) syntax.RuleCondition {
+	return ruleConditionWithKinds(subject, syntax.TokenIdentifier, subjectStart, subjectEnd, property, syntax.TokenIdentifier, propertyStart, propertyEnd, operator, operatorKind, operatorStart, operatorEnd, value, valueKind, valueStart, valueEnd, conditionStart, conditionEnd)
+}
+
+func ruleConditionWithKinds(subject string, subjectKind syntax.TokenKind, subjectStart, subjectEnd location.Position, property string, propertyKind syntax.TokenKind, propertyStart, propertyEnd location.Position, operator string, operatorKind syntax.TokenKind, operatorStart, operatorEnd location.Position, value string, valueKind syntax.TokenKind, valueStart, valueEnd, conditionStart, conditionEnd location.Position) syntax.RuleCondition {
+	return syntax.RuleCondition{
+		Subject: syntax.Token{
+			Kind: subjectKind,
+			Text: subject,
+			Span: span(subjectStart, subjectEnd),
+		},
+		Property: syntax.Token{
+			Kind: propertyKind,
+			Text: property,
+			Span: span(propertyStart, propertyEnd),
+		},
+		Operator: syntax.Token{
+			Kind: operatorKind,
+			Text: operator,
+			Span: span(operatorStart, operatorEnd),
+		},
+		Value: syntax.Token{
+			Kind: valueKind,
+			Text: value,
+			Span: span(valueStart, valueEnd),
+		},
+		Span: span(conditionStart, conditionEnd),
 	}
 }
 

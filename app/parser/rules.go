@@ -51,12 +51,14 @@ func (parser *parser) parseRule() syntax.Rule {
 	}
 
 	match := parser.parseRuleMatch()
+	where := parser.parseOptionalRuleCondition()
 	report := parser.parseRuleReport()
 	end := parser.expect(syntax.TokenRightBrace)
 
 	return syntax.Rule{
 		Name:   name,
 		Match:  match,
+		Where:  where,
 		Report: report,
 		Span:   span(start.Span.Start, end.Span.End),
 	}
@@ -69,6 +71,31 @@ func (parser *parser) parseRuleMatch() syntax.RuleMatch {
 	return syntax.RuleMatch{
 		Token: token,
 		Span:  span(start.Span.Start, token.Span.End),
+	}
+}
+
+func (parser *parser) parseOptionalRuleCondition() syntax.RuleCondition {
+	if !parser.at(syntax.TokenWhere) {
+		return syntax.RuleCondition{}
+	}
+
+	return parser.parseRuleCondition()
+}
+
+func (parser *parser) parseRuleCondition() syntax.RuleCondition {
+	start := parser.expect(syntax.TokenWhere)
+	subject := parser.expect(syntax.TokenIdentifier)
+	parser.expect(syntax.TokenDot)
+	property := parser.expect(syntax.TokenIdentifier)
+	operator := parser.expectComparisonOperator()
+	value := parser.expectConditionLiteral()
+
+	return syntax.RuleCondition{
+		Subject:  subject,
+		Property: property,
+		Operator: operator,
+		Value:    value,
+		Span:     span(start.Span.Start, value.Span.End),
 	}
 }
 
@@ -85,6 +112,39 @@ func (parser *parser) parseRuleReport() syntax.RuleReport {
 		Message:  message,
 		Span:     span(start.Span.Start, message.Span.End),
 	}
+}
+
+func (parser *parser) expectComparisonOperator() syntax.Token {
+	if parser.at(syntax.TokenEqualEqual) ||
+		parser.at(syntax.TokenBangEqual) ||
+		parser.at(syntax.TokenLess) ||
+		parser.at(syntax.TokenLessEqual) ||
+		parser.at(syntax.TokenGreater) ||
+		parser.at(syntax.TokenGreaterEqual) {
+		token := parser.current
+		parser.advance()
+
+		return token
+	}
+
+	token := parser.current
+	parser.addDiagnostic(syntax.TokenEqualEqual)
+
+	return token
+}
+
+func (parser *parser) expectConditionLiteral() syntax.Token {
+	if parser.at(syntax.TokenString) || parser.at(syntax.TokenInteger) {
+		token := parser.current
+		parser.advance()
+
+		return token
+	}
+
+	token := parser.current
+	parser.addDiagnostic(syntax.TokenString)
+
+	return token
 }
 
 func (parser *parser) expectSeverity() syntax.Token {
