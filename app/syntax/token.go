@@ -21,17 +21,23 @@ const (
 	// TokenScope marks the 'scope' section keyword.
 	TokenScope
 
+	// TokenInclude marks a scope include entry.
+	TokenInclude
+
+	// TokenExclude marks a scope exclude entry.
+	TokenExclude
+
 	// TokenDefinitions marks the 'definitions' section keyword.
 	TokenDefinitions
 
 	// TokenTokens marks the 'tokens' section keyword.
 	TokenTokens
 
-	// TokenRules marks the 'rules' section keyword.
-	TokenRules
-
 	// TokenSkip marks a skipped token declaration.
 	TokenSkip
+
+	// TokenRules marks the 'rules' section keyword.
+	TokenRules
 
 	// TokenRule marks a rule declaration.
 	TokenRule
@@ -45,9 +51,6 @@ const (
 	// TokenReport marks a rule report statement.
 	TokenReport
 
-	// TokenAt marks a rule report target.
-	TokenAt
-
 	// TokenInfo marks an informational diagnostic severity.
 	TokenInfo
 
@@ -57,23 +60,11 @@ const (
 	// TokenErr marks an error diagnostic severity.
 	TokenErr
 
-	// TokenInclude marks a scope include entry.
-	TokenInclude
-
-	// TokenExclude marks a scope exclude entry.
-	TokenExclude
+	// TokenAt marks a rule report target.
+	TokenAt
 
 	// TokenLeftBrace marks the start of a section block.
 	TokenLeftBrace
-
-	// TokenRightBrace marks the end of a section block.
-	TokenRightBrace
-
-	// TokenLeftParen marks the start of an expression group.
-	TokenLeftParen
-
-	// TokenRightParen marks the end of an expression group.
-	TokenRightParen
 
 	// TokenString marks a double-quoted string literal.
 	TokenString
@@ -83,6 +74,18 @@ const (
 
 	// TokenIdentifier marks a user-defined DSL name.
 	TokenIdentifier
+
+	// TokenCharacter marks a single-quoted character literal.
+	TokenCharacter
+
+	// TokenRightBrace marks the end of a section block.
+	TokenRightBrace
+
+	// TokenLeftParen marks the start of an expression group.
+	TokenLeftParen
+
+	// TokenRightParen marks the end of an expression group.
+	TokenRightParen
 
 	// TokenEqual marks a definition assignment.
 	TokenEqual
@@ -122,9 +125,6 @@ const (
 
 	// TokenPlus marks one-or-more repetition.
 	TokenPlus
-
-	// TokenCharacter marks a single-quoted character literal.
-	TokenCharacter
 )
 
 // Token is a lexical token from a Spot DSL source file.
@@ -137,4 +137,126 @@ type Token struct {
 
 	// Span is the byte range covered by the token.
 	Span location.Span
+}
+
+// String returns a stable display name for kind.
+func (kind TokenKind) String() string {
+	switch kind {
+	case TokenInvalid:
+		return "invalid"
+
+	case TokenEOF:
+		return "EOF"
+
+	case TokenScope:
+		return "scope"
+
+	case TokenInclude:
+		return "include"
+
+	case TokenExclude:
+		return "exclude"
+
+	case TokenDefinitions:
+		return "definitions"
+
+	case TokenTokens:
+		return "tokens"
+
+	case TokenSkip:
+		return "skip"
+
+	case TokenRules:
+		return "rules"
+
+	case TokenRule:
+		return "rule"
+
+	case TokenMatch:
+		return "match"
+
+	case TokenWhere:
+		return "where"
+
+	case TokenReport:
+		return "report"
+
+	case TokenInfo:
+		return "info"
+
+	case TokenWarn:
+		return "warn"
+
+	case TokenErr:
+		return "err"
+
+	case TokenAt:
+		return "at"
+
+	case TokenString:
+		return "string"
+
+	case TokenInteger:
+		return "integer"
+
+	case TokenIdentifier:
+		return "identifier"
+
+	case TokenCharacter:
+		return "character"
+
+	case TokenLeftBrace:
+		return "{"
+
+	case TokenRightBrace:
+		return "}"
+
+	case TokenLeftParen:
+		return "("
+
+	case TokenRightParen:
+		return ")"
+
+	case TokenEqual:
+		return "="
+
+	case TokenEqualEqual:
+		return "=="
+
+	case TokenBangEqual:
+		return "!="
+
+	case TokenLess:
+		return "<"
+
+	case TokenLessEqual:
+		return "<="
+
+	case TokenGreater:
+		return ">"
+
+	case TokenGreaterEqual:
+		return ">="
+
+	case TokenDot:
+		return "."
+
+	case TokenDotDot:
+		return ".."
+
+	case TokenPipe:
+		return "|"
+
+	case TokenQuestion:
+		return "?"
+
+	case TokenStar:
+		return "*"
+
+	case TokenPlus:
+		return "+"
+
+	default:
+		return "unknown"
+	}
 }
