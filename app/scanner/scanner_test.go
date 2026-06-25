@@ -19,229 +19,266 @@ import (
 	"github.com/kdeconinck/spot/syntax"
 )
 
-func Test_Scanner_Next(t *testing.T) {
+func Test_Scanner_Next_SkipsTrivia(t *testing.T) {
 	t.Parallel()
 
-	for tcName, tc := range map[string]struct {
+	for _, tc := range []struct {
+		name     string
 		inSource string
 		want     []syntax.Token
 	}{
-		"When scanning an empty scope block, the expected tokens are returned.": {
-			inSource: "scope {}",
+		{
+			name:     "When source starts with a space, the space is skipped.",
+			inSource: " scope",
 			want: []syntax.Token{
-				token(syntax.TokenScope, "scope", 0, 5),
-				token(syntax.TokenLeftBrace, "{", 6, 7),
-				token(syntax.TokenRightBrace, "}", 7, 8),
-				token(syntax.TokenEOF, "", 8, 8),
-			},
-		},
-		"When scanning an empty definitions block, the expected tokens are returned.": {
-			inSource: "definitions {}",
-			want: []syntax.Token{
-				token(syntax.TokenDefinitions, "definitions", 0, 11),
-				token(syntax.TokenLeftBrace, "{", 12, 13),
-				token(syntax.TokenRightBrace, "}", 13, 14),
-				token(syntax.TokenEOF, "", 14, 14),
-			},
-		},
-		"When scanning a definitions block with a character definition, the expected tokens are returned.": {
-			inSource: "definitions { letter = 'a' }",
-			want: []syntax.Token{
-				token(syntax.TokenDefinitions, "definitions", 0, 11),
-				token(syntax.TokenLeftBrace, "{", 12, 13),
-				token(syntax.TokenIdentifier, "letter", 14, 20),
-				token(syntax.TokenEqual, "=", 21, 22),
-				token(syntax.TokenCharacter, "'a'", 23, 26),
-				token(syntax.TokenRightBrace, "}", 27, 28),
-				token(syntax.TokenEOF, "", 28, 28),
-			},
-		},
-		"When scanning a definitions block with a character range, the expected tokens are returned.": {
-			inSource: "definitions { letter = 'a'..'z' }",
-			want: []syntax.Token{
-				token(syntax.TokenDefinitions, "definitions", 0, 11),
-				token(syntax.TokenLeftBrace, "{", 12, 13),
-				token(syntax.TokenIdentifier, "letter", 14, 20),
-				token(syntax.TokenEqual, "=", 21, 22),
-				token(syntax.TokenCharacter, "'a'", 23, 26),
-				token(syntax.TokenDotDot, "..", 26, 28),
-				token(syntax.TokenCharacter, "'z'", 28, 31),
-				token(syntax.TokenRightBrace, "}", 32, 33),
-				token(syntax.TokenEOF, "", 33, 33),
-			},
-		},
-		"When scanning a definitions block with alternation, the expected tokens are returned.": {
-			inSource: "definitions { letter = 'a'..'z' | 'A'..'Z' }",
-			want: []syntax.Token{
-				token(syntax.TokenDefinitions, "definitions", 0, 11),
-				token(syntax.TokenLeftBrace, "{", 12, 13),
-				token(syntax.TokenIdentifier, "letter", 14, 20),
-				token(syntax.TokenEqual, "=", 21, 22),
-				token(syntax.TokenCharacter, "'a'", 23, 26),
-				token(syntax.TokenDotDot, "..", 26, 28),
-				token(syntax.TokenCharacter, "'z'", 28, 31),
-				token(syntax.TokenPipe, "|", 32, 33),
-				token(syntax.TokenCharacter, "'A'", 34, 37),
-				token(syntax.TokenDotDot, "..", 37, 39),
-				token(syntax.TokenCharacter, "'Z'", 39, 42),
-				token(syntax.TokenRightBrace, "}", 43, 44),
-				token(syntax.TokenEOF, "", 44, 44),
-			},
-		},
-		"When scanning a definitions block with grouping, the expected tokens are returned.": {
-			inSource: "definitions { value = ('a' | 'b') }",
-			want: []syntax.Token{
-				token(syntax.TokenDefinitions, "definitions", 0, 11),
-				token(syntax.TokenLeftBrace, "{", 12, 13),
-				token(syntax.TokenIdentifier, "value", 14, 19),
-				token(syntax.TokenEqual, "=", 20, 21),
-				token(syntax.TokenLeftParen, "(", 22, 23),
-				token(syntax.TokenCharacter, "'a'", 23, 26),
-				token(syntax.TokenPipe, "|", 27, 28),
-				token(syntax.TokenCharacter, "'b'", 29, 32),
-				token(syntax.TokenRightParen, ")", 32, 33),
-				token(syntax.TokenRightBrace, "}", 34, 35),
-				token(syntax.TokenEOF, "", 35, 35),
-			},
-		},
-		"When scanning a definitions block with repetition, the expected tokens are returned.": {
-			inSource: "definitions { value = 'a'? 'b'* 'c'+ }",
-			want: []syntax.Token{
-				token(syntax.TokenDefinitions, "definitions", 0, 11),
-				token(syntax.TokenLeftBrace, "{", 12, 13),
-				token(syntax.TokenIdentifier, "value", 14, 19),
-				token(syntax.TokenEqual, "=", 20, 21),
-				token(syntax.TokenCharacter, "'a'", 22, 25),
-				token(syntax.TokenQuestion, "?", 25, 26),
-				token(syntax.TokenCharacter, "'b'", 27, 30),
-				token(syntax.TokenStar, "*", 30, 31),
-				token(syntax.TokenCharacter, "'c'", 32, 35),
-				token(syntax.TokenPlus, "+", 35, 36),
-				token(syntax.TokenRightBrace, "}", 37, 38),
-				token(syntax.TokenEOF, "", 38, 38),
-			},
-		},
-		"When scanning a scope block with include and exclude entries, the expected tokens are returned.": {
-			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
-			want: []syntax.Token{
-				token(syntax.TokenScope, "scope", 0, 5),
-				token(syntax.TokenLeftBrace, "{", 6, 7),
-				token(syntax.TokenInclude, "include", 8, 15),
-				token(syntax.TokenString, "\"**/*.go\"", 16, 25),
-				token(syntax.TokenExclude, "exclude", 26, 33),
-				token(syntax.TokenString, "\"vendor/**\"", 34, 45),
-				token(syntax.TokenRightBrace, "}", 46, 47),
-				token(syntax.TokenEOF, "", 47, 47),
-			},
-		},
-		"When scanning whitespace around an empty scope block, whitespace is skipped.": {
-			inSource: "\n scope \t{\r\n}\n",
-			want: []syntax.Token{
-				token(syntax.TokenScope, "scope", 2, 7),
-				token(syntax.TokenLeftBrace, "{", 9, 10),
-				token(syntax.TokenRightBrace, "}", 12, 13),
-				token(syntax.TokenEOF, "", 14, 14),
-			},
-		},
-		"When scanning a comment before an empty scope block, the comment is skipped.": {
-			inSource: "// comment\nscope {}",
-			want: []syntax.Token{
-				token(syntax.TokenScope, "scope", 11, 16),
-				token(syntax.TokenLeftBrace, "{", 17, 18),
-				token(syntax.TokenRightBrace, "}", 18, 19),
-				token(syntax.TokenEOF, "", 19, 19),
-			},
-		},
-		"When scanning a comment inside an empty scope block, the comment is skipped.": {
-			inSource: "scope {// comment\n}",
-			want: []syntax.Token{
-				token(syntax.TokenScope, "scope", 0, 5),
-				token(syntax.TokenLeftBrace, "{", 6, 7),
-				token(syntax.TokenRightBrace, "}", 18, 19),
-				token(syntax.TokenEOF, "", 19, 19),
-			},
-		},
-		"When scanning a string literal, a string token is returned.": {
-			inSource: "\"**/*.go\"",
-			want: []syntax.Token{
-				token(syntax.TokenString, "\"**/*.go\"", 0, 9),
-				token(syntax.TokenEOF, "", 9, 9),
-			},
-		},
-		"When scanning a string literal with valid escapes, a string token is returned.": {
-			inSource: `"` + `\\` + `\"` + `\n` + `\r` + `\t` + `"`,
-			want: []syntax.Token{
-				token(syntax.TokenString, `"`+`\\`+`\"`+`\n`+`\r`+`\t`+`"`, 0, 12),
-				token(syntax.TokenEOF, "", 12, 12),
-			},
-		},
-		"When scanning a string literal with an invalid escape, an invalid token is returned.": {
-			inSource: "\"\\x\"",
-			want: []syntax.Token{
-				token(syntax.TokenInvalid, "\"\\", 0, 2),
-				token(syntax.TokenIdentifier, "x", 2, 3),
-				token(syntax.TokenInvalid, "\"", 3, 4),
-				token(syntax.TokenEOF, "", 4, 4),
-			},
-		},
-		"When scanning a string literal without a closing quote, an invalid token is returned.": {
-			inSource: "\"abc",
-			want: []syntax.Token{
-				token(syntax.TokenInvalid, "\"abc", 0, 4),
-				token(syntax.TokenEOF, "", 4, 4),
-			},
-		},
-		"When scanning a string literal with a newline, an invalid token is returned.": {
-			inSource: "\"abc\n\"",
-			want: []syntax.Token{
-				token(syntax.TokenInvalid, "\"abc", 0, 4),
-				token(syntax.TokenInvalid, "\"", 5, 6),
+				token(syntax.TokenScope, "scope", 1, 6),
 				token(syntax.TokenEOF, "", 6, 6),
 			},
 		},
-		"When scanning identifier text, an identifier token is returned.": {
-			inSource: "x",
+		{
+			name:     "When source starts with a tab, the tab is skipped.",
+			inSource: "\tscope",
 			want: []syntax.Token{
-				token(syntax.TokenIdentifier, "x", 0, 1),
-				token(syntax.TokenEOF, "", 1, 1),
+				token(syntax.TokenScope, "scope", 1, 6),
+				token(syntax.TokenEOF, "", 6, 6),
 			},
 		},
-		"When scanning an unknown symbol, an invalid token is returned.": {
-			inSource: "@",
+		{
+			name:     "When source starts with a carriage return, the carriage return is skipped.",
+			inSource: "\rscope",
 			want: []syntax.Token{
-				token(syntax.TokenInvalid, "@", 0, 1),
-				token(syntax.TokenEOF, "", 1, 1),
+				token(syntax.TokenScope, "scope", 1, 6),
+				token(syntax.TokenEOF, "", 6, 6),
 			},
 		},
-		"When scanning a single dot, an invalid token is returned.": {
-			inSource: ".",
+		{
+			name:     "When source starts with a newline, the newline is skipped.",
+			inSource: "\nscope",
 			want: []syntax.Token{
-				token(syntax.TokenInvalid, ".", 0, 1),
-				token(syntax.TokenEOF, "", 1, 1),
+				token(syntax.TokenScope, "scope", 1, 6),
+				token(syntax.TokenEOF, "", 6, 6),
 			},
 		},
-		"When scanning a slash that does not start a comment, an invalid token is returned.": {
+		{
+			name:     "When source starts with a line comment, the comment is skipped.",
+			inSource: "// comment\nscope",
+			want: []syntax.Token{
+				token(syntax.TokenScope, "scope", 11, 16),
+				token(syntax.TokenEOF, "", 16, 16),
+			},
+		},
+		{
+			name:     "When source is only a line comment, EOF is returned after the comment.",
+			inSource: "// comment",
+			want: []syntax.Token{
+				token(syntax.TokenEOF, "", 10, 10),
+			},
+		},
+		{
+			name:     "When source starts with a slash that is not a comment, the slash is not skipped.",
 			inSource: "/",
 			want: []syntax.Token{
 				token(syntax.TokenInvalid, "/", 0, 1),
 				token(syntax.TokenEOF, "", 1, 1),
 			},
 		},
-		"When scanning an identifier that starts with a keyword, an identifier token is returned.": {
-			inSource: "scopex",
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange.
+			scan := scanner.New(tc.inSource)
+
+			// Act & assert.
+			for idx := range tc.want {
+				got := scan.Next()
+
+				claim.Equal(t, tc.name, tc.want[idx], got, "Token")
+			}
+		})
+	}
+}
+
+func Test_Scanner_Next_ReturnsEOF(t *testing.T) {
+	t.Parallel()
+
+	// Arrange.
+	scan := scanner.New("")
+
+	// Act.
+	got, want := scan.Next(), token(syntax.TokenEOF, "", 0, 0)
+
+	// Assert.
+	claim.Equal(t, "When scanning empty source, EOF is returned.", want, got, "Token")
+}
+
+func Test_Scanner_Next_ScansString(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name     string
+		inSource string
+		want     []syntax.Token
+	}{
+		{
+			name:     "When scanning a string literal with plain text, a string token is returned.",
+			inSource: `"abc"`,
 			want: []syntax.Token{
-				token(syntax.TokenIdentifier, "scopex", 0, 6),
+				token(syntax.TokenString, `"abc"`, 0, 5),
+				token(syntax.TokenEOF, "", 5, 5),
+			},
+		},
+		{
+			name:     "When scanning a string literal with an escaped backslash, a string token is returned.",
+			inSource: `"\\"`,
+			want: []syntax.Token{
+				token(syntax.TokenString, `"\\"`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning a string literal with an escaped quote, a string token is returned.",
+			inSource: `"\""`,
+			want: []syntax.Token{
+				token(syntax.TokenString, `"\""`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning a string literal with an escaped newline, a string token is returned.",
+			inSource: `"\n"`,
+			want: []syntax.Token{
+				token(syntax.TokenString, `"\n"`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning a string literal with an escaped carriage return, a string token is returned.",
+			inSource: `"\r"`,
+			want: []syntax.Token{
+				token(syntax.TokenString, `"\r"`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning a string literal with an escaped tab, a string token is returned.",
+			inSource: `"\t"`,
+			want: []syntax.Token{
+				token(syntax.TokenString, `"\t"`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning a string literal with an invalid escape, an invalid token is returned.",
+			inSource: `"\x"`,
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, `"\`, 0, 2),
+				token(syntax.TokenIdentifier, "x", 2, 3),
+				token(syntax.TokenInvalid, `"`, 3, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning a string literal with a newline, an invalid token is returned.",
+			inSource: "\"abc\n\"",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "\"abc", 0, 4),
+				token(syntax.TokenInvalid, `"`, 5, 6),
 				token(syntax.TokenEOF, "", 6, 6),
 			},
 		},
-		"When scanning a character literal with a valid escape, a character token is returned.": {
+		{
+			name:     "When scanning a string literal with a carriage return, an invalid token is returned.",
+			inSource: "\"abc\r\"",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "\"abc", 0, 4),
+				token(syntax.TokenInvalid, `"`, 5, 6),
+				token(syntax.TokenEOF, "", 6, 6),
+			},
+		},
+		{
+			name:     "When scanning a string literal without a closing quote, an invalid token is returned.",
+			inSource: `"abc`,
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, `"abc`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange.
+			scan := scanner.New(tc.inSource)
+
+			// Act & assert.
+			for idx := range tc.want {
+				got := scan.Next()
+
+				claim.Equal(t, tc.name, tc.want[idx], got, "Token")
+			}
+		})
+	}
+}
+
+func Test_Scanner_Next_ScansCharacter(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name     string
+		inSource string
+		want     []syntax.Token
+	}{
+		{
+			name:     "When scanning a character literal with a plain character, a character token is returned.",
+			inSource: `'a'`,
+			want: []syntax.Token{
+				token(syntax.TokenCharacter, `'a'`, 0, 3),
+				token(syntax.TokenEOF, "", 3, 3),
+			},
+		},
+		{
+			name:     "When scanning a character literal with an escaped backslash, a character token is returned.",
 			inSource: `'\\'`,
 			want: []syntax.Token{
 				token(syntax.TokenCharacter, `'\\'`, 0, 4),
 				token(syntax.TokenEOF, "", 4, 4),
 			},
 		},
-		"When scanning a character literal with an invalid escape, an invalid token is returned.": {
+		{
+			name:     "When scanning a character literal with an escaped quote, a character token is returned.",
+			inSource: `'\''`,
+			want: []syntax.Token{
+				token(syntax.TokenCharacter, `'\''`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning a character literal with an escaped newline, a character token is returned.",
+			inSource: `'\n'`,
+			want: []syntax.Token{
+				token(syntax.TokenCharacter, `'\n'`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning a character literal with an escaped carriage return, a character token is returned.",
+			inSource: `'\r'`,
+			want: []syntax.Token{
+				token(syntax.TokenCharacter, `'\r'`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning a character literal with an escaped tab, a character token is returned.",
+			inSource: `'\t'`,
+			want: []syntax.Token{
+				token(syntax.TokenCharacter, `'\t'`, 0, 4),
+				token(syntax.TokenEOF, "", 4, 4),
+			},
+		},
+		{
+			name:     "When scanning a character literal with an invalid escape, an invalid token is returned.",
 			inSource: `'\x'`,
 			want: []syntax.Token{
 				token(syntax.TokenInvalid, `'\`, 0, 2),
@@ -250,14 +287,8 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 4, 4),
 			},
 		},
-		"When scanning a character literal without a closing quote, an invalid token is returned.": {
-			inSource: "'a",
-			want: []syntax.Token{
-				token(syntax.TokenInvalid, "'a", 0, 2),
-				token(syntax.TokenEOF, "", 2, 2),
-			},
-		},
-		"When scanning a character literal with a newline, an invalid token is returned.": {
+		{
+			name:     "When scanning a character literal with a newline, an invalid token is returned.",
 			inSource: "'\n'",
 			want: []syntax.Token{
 				token(syntax.TokenInvalid, "'", 0, 1),
@@ -265,18 +296,317 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 3, 3),
 			},
 		},
+		{
+			name:     "When scanning a character literal with a carriage return, an invalid token is returned.",
+			inSource: "'\r'",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "'", 0, 1),
+				token(syntax.TokenInvalid, "'", 2, 3),
+				token(syntax.TokenEOF, "", 3, 3),
+			},
+		},
+		{
+			name:     "When scanning a character literal without content, an invalid token is returned.",
+			inSource: "'",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "'", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a character literal without a closing quote, an invalid token is returned.",
+			inSource: "'a",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, "'a", 0, 2),
+				token(syntax.TokenEOF, "", 2, 2),
+			},
+		},
 	} {
-		t.Run(tcName, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			// Arrange.
 			scan := scanner.New(tc.inSource)
 
-			// Act and assert.
+			// Act & assert.
 			for idx := range tc.want {
 				got := scan.Next()
 
-				claim.Equal(t, tcName, tc.want[idx], got, "Token")
+				claim.Equal(t, tc.name, tc.want[idx], got, "Token")
+			}
+		})
+	}
+}
+
+func Test_Scanner_Next_ScansFixedTokens(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name     string
+		inSource string
+		want     []syntax.Token
+	}{
+		{
+			name:     "When scanning a character range operator, a dot-dot token is returned.",
+			inSource: "..",
+			want: []syntax.Token{
+				token(syntax.TokenDotDot, "..", 0, 2),
+				token(syntax.TokenEOF, "", 2, 2),
+			},
+		},
+		{
+			name:     "When scanning a single dot, an invalid token is returned.",
+			inSource: ".",
+			want: []syntax.Token{
+				token(syntax.TokenInvalid, ".", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning an equal sign, an equal token is returned.",
+			inSource: "=",
+			want: []syntax.Token{
+				token(syntax.TokenEqual, "=", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a left parenthesis, a left-parenthesis token is returned.",
+			inSource: "(",
+			want: []syntax.Token{
+				token(syntax.TokenLeftParen, "(", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a right parenthesis, a right-parenthesis token is returned.",
+			inSource: ")",
+			want: []syntax.Token{
+				token(syntax.TokenRightParen, ")", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a left brace, a left-brace token is returned.",
+			inSource: "{",
+			want: []syntax.Token{
+				token(syntax.TokenLeftBrace, "{", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a right brace, a right-brace token is returned.",
+			inSource: "}",
+			want: []syntax.Token{
+				token(syntax.TokenRightBrace, "}", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a pipe, a pipe token is returned.",
+			inSource: "|",
+			want: []syntax.Token{
+				token(syntax.TokenPipe, "|", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a question mark, a question token is returned.",
+			inSource: "?",
+			want: []syntax.Token{
+				token(syntax.TokenQuestion, "?", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a star, a star token is returned.",
+			inSource: "*",
+			want: []syntax.Token{
+				token(syntax.TokenStar, "*", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+		{
+			name:     "When scanning a plus, a plus token is returned.",
+			inSource: "+",
+			want: []syntax.Token{
+				token(syntax.TokenPlus, "+", 0, 1),
+				token(syntax.TokenEOF, "", 1, 1),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange.
+			scan := scanner.New(tc.inSource)
+
+			// Act & assert.
+			for idx := range tc.want {
+				got := scan.Next()
+
+				claim.Equal(t, tc.name, tc.want[idx], got, "Token")
+			}
+		})
+	}
+}
+
+func Test_Scanner_Next_ScansIdentifiers(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name     string
+		inSource string
+		want     []syntax.Token
+	}{
+		{
+			name:     "When scanning the scope keyword, a scope token is returned.",
+			inSource: "scope",
+			want: []syntax.Token{
+				token(syntax.TokenScope, "scope", 0, 5),
+				token(syntax.TokenEOF, "", 5, 5),
+			},
+		},
+		{
+			name:     "When scanning the include keyword, an include token is returned.",
+			inSource: "include",
+			want: []syntax.Token{
+				token(syntax.TokenInclude, "include", 0, 7),
+				token(syntax.TokenEOF, "", 7, 7),
+			},
+		},
+		{
+			name:     "When scanning the exclude keyword, an exclude token is returned.",
+			inSource: "exclude",
+			want: []syntax.Token{
+				token(syntax.TokenExclude, "exclude", 0, 7),
+				token(syntax.TokenEOF, "", 7, 7),
+			},
+		},
+		{
+			name:     "When scanning the definitions keyword, a definitions token is returned.",
+			inSource: "definitions",
+			want: []syntax.Token{
+				token(syntax.TokenDefinitions, "definitions", 0, 11),
+				token(syntax.TokenEOF, "", 11, 11),
+			},
+		},
+		{
+			name:     "When scanning a lowercase identifier, an identifier token is returned.",
+			inSource: "letter",
+			want: []syntax.Token{
+				token(syntax.TokenIdentifier, "letter", 0, 6),
+				token(syntax.TokenEOF, "", 6, 6),
+			},
+		},
+		{
+			name:     "When scanning an uppercase identifier, an identifier token is returned.",
+			inSource: "Identifier",
+			want: []syntax.Token{
+				token(syntax.TokenIdentifier, "Identifier", 0, 10),
+				token(syntax.TokenEOF, "", 10, 10),
+			},
+		},
+		{
+			name:     "When scanning an identifier with digits, an identifier token is returned.",
+			inSource: "letter1",
+			want: []syntax.Token{
+				token(syntax.TokenIdentifier, "letter1", 0, 7),
+				token(syntax.TokenEOF, "", 7, 7),
+			},
+		},
+		{
+			name:     "When scanning an identifier with underscores, an identifier token is returned.",
+			inSource: "identifier_part",
+			want: []syntax.Token{
+				token(syntax.TokenIdentifier, "identifier_part", 0, 15),
+				token(syntax.TokenEOF, "", 15, 15),
+			},
+		},
+		{
+			name:     "When scanning an identifier that starts with a keyword, an identifier token is returned.",
+			inSource: "scopex",
+			want: []syntax.Token{
+				token(syntax.TokenIdentifier, "scopex", 0, 6),
+				token(syntax.TokenEOF, "", 6, 6),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange.
+			scan := scanner.New(tc.inSource)
+
+			// Act & assert.
+			for idx := range tc.want {
+				got := scan.Next()
+
+				claim.Equal(t, tc.name, tc.want[idx], got, "Token")
+			}
+		})
+	}
+}
+
+func Test_Scanner_Next_ReturnsInvalidToken(t *testing.T) {
+	t.Parallel()
+
+	// Arrange.
+	scan := scanner.New("@")
+
+	// Act.
+	got, want := scan.Next(), token(syntax.TokenInvalid, "@", 0, 1)
+
+	// Assert.
+	claim.Equal(t, "When scanning an unknown symbol, an invalid token is returned.", want, got, "Token")
+}
+
+func Test_Scanner_Next_PreservesSpans(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name     string
+		inSource string
+		want     []syntax.Token
+	}{
+		{
+			name:     "When scanning realistic DSL source, token spans are preserved.",
+			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }\ndefinitions { letter = 'a'..'z' | 'A'..'Z' }",
+			want: []syntax.Token{
+				token(syntax.TokenScope, "scope", 0, 5),
+				token(syntax.TokenLeftBrace, "{", 6, 7),
+				token(syntax.TokenInclude, "include", 8, 15),
+				token(syntax.TokenString, "\"**/*.go\"", 16, 25),
+				token(syntax.TokenExclude, "exclude", 26, 33),
+				token(syntax.TokenString, "\"vendor/**\"", 34, 45),
+				token(syntax.TokenRightBrace, "}", 46, 47),
+				token(syntax.TokenDefinitions, "definitions", 48, 59),
+				token(syntax.TokenLeftBrace, "{", 60, 61),
+				token(syntax.TokenIdentifier, "letter", 62, 68),
+				token(syntax.TokenEqual, "=", 69, 70),
+				token(syntax.TokenCharacter, "'a'", 71, 74),
+				token(syntax.TokenDotDot, "..", 74, 76),
+				token(syntax.TokenCharacter, "'z'", 76, 79),
+				token(syntax.TokenPipe, "|", 80, 81),
+				token(syntax.TokenCharacter, "'A'", 82, 85),
+				token(syntax.TokenDotDot, "..", 85, 87),
+				token(syntax.TokenCharacter, "'Z'", 87, 90),
+				token(syntax.TokenRightBrace, "}", 91, 92),
+				token(syntax.TokenEOF, "", 92, 92),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange.
+			scan := scanner.New(tc.inSource)
+
+			// Act & assert.
+			for idx := range tc.want {
+				got := scan.Next()
+
+				claim.Equal(t, tc.name, tc.want[idx], got, "Token")
 			}
 		})
 	}
@@ -284,7 +614,6 @@ func Test_Scanner_Next(t *testing.T) {
 
 func benchmark_Scanner_Next(b *testing.B, source string) {
 	b.Helper()
-	b.SetBytes(int64(len(source)))
 
 	for b.Loop() {
 		scan := scanner.New(source)
@@ -295,22 +624,21 @@ func benchmark_Scanner_Next(b *testing.B, source string) {
 	}
 }
 
-func Benchmark_Scanner_Next_DSL_0(b *testing.B)    { benchmark_Scanner_Next_DSL(b, 0, 0) }
-func Benchmark_Scanner_Next_DSL_1(b *testing.B)    { benchmark_Scanner_Next_DSL(b, 1, 1) }
-func Benchmark_Scanner_Next_DSL_10(b *testing.B)   { benchmark_Scanner_Next_DSL(b, 10, 10) }
-func Benchmark_Scanner_Next_DSL_100(b *testing.B)  { benchmark_Scanner_Next_DSL(b, 100, 100) }
-func Benchmark_Scanner_Next_DSL_1000(b *testing.B) { benchmark_Scanner_Next_DSL(b, 1000, 1000) }
+func Benchmark_Scanner_Next_DSL_0(b *testing.B)    { benchmark_Scanner_Next_DSL(b, 0) }
+func Benchmark_Scanner_Next_DSL_1(b *testing.B)    { benchmark_Scanner_Next_DSL(b, 1) }
+func Benchmark_Scanner_Next_DSL_10(b *testing.B)   { benchmark_Scanner_Next_DSL(b, 10) }
+func Benchmark_Scanner_Next_DSL_100(b *testing.B)  { benchmark_Scanner_Next_DSL(b, 100) }
+func Benchmark_Scanner_Next_DSL_1000(b *testing.B) { benchmark_Scanner_Next_DSL(b, 1000) }
 
-func benchmark_Scanner_Next_DSL(b *testing.B, scopeEntryPairCount, definitionCount int) {
+func benchmark_Scanner_Next_DSL(b *testing.B, size int) {
 	b.Helper()
 
 	inputData :=
 		"scope {\n" +
-			strings.Repeat("    include \"**/*.go\"\n", scopeEntryPairCount) +
-			strings.Repeat("    exclude \"vendor/**\"\n", scopeEntryPairCount) +
+			strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) +
 			"}\n" +
 			"definitions {\n" +
-			strings.Repeat("    letter = 'a'\n", definitionCount) +
+			strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    value = ('a' | 'b')+\n", size) +
 			"}"
 
 	benchmark_Scanner_Next(b, inputData)
