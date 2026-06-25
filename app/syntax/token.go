@@ -36,6 +36,12 @@ const (
 	// TokenRightBrace marks the end of a section block.
 	TokenRightBrace
 
+	// TokenLeftParen marks the start of an expression group.
+	TokenLeftParen
+
+	// TokenRightParen marks the end of an expression group.
+	TokenRightParen
+
 	// TokenString marks a double-quoted string literal.
 	TokenString
 

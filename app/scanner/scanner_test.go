@@ -88,6 +88,22 @@ func Test_Scanner_Next(t *testing.T) {
 				token(syntax.TokenEOF, "", 44, 44),
 			},
 		},
+		"When scanning a definitions block with grouping, the expected tokens are returned.": {
+			inSource: "definitions { value = ('a' | 'b') }",
+			want: []syntax.Token{
+				token(syntax.TokenDefinitions, "definitions", 0, 11),
+				token(syntax.TokenLeftBrace, "{", 12, 13),
+				token(syntax.TokenIdentifier, "value", 14, 19),
+				token(syntax.TokenEqual, "=", 20, 21),
+				token(syntax.TokenLeftParen, "(", 22, 23),
+				token(syntax.TokenCharacter, "'a'", 23, 26),
+				token(syntax.TokenPipe, "|", 27, 28),
+				token(syntax.TokenCharacter, "'b'", 29, 32),
+				token(syntax.TokenRightParen, ")", 32, 33),
+				token(syntax.TokenRightBrace, "}", 34, 35),
+				token(syntax.TokenEOF, "", 35, 35),
+			},
+		},
 		"When scanning a scope block with include and exclude entries, the expected tokens are returned.": {
 			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
 			want: []syntax.Token{

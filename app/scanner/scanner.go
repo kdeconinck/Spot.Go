@@ -64,6 +64,16 @@ func (scanner *Scanner) Next() syntax.Token {
 
 		return scanner.token(syntax.TokenEqual, start, scanner.offset)
 
+	case '(':
+		scanner.offset++
+
+		return scanner.token(syntax.TokenLeftParen, start, scanner.offset)
+
+	case ')':
+		scanner.offset++
+
+		return scanner.token(syntax.TokenRightParen, start, scanner.offset)
+
 	case '{':
 		scanner.offset++
 
