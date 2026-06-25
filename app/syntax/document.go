@@ -88,6 +88,9 @@ const (
 
 	// DefinitionExpressionAlternation is a list of alternative expressions.
 	DefinitionExpressionAlternation
+
+	// DefinitionExpressionGroup is a parenthesized expression.
+	DefinitionExpressionGroup
 )
 
 // DefinitionExpression is a parsed character-level definition expression.
@@ -103,6 +106,9 @@ type DefinitionExpression struct {
 
 	// Terms are the alternative expressions in an alternation expression.
 	Terms []DefinitionExpression
+
+	// Inner is the expression contained in a grouped expression.
+	Inner *DefinitionExpression
 
 	// Span is the byte range covered by the expression.
 	Span location.Span

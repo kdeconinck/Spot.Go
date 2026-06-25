@@ -188,6 +188,22 @@ func Test_Parse(t *testing.T) {
 			},
 		},
 		{
+			name:     "When parsing a definitions block with a grouped expression, a document is returned.",
+			inSource: "scope {} definitions { value = ('a' | 'b') }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						groupDefinition("value", 23, 28, groupExpression(alternationExpression(characterExpression(syntax.TokenCharacter, "'a'", 32, 35), characterExpression(syntax.TokenCharacter, "'b'", 38, 41)), 31, 42), 23, 42),
+					},
+					Span: span(9, 44),
+				},
+				Span: span(0, 44),
+			},
+		},
+		{
 			name:     "When the scope keyword is missing, a diagnostic is returned.",
 			inSource: "x",
 			wantDocument: syntax.Document{
@@ -392,6 +408,25 @@ func Test_Parse(t *testing.T) {
 				diagnostic("Expected 'character', found '}'.", 37, 38),
 			},
 		},
+		{
+			name:     "When a grouped expression is missing a closing parenthesis, a diagnostic is returned.",
+			inSource: "scope {} definitions { value = ('a' | 'b' }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						groupDefinition("value", 23, 28, groupExpression(alternationExpression(characterExpression(syntax.TokenCharacter, "'a'", 32, 35), characterExpression(syntax.TokenCharacter, "'b'", 38, 41)), 31, 43), 23, 43),
+					},
+					Span: span(9, 43),
+				},
+				Span: span(0, 43),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected ')', found '}'.", 42, 43),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -435,7 +470,7 @@ func dsl(size int) string {
 		strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) +
 		"}\n" +
 		"definitions {\n" +
-		strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    identifierStart = letter | '_'\n", size) +
+		strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    identifierStart = letter | '_'\n    value = ('a' | 'b')\n", size) +
 		"}"
 }
 
@@ -505,6 +540,18 @@ func referenceDefinition(name string, nameStart, nameEnd location.Position, refe
 	}
 }
 
+func groupDefinition(name string, nameStart, nameEnd location.Position, expression syntax.DefinitionExpression, definitionStart, definitionEnd location.Position) syntax.Definition {
+	return syntax.Definition{
+		Name: syntax.Token{
+			Kind: syntax.TokenIdentifier,
+			Text: name,
+			Span: span(nameStart, nameEnd),
+		},
+		Expression: expression,
+		Span:       span(definitionStart, definitionEnd),
+	}
+}
+
 func alternationDefinition(name string, nameStart, nameEnd, definitionStart, definitionEnd location.Position, terms ...syntax.DefinitionExpression) syntax.Definition {
 	return syntax.Definition{
 		Name: syntax.Token{
@@ -512,12 +559,16 @@ func alternationDefinition(name string, nameStart, nameEnd, definitionStart, def
 			Text: name,
 			Span: span(nameStart, nameEnd),
 		},
-		Expression: syntax.DefinitionExpression{
-			Kind:  syntax.DefinitionExpressionAlternation,
-			Terms: terms,
-			Span:  span(terms[0].Span.Start, terms[len(terms)-1].Span.End),
-		},
-		Span: span(definitionStart, definitionEnd),
+		Expression: alternationExpression(terms...),
+		Span:       span(definitionStart, definitionEnd),
+	}
+}
+
+func alternationExpression(terms ...syntax.DefinitionExpression) syntax.DefinitionExpression {
+	return syntax.DefinitionExpression{
+		Kind:  syntax.DefinitionExpressionAlternation,
+		Terms: terms,
+		Span:  span(terms[0].Span.Start, terms[len(terms)-1].Span.End),
 	}
 }
 
@@ -530,6 +581,14 @@ func characterExpression(kind syntax.TokenKind, text string, start, end location
 			Span: span(start, end),
 		},
 		Span: span(start, end),
+	}
+}
+
+func groupExpression(inner syntax.DefinitionExpression, start, end location.Position) syntax.DefinitionExpression {
+	return syntax.DefinitionExpression{
+		Kind:  syntax.DefinitionExpressionGroup,
+		Inner: &inner,
+		Span:  span(start, end),
 	}
 }
 

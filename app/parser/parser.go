@@ -175,6 +175,10 @@ func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
 }
 
 func (parser *parser) parseDefinitionPrimary() syntax.DefinitionExpression {
+	if parser.at(syntax.TokenLeftParen) {
+		return parser.parseGroupedDefinitionExpression()
+	}
+
 	if parser.at(syntax.TokenIdentifier) {
 		reference := parser.expect(syntax.TokenIdentifier)
 
@@ -201,6 +205,18 @@ func (parser *parser) parseDefinitionPrimary() syntax.DefinitionExpression {
 		Kind:  syntax.DefinitionExpressionRange,
 		Start: start,
 		End:   end,
+		Span:  span(start.Span.Start, end.Span.End),
+	}
+}
+
+func (parser *parser) parseGroupedDefinitionExpression() syntax.DefinitionExpression {
+	start := parser.expect(syntax.TokenLeftParen)
+	inner := parser.parseDefinitionExpression()
+	end := parser.expect(syntax.TokenRightParen)
+
+	return syntax.DefinitionExpression{
+		Kind:  syntax.DefinitionExpressionGroup,
+		Inner: &inner,
 		Span:  span(start.Span.Start, end.Span.End),
 	}
 }
