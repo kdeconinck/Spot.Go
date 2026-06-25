@@ -72,10 +72,21 @@ func (parser *parser) parseScopeSection() (syntax.ScopeSection, bool) {
 
 	parser.advance()
 
+	var entries []syntax.ScopeEntry
+
+	for parser.current.Kind == syntax.TokenInclude || parser.current.Kind == syntax.TokenExclude {
+		entries = append(entries, parser.parseScopeEntry())
+	}
+
 	if parser.current.Kind != syntax.TokenRightBrace {
-		parser.addDiagnostic(syntax.TokenRightBrace)
+		if parser.current.Kind == syntax.TokenEOF {
+			parser.addDiagnostic(syntax.TokenRightBrace)
+		} else {
+			parser.addDiagnostic(syntax.TokenInclude)
+		}
 
 		return syntax.ScopeSection{
+			Entries: entries,
 			Span: location.Span{
 				Start: start.Span.Start,
 				End:   parser.current.Span.End,
@@ -87,11 +98,33 @@ func (parser *parser) parseScopeSection() (syntax.ScopeSection, bool) {
 	parser.advance()
 
 	return syntax.ScopeSection{
+		Entries: entries,
 		Span: location.Span{
 			Start: start.Span.Start,
 			End:   end.Span.End,
 		},
 	}, true
+}
+
+func (parser *parser) parseScopeEntry() syntax.ScopeEntry {
+	start := parser.current
+	kind := syntax.ScopeEntryInclude
+
+	if start.Kind == syntax.TokenExclude {
+		kind = syntax.ScopeEntryExclude
+	}
+
+	parser.advance()
+	pattern := parser.expect(syntax.TokenString)
+
+	return syntax.ScopeEntry{
+		Kind:    kind,
+		Pattern: pattern,
+		Span: location.Span{
+			Start: start.Span.Start,
+			End:   pattern.Span.End,
+		},
+	}
 }
 
 func (parser *parser) expect(kind syntax.TokenKind) syntax.Token {
