@@ -338,6 +338,11 @@ Use explicit sections:
 ```
 
 The separation between setup, execution, and verification should remain obvious.
+Assertions should always be written using the `qa/claim` package.
+Use the `ansi` package tests as the reference for how `claim` assertions should be structured and named.
+Do not force unrelated assertions through `claim.Equal`.
+If a new kind of assertion is required, add a dedicated function to `qa/claim`, such as `Error`, `DeepEqual`, `True`,
+or `False`, rather than misusing `Equal`.
 
 ## Parallel Execution
 
