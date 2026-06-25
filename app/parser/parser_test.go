@@ -124,6 +124,22 @@ func Test_Parse(t *testing.T) {
 			},
 		},
 		{
+			name:     "When parsing a definitions block with a reference definition, a document is returned.",
+			inSource: "scope {} definitions { identifierStart = letter }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						referenceDefinition("identifierStart", 23, 38, "letter", 41, 47, 23, 47),
+					},
+					Span: span(9, 49),
+				},
+				Span: span(0, 49),
+			},
+		},
+		{
 			name:     "When the scope keyword is missing, a diagnostic is returned.",
 			inSource: "x",
 			wantDocument: syntax.Document{
@@ -352,7 +368,7 @@ func dsl(size int) string {
 		strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) +
 		"}\n" +
 		"definitions {\n" +
-		strings.Repeat("    letter = 'a'..'z'\n", size) +
+		strings.Repeat("    letter = 'a'..'z'\n    identifierStart = letter\n", size) +
 		"}"
 }
 
@@ -426,6 +442,26 @@ func rangeDefinitionWithEndKind(name string, nameStart, nameEnd location.Positio
 				Span: span(endStart, endEnd),
 			},
 			Span: span(startStart, endEnd),
+		},
+		Span: span(definitionStart, definitionEnd),
+	}
+}
+
+func referenceDefinition(name string, nameStart, nameEnd location.Position, reference string, referenceStart, referenceEnd, definitionStart, definitionEnd location.Position) syntax.Definition {
+	return syntax.Definition{
+		Name: syntax.Token{
+			Kind: syntax.TokenIdentifier,
+			Text: name,
+			Span: span(nameStart, nameEnd),
+		},
+		Expression: syntax.DefinitionExpression{
+			Kind: syntax.DefinitionExpressionReference,
+			Start: syntax.Token{
+				Kind: syntax.TokenIdentifier,
+				Text: reference,
+				Span: span(referenceStart, referenceEnd),
+			},
+			Span: span(referenceStart, referenceEnd),
 		},
 		Span: span(definitionStart, definitionEnd),
 	}

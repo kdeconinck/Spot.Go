@@ -153,6 +153,16 @@ func (parser *parser) parseDefinition() syntax.Definition {
 }
 
 func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
+	if parser.at(syntax.TokenIdentifier) {
+		reference := parser.expect(syntax.TokenIdentifier)
+
+		return syntax.DefinitionExpression{
+			Kind:  syntax.DefinitionExpressionReference,
+			Start: reference,
+			Span:  reference.Span,
+		}
+	}
+
 	start := parser.expect(syntax.TokenCharacter)
 
 	if !parser.consume(syntax.TokenDotDot) {

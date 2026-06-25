@@ -82,6 +82,9 @@ const (
 
 	// DefinitionExpressionRange is a character range expression.
 	DefinitionExpressionRange
+
+	// DefinitionExpressionReference is a reference to another definition.
+	DefinitionExpressionReference
 )
 
 // DefinitionExpression is a parsed character-level definition expression.
@@ -89,7 +92,7 @@ type DefinitionExpression struct {
 	// Kind identifies the form of expression.
 	Kind DefinitionExpressionKind
 
-	// Start is the first character literal in the expression.
+	// Start is the first token in the expression.
 	Start Token
 
 	// End is the final character literal in a range expression.
