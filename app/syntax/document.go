@@ -66,9 +66,35 @@ type Definition struct {
 	// Name is the identifier token naming the definition.
 	Name Token
 
-	// Expression is the character literal token assigned to the definition.
-	Expression Token
+	// Expression is the character-level expression assigned to the definition.
+	Expression DefinitionExpression
 
 	// Span is the byte range covered by the definition.
+	Span location.Span
+}
+
+// DefinitionExpressionKind identifies the form of a definition expression.
+type DefinitionExpressionKind uint8
+
+const (
+	// DefinitionExpressionCharacter is a single character literal expression.
+	DefinitionExpressionCharacter DefinitionExpressionKind = iota
+
+	// DefinitionExpressionRange is a character range expression.
+	DefinitionExpressionRange
+)
+
+// DefinitionExpression is a parsed character-level definition expression.
+type DefinitionExpression struct {
+	// Kind identifies the form of expression.
+	Kind DefinitionExpressionKind
+
+	// Start is the first character literal in the expression.
+	Start Token
+
+	// End is the final character literal in a range expression.
+	End Token
+
+	// Span is the byte range covered by the expression.
 	Span location.Span
 }

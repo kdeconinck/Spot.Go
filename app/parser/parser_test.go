@@ -100,11 +100,27 @@ func Test_Parse(t *testing.T) {
 				},
 				Definitions: syntax.DefinitionsSection{
 					Definitions: []syntax.Definition{
-						definition("letter", 23, 29, syntax.TokenCharacter, "'a'", 32, 35, 23, 35),
+						characterDefinition("letter", 23, 29, syntax.TokenCharacter, "'a'", 32, 35, 23, 35),
 					},
 					Span: span(9, 37),
 				},
 				Span: span(0, 37),
+			},
+		},
+		{
+			name:     "When parsing a definitions block with a character range definition, a document is returned.",
+			inSource: "scope {} definitions { letter = 'a'..'z' }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						rangeDefinition("letter", 23, 29, "'a'", 32, 35, "'z'", 37, 40, 23, 40),
+					},
+					Span: span(9, 42),
+				},
+				Span: span(0, 42),
 			},
 		},
 		{
@@ -245,7 +261,7 @@ func Test_Parse(t *testing.T) {
 				},
 				Definitions: syntax.DefinitionsSection{
 					Definitions: []syntax.Definition{
-						definition("letter", 23, 29, syntax.TokenCharacter, "'a'", 30, 33, 23, 33),
+						characterDefinition("letter", 23, 29, syntax.TokenCharacter, "'a'", 30, 33, 23, 33),
 					},
 					Span: span(9, 35),
 				},
@@ -264,7 +280,7 @@ func Test_Parse(t *testing.T) {
 				},
 				Definitions: syntax.DefinitionsSection{
 					Definitions: []syntax.Definition{
-						definition("letter", 23, 29, syntax.TokenRightBrace, "}", 32, 33, 23, 33),
+						characterDefinition("letter", 23, 29, syntax.TokenRightBrace, "}", 32, 33, 23, 33),
 					},
 					Span: span(9, 33),
 				},
@@ -272,6 +288,25 @@ func Test_Parse(t *testing.T) {
 			},
 			wantDiagnostics: []parser.Diagnostic{
 				diagnostic("Expected 'character', found '}'.", 32, 33),
+			},
+		},
+		{
+			name:     "When a character range is missing an end character, a diagnostic is returned.",
+			inSource: "scope {} definitions { letter = 'a'.. }",
+			wantDocument: syntax.Document{
+				Scope: syntax.ScopeSection{
+					Span: span(0, 8),
+				},
+				Definitions: syntax.DefinitionsSection{
+					Definitions: []syntax.Definition{
+						rangeDefinitionWithEndKind("letter", 23, 29, "'a'", 32, 35, syntax.TokenRightBrace, "}", 38, 39, 23, 39),
+					},
+					Span: span(9, 39),
+				},
+				Span: span(0, 39),
+			},
+			wantDiagnostics: []parser.Diagnostic{
+				diagnostic("Expected 'character', found '}'.", 38, 39),
 			},
 		},
 	} {
@@ -317,7 +352,7 @@ func dsl(size int) string {
 		strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) +
 		"}\n" +
 		"definitions {\n" +
-		strings.Repeat("    letter = 'a'\n", size) +
+		strings.Repeat("    letter = 'a'..'z'\n", size) +
 		"}"
 }
 
@@ -347,17 +382,50 @@ func scopeEntry(kind syntax.ScopeEntryKind, patternKind syntax.TokenKind, patter
 	}
 }
 
-func definition(name string, nameStart, nameEnd location.Position, expressionKind syntax.TokenKind, expression string, expressionStart, expressionEnd, definitionStart, definitionEnd location.Position) syntax.Definition {
+func characterDefinition(name string, nameStart, nameEnd location.Position, expressionKind syntax.TokenKind, expression string, expressionStart, expressionEnd, definitionStart, definitionEnd location.Position) syntax.Definition {
 	return syntax.Definition{
 		Name: syntax.Token{
 			Kind: syntax.TokenIdentifier,
 			Text: name,
 			Span: span(nameStart, nameEnd),
 		},
-		Expression: syntax.Token{
-			Kind: expressionKind,
-			Text: expression,
+		Expression: syntax.DefinitionExpression{
+			Kind: syntax.DefinitionExpressionCharacter,
+			Start: syntax.Token{
+				Kind: expressionKind,
+				Text: expression,
+				Span: span(expressionStart, expressionEnd),
+			},
 			Span: span(expressionStart, expressionEnd),
+		},
+		Span: span(definitionStart, definitionEnd),
+	}
+}
+
+func rangeDefinition(name string, nameStart, nameEnd location.Position, start string, startStart, startEnd location.Position, end string, endStart, endEnd, definitionStart, definitionEnd location.Position) syntax.Definition {
+	return rangeDefinitionWithEndKind(name, nameStart, nameEnd, start, startStart, startEnd, syntax.TokenCharacter, end, endStart, endEnd, definitionStart, definitionEnd)
+}
+
+func rangeDefinitionWithEndKind(name string, nameStart, nameEnd location.Position, start string, startStart, startEnd location.Position, endKind syntax.TokenKind, end string, endStart, endEnd, definitionStart, definitionEnd location.Position) syntax.Definition {
+	return syntax.Definition{
+		Name: syntax.Token{
+			Kind: syntax.TokenIdentifier,
+			Text: name,
+			Span: span(nameStart, nameEnd),
+		},
+		Expression: syntax.DefinitionExpression{
+			Kind: syntax.DefinitionExpressionRange,
+			Start: syntax.Token{
+				Kind: syntax.TokenCharacter,
+				Text: start,
+				Span: span(startStart, startEnd),
+			},
+			End: syntax.Token{
+				Kind: endKind,
+				Text: end,
+				Span: span(endStart, endEnd),
+			},
+			Span: span(startStart, endEnd),
 		},
 		Span: span(definitionStart, definitionEnd),
 	}

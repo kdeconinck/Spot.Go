@@ -122,7 +122,7 @@ func (parser *parser) parseDefinition() syntax.Definition {
 	name := parser.current
 	parser.advance()
 	parser.expect(syntax.TokenEqual)
-	expression := parser.expect(syntax.TokenCharacter)
+	expression := parser.parseDefinitionExpression()
 
 	return syntax.Definition{
 		Name:       name,
@@ -130,6 +130,31 @@ func (parser *parser) parseDefinition() syntax.Definition {
 		Span: location.Span{
 			Start: name.Span.Start,
 			End:   expression.Span.End,
+		},
+	}
+}
+
+func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
+	start := parser.expect(syntax.TokenCharacter)
+
+	if parser.current.Kind != syntax.TokenDotDot {
+		return syntax.DefinitionExpression{
+			Kind:  syntax.DefinitionExpressionCharacter,
+			Start: start,
+			Span:  start.Span,
+		}
+	}
+
+	parser.advance()
+	end := parser.expect(syntax.TokenCharacter)
+
+	return syntax.DefinitionExpression{
+		Kind:  syntax.DefinitionExpressionRange,
+		Start: start,
+		End:   end,
+		Span: location.Span{
+			Start: start.Span.Start,
+			End:   end.Span.End,
 		},
 	}
 }
