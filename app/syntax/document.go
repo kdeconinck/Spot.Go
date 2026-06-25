@@ -85,6 +85,9 @@ const (
 
 	// DefinitionExpressionReference is a reference to another definition.
 	DefinitionExpressionReference
+
+	// DefinitionExpressionAlternation is a list of alternative expressions.
+	DefinitionExpressionAlternation
 )
 
 // DefinitionExpression is a parsed character-level definition expression.
@@ -97,6 +100,9 @@ type DefinitionExpression struct {
 
 	// End is the final character literal in a range expression.
 	End Token
+
+	// Terms are the alternative expressions in an alternation expression.
+	Terms []DefinitionExpression
 
 	// Span is the byte range covered by the expression.
 	Span location.Span

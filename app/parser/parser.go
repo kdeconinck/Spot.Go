@@ -153,6 +153,28 @@ func (parser *parser) parseDefinition() syntax.Definition {
 }
 
 func (parser *parser) parseDefinitionExpression() syntax.DefinitionExpression {
+	first := parser.parseDefinitionPrimary()
+
+	if !parser.at(syntax.TokenPipe) {
+		return first
+	}
+
+	terms := []syntax.DefinitionExpression{
+		first,
+	}
+
+	for parser.consume(syntax.TokenPipe) {
+		terms = append(terms, parser.parseDefinitionPrimary())
+	}
+
+	return syntax.DefinitionExpression{
+		Kind:  syntax.DefinitionExpressionAlternation,
+		Terms: terms,
+		Span:  span(first.Span.Start, terms[len(terms)-1].Span.End),
+	}
+}
+
+func (parser *parser) parseDefinitionPrimary() syntax.DefinitionExpression {
 	if parser.at(syntax.TokenIdentifier) {
 		reference := parser.expect(syntax.TokenIdentifier)
 
