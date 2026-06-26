@@ -35,6 +35,14 @@ func validateDefinitions(definitions syntax.DefinitionsSection, diagnostics []Di
 
 func validateDefinitionExpression(expression syntax.DefinitionExpression, names map[string]struct{}, diagnostics []Diagnostic) []Diagnostic {
 	switch expression.Kind {
+	case syntax.DefinitionExpressionRange:
+		if characterValue(expression.Start) > characterValue(expression.End) {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: "Character range start must be less than or equal to end.",
+				Span:    expression.Span,
+			})
+		}
+
 	case syntax.DefinitionExpressionReference:
 		if _, ok := names[expression.Start.Text]; !ok {
 			diagnostics = append(diagnostics, Diagnostic{
@@ -53,4 +61,30 @@ func validateDefinitionExpression(expression syntax.DefinitionExpression, names 
 	}
 
 	return diagnostics
+}
+
+func characterValue(token syntax.Token) byte {
+	if token.Text[1] != '\\' {
+		return token.Text[1]
+	}
+
+	switch token.Text[2] {
+	case '\\':
+		return '\\'
+
+	case '\'':
+		return '\''
+
+	case 'n':
+		return '\n'
+
+	case 'r':
+		return '\r'
+
+	case 't':
+		return '\t'
+
+	default:
+		return token.Text[2]
+	}
 }

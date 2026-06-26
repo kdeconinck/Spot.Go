@@ -82,6 +82,28 @@ func Test_Validate_Definitions(t *testing.T) {
 				diagnostic(`Definition "missing" is not declared.`, 63, 70),
 			},
 		},
+		{
+			name:     "When a character range start is less than the end, no diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a'..'z' }",
+		},
+		{
+			name:     "When a character range start is greater than the end, a diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { letter = 'z'..'a' }",
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Character range start must be less than or equal to end.", 51, 59),
+			},
+		},
+		{
+			name:     "When an escaped character range start is greater than the end, a diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { whitespace = '\\r'..'\\n' }",
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Character range start must be less than or equal to end.", 55, 65),
+			},
+		},
+		{
+			name:     "When a character range uses escaped quote and backslash, no diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { quote = '\\''..'\\\\' }",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -121,7 +143,7 @@ func definitionsDSL(size int) string {
 
 	sb.WriteString("scope { include \"**/*.go\" }\n")
 	sb.WriteString("definitions {\n")
-	sb.WriteString("    base = 'a'\n")
+	sb.WriteString("    base = 'a'..'z'\n")
 
 	for idx := range size {
 		sb.WriteString("    definition")
