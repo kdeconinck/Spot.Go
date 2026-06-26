@@ -36,6 +36,27 @@ func validateRules(rules syntax.RulesSection, tokens syntax.TokensSection, diagn
 }
 
 func validateRuleReferences(rule syntax.Rule, tokens syntax.TokensSection, diagnostics []Diagnostic) []Diagnostic {
+	hasMatch := ruleHasMatch(rule)
+	hasReport := ruleHasReport(rule)
+
+	if !hasMatch {
+		diagnostics = append(diagnostics, Diagnostic{
+			Message: "Rule must contain a match statement.",
+			Span:    rule.Match.Span,
+		})
+	}
+
+	if !hasReport {
+		diagnostics = append(diagnostics, Diagnostic{
+			Message: "Rule must contain a report statement.",
+			Span:    rule.Report.Span,
+		})
+	}
+
+	if !hasMatch {
+		return diagnostics
+	}
+
 	matchedToken := rule.Match.Token
 
 	if !tokenDeclared(tokens, matchedToken.Text) {
@@ -73,7 +94,7 @@ func validateRuleReferences(rule syntax.Rule, tokens syntax.TokensSection, diagn
 		})
 	}
 
-	if rule.Report.Target.Text != "" && rule.Report.Target.Text != matchedToken.Text {
+	if hasReport && rule.Report.Target.Text != "" && rule.Report.Target.Text != matchedToken.Text {
 		diagnostics = append(diagnostics, Diagnostic{
 			Message: `Report target must reference matched token "` + matchedToken.Text + `".`,
 			Span:    rule.Report.Target.Span,
@@ -81,6 +102,14 @@ func validateRuleReferences(rule syntax.Rule, tokens syntax.TokensSection, diagn
 	}
 
 	return diagnostics
+}
+
+func ruleHasMatch(rule syntax.Rule) bool {
+	return rule.Match.Span.Start != rule.Match.Token.Span.Start
+}
+
+func ruleHasReport(rule syntax.Rule) bool {
+	return rule.Report.Span.Start != rule.Report.Severity.Span.Start
 }
 
 func tokenDeclared(tokens syntax.TokensSection, name string) bool {

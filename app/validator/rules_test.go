@@ -23,9 +23,10 @@ func Test_Validate_Rules(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
-		name            string
-		inSource        string
-		wantDiagnostics []validator.Diagnostic
+		name                     string
+		inSource                 string
+		wantParseDiagnosticCount int
+		wantDiagnostics          []validator.Diagnostic
 	}{
 		{
 			name:     "When rule names are unique, no diagnostic is returned.",
@@ -44,6 +45,22 @@ func Test_Validate_Rules(t *testing.T) {
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Rule "PublicIdentifier" is already declared.`, 143, 159),
 				diagnostic(`Rule "PublicIdentifier" is already declared.`, 216, 232),
+			},
+		},
+		{
+			name:                     "When a rule is missing a match statement, a diagnostic is returned.",
+			inSource:                 `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { report warn at Identifier "x" } }`,
+			wantParseDiagnosticCount: 2,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Rule must contain a match statement.", 89, 95),
+			},
+		},
+		{
+			name:                     "When a rule is missing a report statement, a diagnostic is returned.",
+			inSource:                 `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier } }`,
+			wantParseDiagnosticCount: 5,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Rule must contain a report statement.", 106, 107),
 			},
 		},
 		{
@@ -107,7 +124,7 @@ func Test_Validate_Rules(t *testing.T) {
 			gotDiagnostics := validator.Validate(document)
 
 			// Assert.
-			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")
+			claim.Equal(t, tc.name, tc.wantParseDiagnosticCount, len(parseDiagnostics), "Parse Diagnostic Count")
 			claim.DeepEqual(t, tc.name, tc.wantDiagnostics, gotDiagnostics, "Diagnostic")
 		})
 	}
