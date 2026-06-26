@@ -46,6 +46,27 @@ func Test_Validate_Rules(t *testing.T) {
 				diagnostic(`Rule "PublicIdentifier" is already declared.`, 216, 232),
 			},
 		},
+		{
+			name:     "When a rule matches an undeclared token, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Missing report warn at Missing "x" } }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Token "Missing" is not declared.`, 95, 102),
+			},
+		},
+		{
+			name:     "When a where clause references a token other than the matched token, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" Keyword = "kw" } rules { rule PublicIdentifier { match Identifier where Keyword.text == "public" report warn at Identifier "x" } }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Where clause must reference matched token "Identifier".`, 127, 134),
+			},
+		},
+		{
+			name:     "When a report target references a token other than the matched token, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" Keyword = "kw" } rules { rule PublicIdentifier { match Identifier report warn at Keyword "x" } }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Report target must reference matched token "Identifier".`, 136, 143),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

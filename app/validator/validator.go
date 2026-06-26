@@ -15,7 +15,7 @@ func Validate(document syntax.Document) []Diagnostic {
 	diagnostics = validateScope(document.Scope, diagnostics)
 	diagnostics = validateDefinitions(document.Definitions, diagnostics)
 	diagnostics = validateTokens(document.Tokens, document.Definitions, diagnostics)
-	diagnostics = validateRules(document.Rules, diagnostics)
+	diagnostics = validateRules(document.Rules, document.Tokens, diagnostics)
 	diagnostics = validateNames(document.Definitions, document.Tokens, diagnostics)
 
 	return diagnostics
