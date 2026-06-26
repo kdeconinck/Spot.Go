@@ -58,6 +58,13 @@ func Test_Validate_Definitions(t *testing.T) {
 			},
 		},
 		{
+			name:     "When one of multiple definitions references an undeclared definition, a diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { a = missing b = 'b' }",
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "missing" is not declared.`, 46, 53),
+			},
+		},
+		{
 			name:     "When an alternation references undeclared definitions, diagnostics are returned.",
 			inSource: "scope { include \"**/*.go\" } definitions { value = letter | digit }",
 			wantDiagnostics: []validator.Diagnostic{
@@ -120,6 +127,10 @@ func Test_Validate_Definitions(t *testing.T) {
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic("Character range start must be less than or equal to end.", 55, 65),
 			},
+		},
+		{
+			name:     "When an escaped tab character range start is less than the end, no diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { whitespace = '\\t'..'\\n' }",
 		},
 		{
 			name:     "When a character range uses escaped quote and backslash, no diagnostic is returned.",

@@ -82,13 +82,9 @@ func characterValue(token syntax.Token) byte {
 
 	case 'r':
 		return '\r'
-
-	case 't':
-		return '\t'
-
-	default:
-		return token.Text[2]
 	}
+
+	return '\t'
 }
 
 func validateDefinitionRecursion(definitions syntax.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
