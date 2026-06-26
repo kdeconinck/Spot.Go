@@ -52,12 +52,12 @@ func Test_Validate_Definitions(t *testing.T) {
 
 			// Arrange.
 			document, parseDiagnostics := parser.Parse(tc.inSource)
-			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")
 
 			// Act.
 			gotDiagnostics := validator.Validate(document)
 
 			// Assert.
+			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")
 			claim.DeepEqual(t, tc.name, tc.wantDiagnostics, gotDiagnostics, "Diagnostic")
 		})
 	}
@@ -86,7 +86,7 @@ func definitionsDSL(size int) string {
 	sb.WriteString("scope { include \"**/*.go\" }\n")
 	sb.WriteString("definitions {\n")
 
-	for idx := 0; idx < size; idx++ {
+	for idx := range size {
 		sb.WriteString("    definition")
 		sb.WriteString(strconv.Itoa(idx))
 		sb.WriteString(" = 'a'\n")

@@ -58,12 +58,12 @@ func Test_Validate_Scope(t *testing.T) {
 
 			// Arrange.
 			document, parseDiagnostics := parser.Parse(tc.inSource)
-			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")
 
 			// Act.
 			gotDiagnostics := validator.Validate(document)
 
 			// Assert.
+			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")
 			claim.DeepEqual(t, tc.name, tc.wantDiagnostics, gotDiagnostics, "Diagnostic")
 		})
 	}
