@@ -46,6 +46,42 @@ func Test_Validate_Definitions(t *testing.T) {
 				diagnostic(`Definition "letter" is already declared.`, 68, 74),
 			},
 		},
+		{
+			name:     "When a definition references a declared definition, no diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a' identifier = letter }",
+		},
+		{
+			name:     "When a definition references an undeclared definition, a diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { identifier = missing }",
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "missing" is not declared.`, 55, 62),
+			},
+		},
+		{
+			name:     "When an alternation references undeclared definitions, diagnostics are returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { value = letter | digit }",
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "letter" is not declared.`, 50, 56),
+				diagnostic(`Definition "digit" is not declared.`, 59, 64),
+			},
+		},
+		{
+			name:     "When grouped repetition references undeclared definitions, diagnostics are returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { value = letter (digit | '_')+ }",
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "letter" is not declared.`, 50, 56),
+				diagnostic(`Definition "digit" is not declared.`, 58, 63),
+			},
+		},
+		{
+			name:     "When concatenation references undeclared definitions, diagnostics are returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { value = letter digit missing }",
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "letter" is not declared.`, 50, 56),
+				diagnostic(`Definition "digit" is not declared.`, 57, 62),
+				diagnostic(`Definition "missing" is not declared.`, 63, 70),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -85,11 +121,12 @@ func definitionsDSL(size int) string {
 
 	sb.WriteString("scope { include \"**/*.go\" }\n")
 	sb.WriteString("definitions {\n")
+	sb.WriteString("    base = 'a'\n")
 
 	for idx := range size {
 		sb.WriteString("    definition")
 		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" = 'a'\n")
+		sb.WriteString(" = base\n")
 	}
 
 	sb.WriteString("}")

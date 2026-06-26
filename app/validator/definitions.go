@@ -9,10 +9,6 @@ package validator
 import "github.com/kdeconinck/spot/syntax"
 
 func validateDefinitions(definitions syntax.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
-	if len(definitions.Definitions) < 2 {
-		return diagnostics
-	}
-
 	names := map[string]struct{}{}
 
 	for idx := range definitions.Definitions {
@@ -28,6 +24,32 @@ func validateDefinitions(definitions syntax.DefinitionsSection, diagnostics []Di
 		}
 
 		names[name.Text] = struct{}{}
+	}
+
+	for idx := range definitions.Definitions {
+		diagnostics = validateDefinitionExpression(definitions.Definitions[idx].Expression, names, diagnostics)
+	}
+
+	return diagnostics
+}
+
+func validateDefinitionExpression(expression syntax.DefinitionExpression, names map[string]struct{}, diagnostics []Diagnostic) []Diagnostic {
+	switch expression.Kind {
+	case syntax.DefinitionExpressionReference:
+		if _, ok := names[expression.Start.Text]; !ok {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: `Definition "` + expression.Start.Text + `" is not declared.`,
+				Span:    expression.Start.Span,
+			})
+		}
+
+	case syntax.DefinitionExpressionAlternation, syntax.DefinitionExpressionConcatenation:
+		for idx := range expression.Terms {
+			diagnostics = validateDefinitionExpression(expression.Terms[idx], names, diagnostics)
+		}
+
+	case syntax.DefinitionExpressionGroup, syntax.DefinitionExpressionRepetition:
+		diagnostics = validateDefinitionExpression(*expression.Inner, names, diagnostics)
 	}
 
 	return diagnostics
