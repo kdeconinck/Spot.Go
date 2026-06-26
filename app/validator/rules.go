@@ -59,6 +59,20 @@ func validateRuleReferences(rule syntax.Rule, tokens syntax.TokensSection, diagn
 		})
 	}
 
+	if rule.Where.Property.Text == "text" && rule.Where.Value.Kind != syntax.TokenString {
+		diagnostics = append(diagnostics, Diagnostic{
+			Message: `Token property "text" must be compared with a string literal.`,
+			Span:    rule.Where.Value.Span,
+		})
+	}
+
+	if rule.Where.Property.Text == "length" && rule.Where.Value.Kind != syntax.TokenInteger {
+		diagnostics = append(diagnostics, Diagnostic{
+			Message: `Token property "length" must be compared with an integer literal.`,
+			Span:    rule.Where.Value.Span,
+		})
+	}
+
 	if rule.Report.Target.Text != "" && rule.Report.Target.Text != matchedToken.Text {
 		diagnostics = append(diagnostics, Diagnostic{
 			Message: `Report target must reference matched token "` + matchedToken.Text + `".`,

@@ -76,6 +76,20 @@ func Test_Validate_Rules(t *testing.T) {
 			},
 		},
 		{
+			name:     "When a text property is compared with an integer literal, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.text == 1 report warn at Identifier "x" } }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Token property "text" must be compared with a string literal.`, 131, 132),
+			},
+		},
+		{
+			name:     "When a length property is compared with a string literal, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.length > "public" report warn at Identifier "x" } }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Token property "length" must be compared with an integer literal.`, 132, 140),
+			},
+		},
+		{
 			name:     "When a report target references a token other than the matched token, a diagnostic is returned.",
 			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" Keyword = "kw" } rules { rule PublicIdentifier { match Identifier report warn at Keyword "x" } }`,
 			wantDiagnostics: []validator.Diagnostic{
