@@ -3,6 +3,10 @@
 // == SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // =====================================================================================================================
 
+// Verify the public API of the validator package.
+//
+// Tests in this package are written against the exported API only.
+// This ensures that behavior is tested through the same surface that external consumers would use.
 package validator_test
 
 import (
