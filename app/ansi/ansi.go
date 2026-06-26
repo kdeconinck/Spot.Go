@@ -142,8 +142,10 @@ func codeLen(code Code) int {
 		switch {
 		case code < 10:
 			return 1
+
 		case code < 100:
 			return 2
+
 		default:
 			return 3
 		}
