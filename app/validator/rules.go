@@ -52,6 +52,13 @@ func validateRuleReferences(rule syntax.Rule, tokens syntax.TokensSection, diagn
 		})
 	}
 
+	if rule.Where.Property.Text != "" && rule.Where.Property.Text != "text" && rule.Where.Property.Text != "length" {
+		diagnostics = append(diagnostics, Diagnostic{
+			Message: `Token property "` + rule.Where.Property.Text + `" is not declared.`,
+			Span:    rule.Where.Property.Span,
+		})
+	}
+
 	if rule.Report.Target.Text != "" && rule.Report.Target.Text != matchedToken.Text {
 		diagnostics = append(diagnostics, Diagnostic{
 			Message: `Report target must reference matched token "` + matchedToken.Text + `".`,

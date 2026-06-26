@@ -61,6 +61,21 @@ func Test_Validate_Rules(t *testing.T) {
 			},
 		},
 		{
+			name:     "When a where clause references the text property, no diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.text == "public" report warn at Identifier "x" } }`,
+		},
+		{
+			name:     "When a where clause references the length property, no diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.length > 1 report warn at Identifier "x" } }`,
+		},
+		{
+			name:     "When a where clause references an unknown property, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.unknown == "public" report warn at Identifier "x" } }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Token property "unknown" is not declared.`, 123, 130),
+			},
+		},
+		{
 			name:     "When a report target references a token other than the matched token, a diagnostic is returned.",
 			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" Keyword = "kw" } rules { rule PublicIdentifier { match Identifier report warn at Keyword "x" } }`,
 			wantDiagnostics: []validator.Diagnostic{
