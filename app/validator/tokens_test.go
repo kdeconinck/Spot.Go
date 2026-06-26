@@ -28,6 +28,20 @@ func Test_Validate_Tokens(t *testing.T) {
 		wantDiagnostics []validator.Diagnostic
 	}{
 		{
+			name:     "When the tokens section is missing, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Tokens must contain at least one token.", 0, 0),
+			},
+		},
+		{
+			name:     "When the tokens section is empty, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens {}`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Tokens must contain at least one token.", 28, 37),
+			},
+		},
+		{
 			name:     "When token names are unique, no diagnostic is returned.",
 			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" Keyword = "kw" }`,
 		},

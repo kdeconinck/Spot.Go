@@ -29,25 +29,25 @@ func Test_Validate_Scope(t *testing.T) {
 	}{
 		{
 			name:     "When scope contains an include pattern, no diagnostic is returned.",
-			inSource: `scope { include "**/*.go" }`,
+			inSource: `scope { include "**/*.go" } tokens { Token = "x" }`,
 		},
 		{
 			name:     "When scope contains no include pattern, a diagnostic is returned.",
-			inSource: `scope { exclude "vendor/**" }`,
+			inSource: `scope { exclude "vendor/**" } tokens { Token = "x" }`,
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic("Scope must contain at least one include.", 0, 29),
 			},
 		},
 		{
 			name:     "When an include pattern is empty, a diagnostic is returned.",
-			inSource: `scope { include "" }`,
+			inSource: `scope { include "" } tokens { Token = "x" }`,
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic("Scope pattern must not be empty.", 16, 18),
 			},
 		},
 		{
 			name:     "When an exclude pattern is empty, a diagnostic is returned.",
-			inSource: `scope { include "**/*.go" exclude "" }`,
+			inSource: `scope { include "**/*.go" exclude "" } tokens { Token = "x" }`,
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic("Scope pattern must not be empty.", 34, 36),
 			},
@@ -89,7 +89,8 @@ func benchmark_Validate_Scope(b *testing.B, size int) {
 func scopeDSL(size int) string {
 	return "scope {\n" +
 		strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) +
-		"}"
+		"}\n" +
+		"tokens { Token = \"x\" }"
 }
 
 func diagnostic(message string, start, end location.Position) validator.Diagnostic {

@@ -10,6 +10,11 @@ import "github.com/kdeconinck/spot/syntax"
 
 func validateTokens(tokens syntax.TokensSection, definitions syntax.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
 	if len(tokens.Tokens) == 0 {
+		diagnostics = append(diagnostics, Diagnostic{
+			Message: "Tokens must contain at least one token.",
+			Span:    tokens.Span,
+		})
+
 		return diagnostics
 	}
 

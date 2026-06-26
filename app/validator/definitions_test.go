@@ -29,18 +29,18 @@ func Test_Validate_Definitions(t *testing.T) {
 	}{
 		{
 			name:     "When definition names are unique, no diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a' digit = '0' }",
+			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a' digit = '0' } tokens { Token = \"x\" }",
 		},
 		{
 			name:     "When a definition name is declared twice, a diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a' letter = 'b' }",
+			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a' letter = 'b' } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Definition "letter" is already declared.`, 55, 61),
 			},
 		},
 		{
 			name:     "When a definition name is declared three times, diagnostics are returned for the second and third declarations.",
-			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a' letter = 'b' letter = 'c' }",
+			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a' letter = 'b' letter = 'c' } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Definition "letter" is already declared.`, 55, 61),
 				diagnostic(`Definition "letter" is already declared.`, 68, 74),
@@ -48,25 +48,25 @@ func Test_Validate_Definitions(t *testing.T) {
 		},
 		{
 			name:     "When a definition references a declared definition, no diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a' identifier = letter }",
+			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a' identifier = letter } tokens { Token = \"x\" }",
 		},
 		{
 			name:     "When a definition references an undeclared definition, a diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { identifier = missing }",
+			inSource: "scope { include \"**/*.go\" } definitions { identifier = missing } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Definition "missing" is not declared.`, 55, 62),
 			},
 		},
 		{
 			name:     "When one of multiple definitions references an undeclared definition, a diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { a = missing b = 'b' }",
+			inSource: "scope { include \"**/*.go\" } definitions { a = missing b = 'b' } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Definition "missing" is not declared.`, 46, 53),
 			},
 		},
 		{
 			name:     "When an alternation references undeclared definitions, diagnostics are returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { value = letter | digit }",
+			inSource: "scope { include \"**/*.go\" } definitions { value = letter | digit } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Definition "letter" is not declared.`, 50, 56),
 				diagnostic(`Definition "digit" is not declared.`, 59, 64),
@@ -74,7 +74,7 @@ func Test_Validate_Definitions(t *testing.T) {
 		},
 		{
 			name:     "When grouped repetition references undeclared definitions, diagnostics are returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { value = letter (digit | '_')+ }",
+			inSource: "scope { include \"**/*.go\" } definitions { value = letter (digit | '_')+ } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Definition "letter" is not declared.`, 50, 56),
 				diagnostic(`Definition "digit" is not declared.`, 58, 63),
@@ -82,7 +82,7 @@ func Test_Validate_Definitions(t *testing.T) {
 		},
 		{
 			name:     "When concatenation references undeclared definitions, diagnostics are returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { value = letter digit missing }",
+			inSource: "scope { include \"**/*.go\" } definitions { value = letter digit missing } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Definition "letter" is not declared.`, 50, 56),
 				diagnostic(`Definition "digit" is not declared.`, 57, 62),
@@ -91,50 +91,50 @@ func Test_Validate_Definitions(t *testing.T) {
 		},
 		{
 			name:     "When a definition directly references itself, a diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { a = a }",
+			inSource: "scope { include \"**/*.go\" } definitions { a = a } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Definition "a" is recursive.`, 46, 47),
 			},
 		},
 		{
 			name:     "When definitions reference each other, a diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { a = b b = a }",
+			inSource: "scope { include \"**/*.go\" } definitions { a = b b = a } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Definition "a" is recursive.`, 52, 53),
 			},
 		},
 		{
 			name:     "When grouped repetition references a recursive definition, a diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { a = (b | 'x')+ b = a }",
+			inSource: "scope { include \"**/*.go\" } definitions { a = (b | 'x')+ b = a } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Definition "a" is recursive.`, 61, 62),
 			},
 		},
 		{
 			name:     "When a character range start is less than the end, no diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a'..'z' }",
+			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a'..'z' } tokens { Token = \"x\" }",
 		},
 		{
 			name:     "When a character range start is greater than the end, a diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { letter = 'z'..'a' }",
+			inSource: "scope { include \"**/*.go\" } definitions { letter = 'z'..'a' } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic("Character range start must be less than or equal to end.", 51, 59),
 			},
 		},
 		{
 			name:     "When an escaped character range start is greater than the end, a diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { whitespace = '\\r'..'\\n' }",
+			inSource: "scope { include \"**/*.go\" } definitions { whitespace = '\\r'..'\\n' } tokens { Token = \"x\" }",
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic("Character range start must be less than or equal to end.", 55, 65),
 			},
 		},
 		{
 			name:     "When an escaped tab character range start is less than the end, no diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { whitespace = '\\t'..'\\n' }",
+			inSource: "scope { include \"**/*.go\" } definitions { whitespace = '\\t'..'\\n' } tokens { Token = \"x\" }",
 		},
 		{
 			name:     "When a character range uses escaped quote and backslash, no diagnostic is returned.",
-			inSource: "scope { include \"**/*.go\" } definitions { quote = '\\''..'\\\\' }",
+			inSource: "scope { include \"**/*.go\" } definitions { quote = '\\''..'\\\\' } tokens { Token = \"x\" }",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -184,6 +184,8 @@ func definitionsDSL(size int) string {
 	}
 
 	sb.WriteString("}")
+	sb.WriteString("\n")
+	sb.WriteString("tokens { Token = \"x\" }")
 
 	return sb.String()
 }
