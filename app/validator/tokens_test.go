@@ -46,6 +46,38 @@ func Test_Validate_Tokens(t *testing.T) {
 				diagnostic(`Token "Identifier" is already declared.`, 76, 86),
 			},
 		},
+		{
+			name:     "When a token references a declared definition, no diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } definitions { letter = 'a' } tokens { Identifier = letter }`,
+		},
+		{
+			name:     "When a token references an undeclared definition, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = missing }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "missing" is not declared.`, 50, 57),
+			},
+		},
+		{
+			name:     "When a token grouped repetition references undeclared definitions, diagnostics are returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = (letter | digit)+ }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "letter" is not declared.`, 51, 57),
+				diagnostic(`Definition "digit" is not declared.`, 60, 65),
+			},
+		},
+		{
+			name:     "When a token concatenation references undeclared definitions, diagnostics are returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = letter digit missing }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "letter" is not declared.`, 50, 56),
+				diagnostic(`Definition "digit" is not declared.`, 57, 62),
+				diagnostic(`Definition "missing" is not declared.`, 63, 70),
+			},
+		},
+		{
+			name:     "When a token expression is a string literal, no definition lookup diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Keyword = "public" }`,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -84,14 +116,13 @@ func tokensDSL(size int) string {
 	var sb strings.Builder
 
 	sb.WriteString("scope { include \"**/*.go\" }\n")
+	sb.WriteString("definitions { base = 'a' }\n")
 	sb.WriteString("tokens {\n")
 
 	for idx := range size {
 		sb.WriteString("    Token")
 		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" = \"token")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString("\"\n")
+		sb.WriteString(" = base\n")
 	}
 
 	sb.WriteString("}")
