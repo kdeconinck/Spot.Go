@@ -514,6 +514,8 @@ A valid DSL file must satisfy all validation rules.
 * Each top-level section may appear at most once.
 * Unknown top-level sections are invalid.
 * `scope` must contain at least one `include`.
+* `include` patterns must not be empty.
+* `exclude` patterns must not be empty.
 * `tokens` must contain at least one token declaration.
 
 ## Name Validation
