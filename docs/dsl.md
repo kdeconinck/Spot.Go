@@ -529,7 +529,6 @@ A valid DSL file must satisfy all validation rules.
 
 ## Definition Validation
 
-* Definition expressions must not be empty.
 * Character ranges must have a valid order.
 * Recursive definitions are invalid.
 
@@ -544,8 +543,7 @@ definitions {
 
 ## Token Validation
 
-* Token expressions must not be empty.
-* Token expressions must be able to consume at least one character.
+* Token expressions must not match empty input.
 * `skip` may only appear at the end of a token declaration.
 
 Invalid:
