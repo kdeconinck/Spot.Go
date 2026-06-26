@@ -6,10 +6,13 @@
 // Package compiler compiles validated Spot DSL syntax into runtime-oriented data structures.
 package compiler
 
-import "github.com/kdeconinck/spot/syntax"
+import (
+	"github.com/kdeconinck/spot/ir"
+	"github.com/kdeconinck/spot/syntax"
+)
 
 // Compile compiles a validated Spot DSL document into a token program.
-func Compile(document syntax.Document) Program {
+func Compile(document syntax.Document) ir.Program {
 	definitions := map[string]syntax.Definition{}
 
 	for idx := range document.Definitions.Definitions {
@@ -17,13 +20,13 @@ func Compile(document syntax.Document) Program {
 		definitions[definition.Name.Text] = definition
 	}
 
-	program := Program{
-		Tokens: make([]Token, 0, len(document.Tokens.Tokens)),
+	program := ir.Program{
+		Tokens: make([]ir.Token, 0, len(document.Tokens.Tokens)),
 	}
 
 	for idx := range document.Tokens.Tokens {
 		token := document.Tokens.Tokens[idx]
-		program.Tokens = append(program.Tokens, Token{
+		program.Tokens = append(program.Tokens, ir.Token{
 			Name:       token.Name.Text,
 			Expression: compileExpression(token.Expression, definitions),
 			Skip:       token.Skip.Kind == syntax.TokenSkip,
@@ -33,23 +36,23 @@ func Compile(document syntax.Document) Program {
 	return program
 }
 
-func compileExpression(expression syntax.DefinitionExpression, definitions map[string]syntax.Definition) Expression {
+func compileExpression(expression syntax.DefinitionExpression, definitions map[string]syntax.Definition) ir.Expression {
 	switch expression.Kind {
 	case syntax.DefinitionExpressionCharacter:
-		return Expression{
-			Kind:      ExpressionCharacter,
+		return ir.Expression{
+			Kind:      ir.ExpressionCharacter,
 			Character: characterValue(expression.Start),
 		}
 
 	case syntax.DefinitionExpressionString:
-		return Expression{
-			Kind:   ExpressionString,
+		return ir.Expression{
+			Kind:   ir.ExpressionString,
 			String: stringValue(expression.Start),
 		}
 
 	case syntax.DefinitionExpressionRange:
-		return Expression{
-			Kind:       ExpressionRange,
+		return ir.Expression{
+			Kind:       ir.ExpressionRange,
 			RangeStart: characterValue(expression.Start),
 			RangeEnd:   characterValue(expression.End),
 		}
@@ -58,14 +61,14 @@ func compileExpression(expression syntax.DefinitionExpression, definitions map[s
 		return compileExpression(definitions[expression.Start.Text].Expression, definitions)
 
 	case syntax.DefinitionExpressionConcatenation:
-		return Expression{
-			Kind:  ExpressionConcatenation,
+		return ir.Expression{
+			Kind:  ir.ExpressionConcatenation,
 			Terms: compileTerms(expression.Terms, definitions),
 		}
 
 	case syntax.DefinitionExpressionAlternation:
-		return Expression{
-			Kind:  ExpressionAlternation,
+		return ir.Expression{
+			Kind:  ir.ExpressionAlternation,
 			Terms: compileTerms(expression.Terms, definitions),
 		}
 
@@ -73,16 +76,16 @@ func compileExpression(expression syntax.DefinitionExpression, definitions map[s
 		return compileExpression(*expression.Inner, definitions)
 
 	default:
-		return Expression{
-			Kind:       ExpressionRepetition,
+		return ir.Expression{
+			Kind:       ir.ExpressionRepetition,
 			Inner:      pointer(compileExpression(*expression.Inner, definitions)),
 			Repetition: repetitionKind(expression.Operator.Kind),
 		}
 	}
 }
 
-func compileTerms(expressions []syntax.DefinitionExpression, definitions map[string]syntax.Definition) []Expression {
-	terms := make([]Expression, 0, len(expressions))
+func compileTerms(expressions []syntax.DefinitionExpression, definitions map[string]syntax.Definition) []ir.Expression {
+	terms := make([]ir.Expression, 0, len(expressions))
 
 	for idx := range expressions {
 		terms = append(terms, compileExpression(expressions[idx], definitions))
@@ -91,16 +94,16 @@ func compileTerms(expressions []syntax.DefinitionExpression, definitions map[str
 	return terms
 }
 
-func repetitionKind(kind syntax.TokenKind) RepetitionKind {
+func repetitionKind(kind syntax.TokenKind) ir.RepetitionKind {
 	switch kind {
 	case syntax.TokenQuestion:
-		return RepetitionZeroOrOne
+		return ir.RepetitionZeroOrOne
 
 	case syntax.TokenStar:
-		return RepetitionZeroOrMore
+		return ir.RepetitionZeroOrMore
 
 	default:
-		return RepetitionOneOrMore
+		return ir.RepetitionOneOrMore
 	}
 }
 
@@ -161,6 +164,6 @@ func stringValue(token syntax.Token) string {
 	return string(value)
 }
 
-func pointer(expression Expression) *Expression {
+func pointer(expression ir.Expression) *ir.Expression {
 	return &expression
 }

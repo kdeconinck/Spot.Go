@@ -7,26 +7,26 @@
 package parser
 
 import (
+	"github.com/kdeconinck/spot/lexer"
 	"github.com/kdeconinck/spot/location"
-	"github.com/kdeconinck/spot/scanner"
 	"github.com/kdeconinck/spot/syntax"
 )
 
 // Parse parses DSL source text into a syntax document.
 func Parse(src string) (syntax.Document, []Diagnostic) {
 	parser := parser{
-		scanner: scanner.New(src),
+		lexer: lexer.New(src),
 	}
 
-	parser.current = parser.scanner.Next()
-	parser.next = parser.scanner.Next()
+	parser.current = parser.lexer.Next()
+	parser.next = parser.lexer.Next()
 	document := parser.parseDocument()
 
 	return document, parser.diagnostics
 }
 
 type parser struct {
-	scanner     scanner.Scanner
+	lexer       lexer.Lexer
 	current     syntax.Token
 	next        syntax.Token
 	diagnostics []Diagnostic
@@ -95,7 +95,7 @@ func (parser *parser) addDiagnostic(kind syntax.TokenKind) {
 
 func (parser *parser) advance() {
 	parser.current = parser.next
-	parser.next = parser.scanner.Next()
+	parser.next = parser.lexer.Next()
 }
 
 func span(start, end location.Position) location.Span {

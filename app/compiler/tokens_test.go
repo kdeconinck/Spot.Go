@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/kdeconinck/spot/compiler"
+	"github.com/kdeconinck/spot/ir"
 	"github.com/kdeconinck/spot/parser"
 	"github.com/kdeconinck/spot/qa/claim"
 	"github.com/kdeconinck/spot/validator"
@@ -27,11 +28,11 @@ func Test_Compile_Tokens_PreservesSourceOrder(t *testing.T) {
 	source := `scope { include "**/*.go" } tokens { First = "a" Second = "b" Third = "c" }`
 	document, parseDiagnostics := parser.Parse(source)
 	validationDiagnostics := validator.Validate(document)
-	wantProgram := compiler.Program{
-		Tokens: []compiler.Token{
-			{Name: "First", Expression: compiler.Expression{Kind: compiler.ExpressionString, String: "a"}},
-			{Name: "Second", Expression: compiler.Expression{Kind: compiler.ExpressionString, String: "b"}},
-			{Name: "Third", Expression: compiler.Expression{Kind: compiler.ExpressionString, String: "c"}},
+	wantProgram := ir.Program{
+		Tokens: []ir.Token{
+			{Name: "First", Expression: ir.Expression{Kind: ir.ExpressionString, String: "a"}},
+			{Name: "Second", Expression: ir.Expression{Kind: ir.ExpressionString, String: "b"}},
+			{Name: "Third", Expression: ir.Expression{Kind: ir.ExpressionString, String: "c"}},
 		},
 	}
 
@@ -51,24 +52,24 @@ func Test_Compile_Tokens_ResolvesDefinitionReferences(t *testing.T) {
 	source := `scope { include "**/*.go" } definitions { letter = 'a'..'z' identifier = letter (letter | '_')* } tokens { Identifier = identifier }`
 	document, parseDiagnostics := parser.Parse(source)
 	validationDiagnostics := validator.Validate(document)
-	wantProgram := compiler.Program{
-		Tokens: []compiler.Token{
+	wantProgram := ir.Program{
+		Tokens: []ir.Token{
 			{
 				Name: "Identifier",
-				Expression: compiler.Expression{
-					Kind: compiler.ExpressionConcatenation,
-					Terms: []compiler.Expression{
-						{Kind: compiler.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
+				Expression: ir.Expression{
+					Kind: ir.ExpressionConcatenation,
+					Terms: []ir.Expression{
+						{Kind: ir.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
 						{
-							Kind: compiler.ExpressionRepetition,
-							Inner: pointer(compiler.Expression{
-								Kind: compiler.ExpressionAlternation,
-								Terms: []compiler.Expression{
-									{Kind: compiler.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
-									{Kind: compiler.ExpressionCharacter, Character: '_'},
+							Kind: ir.ExpressionRepetition,
+							Inner: pointer(ir.Expression{
+								Kind: ir.ExpressionAlternation,
+								Terms: []ir.Expression{
+									{Kind: ir.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
+									{Kind: ir.ExpressionCharacter, Character: '_'},
 								},
 							}),
-							Repetition: compiler.RepetitionZeroOrMore,
+							Repetition: ir.RepetitionZeroOrMore,
 						},
 					},
 				},
@@ -92,10 +93,10 @@ func Test_Compile_Tokens_UnescapesLiterals(t *testing.T) {
 	source := "scope { include \"**/*.go\" } tokens { Newline = '\\n' Text = \"a\\tb\\n\\\"c\\\\\" }"
 	document, parseDiagnostics := parser.Parse(source)
 	validationDiagnostics := validator.Validate(document)
-	wantProgram := compiler.Program{
-		Tokens: []compiler.Token{
-			{Name: "Newline", Expression: compiler.Expression{Kind: compiler.ExpressionCharacter, Character: '\n'}},
-			{Name: "Text", Expression: compiler.Expression{Kind: compiler.ExpressionString, String: "a\tb\n\"c\\"}},
+	wantProgram := ir.Program{
+		Tokens: []ir.Token{
+			{Name: "Newline", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\n'}},
+			{Name: "Text", Expression: ir.Expression{Kind: ir.ExpressionString, String: "a\tb\n\"c\\"}},
 		},
 	}
 
@@ -114,32 +115,32 @@ func Test_Compile_Tokens_UnescapesCharacterEscapes(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		inSource    string
-		wantProgram compiler.Program
+		wantProgram ir.Program
 	}{
 		{
 			name:     "When compiling a backslash character literal, the literal is unescaped.",
 			inSource: `scope { include "**/*.go" } tokens { Backslash = '\\' }`,
-			wantProgram: compiler.Program{
-				Tokens: []compiler.Token{
-					{Name: "Backslash", Expression: compiler.Expression{Kind: compiler.ExpressionCharacter, Character: '\\'}},
+			wantProgram: ir.Program{
+				Tokens: []ir.Token{
+					{Name: "Backslash", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\\'}},
 				},
 			},
 		},
 		{
 			name:     "When compiling a single quote character literal, the literal is unescaped.",
 			inSource: `scope { include "**/*.go" } tokens { Quote = '\'' }`,
-			wantProgram: compiler.Program{
-				Tokens: []compiler.Token{
-					{Name: "Quote", Expression: compiler.Expression{Kind: compiler.ExpressionCharacter, Character: '\''}},
+			wantProgram: ir.Program{
+				Tokens: []ir.Token{
+					{Name: "Quote", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\''}},
 				},
 			},
 		},
 		{
 			name:     "When compiling a carriage return character literal, the literal is unescaped.",
 			inSource: `scope { include "**/*.go" } tokens { CarriageReturn = '\r' }`,
-			wantProgram: compiler.Program{
-				Tokens: []compiler.Token{
-					{Name: "CarriageReturn", Expression: compiler.Expression{Kind: compiler.ExpressionCharacter, Character: '\r'}},
+			wantProgram: ir.Program{
+				Tokens: []ir.Token{
+					{Name: "CarriageReturn", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\r'}},
 				},
 			},
 		},
@@ -169,9 +170,9 @@ func Test_Compile_Tokens_UnescapesStringEscapes(t *testing.T) {
 	source := `scope { include "**/*.go" } tokens { Escapes = "\\\"\r" }`
 	document, parseDiagnostics := parser.Parse(source)
 	validationDiagnostics := validator.Validate(document)
-	wantProgram := compiler.Program{
-		Tokens: []compiler.Token{
-			{Name: "Escapes", Expression: compiler.Expression{Kind: compiler.ExpressionString, String: "\\\"\r"}},
+	wantProgram := ir.Program{
+		Tokens: []ir.Token{
+			{Name: "Escapes", Expression: ir.Expression{Kind: ir.ExpressionString, String: "\\\"\r"}},
 		},
 	}
 
@@ -191,24 +192,24 @@ func Test_Compile_Tokens_PreservesSkipFlags(t *testing.T) {
 	source := `scope { include "**/*.go" } definitions { whitespace = ' ' | '\t' } tokens { Whitespace = whitespace+ skip Identifier = "id" }`
 	document, parseDiagnostics := parser.Parse(source)
 	validationDiagnostics := validator.Validate(document)
-	wantProgram := compiler.Program{
-		Tokens: []compiler.Token{
+	wantProgram := ir.Program{
+		Tokens: []ir.Token{
 			{
 				Name: "Whitespace",
-				Expression: compiler.Expression{
-					Kind: compiler.ExpressionRepetition,
-					Inner: pointer(compiler.Expression{
-						Kind: compiler.ExpressionAlternation,
-						Terms: []compiler.Expression{
-							{Kind: compiler.ExpressionCharacter, Character: ' '},
-							{Kind: compiler.ExpressionCharacter, Character: '\t'},
+				Expression: ir.Expression{
+					Kind: ir.ExpressionRepetition,
+					Inner: pointer(ir.Expression{
+						Kind: ir.ExpressionAlternation,
+						Terms: []ir.Expression{
+							{Kind: ir.ExpressionCharacter, Character: ' '},
+							{Kind: ir.ExpressionCharacter, Character: '\t'},
 						},
 					}),
-					Repetition: compiler.RepetitionOneOrMore,
+					Repetition: ir.RepetitionOneOrMore,
 				},
 				Skip: true,
 			},
-			{Name: "Identifier", Expression: compiler.Expression{Kind: compiler.ExpressionString, String: "id"}},
+			{Name: "Identifier", Expression: ir.Expression{Kind: ir.ExpressionString, String: "id"}},
 		},
 	}
 
@@ -228,19 +229,19 @@ func Test_Compile_Tokens_PreservesZeroOrOneRepetition(t *testing.T) {
 	source := `scope { include "**/*.go" } tokens { Optional = "a"? "b" }`
 	document, parseDiagnostics := parser.Parse(source)
 	validationDiagnostics := validator.Validate(document)
-	wantProgram := compiler.Program{
-		Tokens: []compiler.Token{
+	wantProgram := ir.Program{
+		Tokens: []ir.Token{
 			{
 				Name: "Optional",
-				Expression: compiler.Expression{
-					Kind: compiler.ExpressionConcatenation,
-					Terms: []compiler.Expression{
+				Expression: ir.Expression{
+					Kind: ir.ExpressionConcatenation,
+					Terms: []ir.Expression{
 						{
-							Kind:       compiler.ExpressionRepetition,
-							Inner:      pointer(compiler.Expression{Kind: compiler.ExpressionString, String: "a"}),
-							Repetition: compiler.RepetitionZeroOrOne,
+							Kind:       ir.ExpressionRepetition,
+							Inner:      pointer(ir.Expression{Kind: ir.ExpressionString, String: "a"}),
+							Repetition: ir.RepetitionZeroOrOne,
 						},
-						{Kind: compiler.ExpressionString, String: "b"},
+						{Kind: ir.ExpressionString, String: "b"},
 					},
 				},
 			},
@@ -306,6 +307,6 @@ func tokensDSL(size int) string {
 	return sb.String()
 }
 
-func pointer(expression compiler.Expression) *compiler.Expression {
+func pointer(expression ir.Expression) *ir.Expression {
 	return &expression
 }

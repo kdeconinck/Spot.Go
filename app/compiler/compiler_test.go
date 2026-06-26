@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/kdeconinck/spot/compiler"
+	"github.com/kdeconinck/spot/ir"
 	"github.com/kdeconinck/spot/parser"
 	"github.com/kdeconinck/spot/qa/claim"
 	"github.com/kdeconinck/spot/validator"
@@ -27,57 +28,57 @@ func Test_Compile_DSL(t *testing.T) {
 	source := dsl(0)
 	document, parseDiagnostics := parser.Parse(source)
 	validationDiagnostics := validator.Validate(document)
-	wantProgram := compiler.Program{
-		Tokens: []compiler.Token{
+	wantProgram := ir.Program{
+		Tokens: []ir.Token{
 			{
 				Name: "Identifier",
-				Expression: compiler.Expression{
-					Kind: compiler.ExpressionConcatenation,
-					Terms: []compiler.Expression{
+				Expression: ir.Expression{
+					Kind: ir.ExpressionConcatenation,
+					Terms: []ir.Expression{
 						{
-							Kind: compiler.ExpressionAlternation,
-							Terms: []compiler.Expression{
-								{Kind: compiler.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
-								{Kind: compiler.ExpressionRange, RangeStart: 'A', RangeEnd: 'Z'},
+							Kind: ir.ExpressionAlternation,
+							Terms: []ir.Expression{
+								{Kind: ir.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
+								{Kind: ir.ExpressionRange, RangeStart: 'A', RangeEnd: 'Z'},
 							},
 						},
 						{
-							Kind: compiler.ExpressionRepetition,
-							Inner: pointer(compiler.Expression{
-								Kind: compiler.ExpressionAlternation,
-								Terms: []compiler.Expression{
+							Kind: ir.ExpressionRepetition,
+							Inner: pointer(ir.Expression{
+								Kind: ir.ExpressionAlternation,
+								Terms: []ir.Expression{
 									{
-										Kind: compiler.ExpressionAlternation,
-										Terms: []compiler.Expression{
-											{Kind: compiler.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
-											{Kind: compiler.ExpressionRange, RangeStart: 'A', RangeEnd: 'Z'},
+										Kind: ir.ExpressionAlternation,
+										Terms: []ir.Expression{
+											{Kind: ir.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
+											{Kind: ir.ExpressionRange, RangeStart: 'A', RangeEnd: 'Z'},
 										},
 									},
-									{Kind: compiler.ExpressionRange, RangeStart: '0', RangeEnd: '9'},
-									{Kind: compiler.ExpressionCharacter, Character: '_'},
+									{Kind: ir.ExpressionRange, RangeStart: '0', RangeEnd: '9'},
+									{Kind: ir.ExpressionCharacter, Character: '_'},
 								},
 							}),
-							Repetition: compiler.RepetitionZeroOrMore,
+							Repetition: ir.RepetitionZeroOrMore,
 						},
 					},
 				},
 			},
 			{
 				Name:       "KeywordPublic",
-				Expression: compiler.Expression{Kind: compiler.ExpressionString, String: "public"},
+				Expression: ir.Expression{Kind: ir.ExpressionString, String: "public"},
 			},
 			{
 				Name: "Whitespace",
-				Expression: compiler.Expression{
-					Kind: compiler.ExpressionRepetition,
-					Inner: pointer(compiler.Expression{
-						Kind: compiler.ExpressionAlternation,
-						Terms: []compiler.Expression{
-							{Kind: compiler.ExpressionCharacter, Character: ' '},
-							{Kind: compiler.ExpressionCharacter, Character: '\t'},
+				Expression: ir.Expression{
+					Kind: ir.ExpressionRepetition,
+					Inner: pointer(ir.Expression{
+						Kind: ir.ExpressionAlternation,
+						Terms: []ir.Expression{
+							{Kind: ir.ExpressionCharacter, Character: ' '},
+							{Kind: ir.ExpressionCharacter, Character: '\t'},
 						},
 					}),
-					Repetition: compiler.RepetitionOneOrMore,
+					Repetition: ir.RepetitionOneOrMore,
 				},
 				Skip: true,
 			},

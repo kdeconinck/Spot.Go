@@ -3,8 +3,8 @@
 // == SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // =====================================================================================================================
 
-// Package compiler compiles validated Spot DSL syntax into runtime-oriented data structures.
-package compiler
+// Package ir defines the runtime-oriented intermediate representation produced by the Spot compiler.
+package ir
 
 // Program is a compiled token program.
 type Program struct {

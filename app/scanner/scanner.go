@@ -3,336 +3,227 @@
 // == SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // =====================================================================================================================
 
-// Package scanner converts Spot DSL source text into syntax tokens.
+// Package scanner tokenizes source text using compiled Spot token definitions.
 package scanner
 
 import (
+	"strconv"
+
+	"github.com/kdeconinck/spot/ir"
 	"github.com/kdeconinck/spot/location"
-	"github.com/kdeconinck/spot/syntax"
 )
 
-var keywordMap = map[string]syntax.TokenKind{
-	"scope":       syntax.TokenScope,
-	"include":     syntax.TokenInclude,
-	"exclude":     syntax.TokenExclude,
-	"definitions": syntax.TokenDefinitions,
-	"tokens":      syntax.TokenTokens,
-	"skip":        syntax.TokenSkip,
-	"rules":       syntax.TokenRules,
-	"rule":        syntax.TokenRule,
-	"match":       syntax.TokenMatch,
-	"where":       syntax.TokenWhere,
-	"report":      syntax.TokenReport,
-	"info":        syntax.TokenInfo,
-	"warn":        syntax.TokenWarn,
-	"err":         syntax.TokenErr,
-	"at":          syntax.TokenAt,
-}
-
-// Scanner reads Spot DSL source text one token at a time.
+// Scanner tokenizes source text into Spot tokens.
 type Scanner struct {
-	src    string
-	offset int
+	tokens       []tokenDefinition
+	states       []state
+	start        int
+	startClosure []int
+	closures     [][]int
 }
 
-// New returns a scanner for src.
-func New(src string) Scanner {
+// Token is a scanner output token.
+type Token struct {
+	// Name is the DSL token name that matched the source text.
+	Name string
+
+	// Text is the exact source text matched by the token.
+	Text string
+
+	// Span is the byte range covered by the token.
+	Span location.Span
+}
+
+// Diagnostic reports a scanning failure.
+type Diagnostic struct {
+	// Message explains why scanning failed.
+	Message string
+
+	// Span identifies the source range where scanning failed.
+	Span location.Span
+}
+
+// New returns a scanner backed by an NFA compiled from program.
+func New(program ir.Program) Scanner {
+	builder := machineBuilder{
+		tokens: make([]tokenDefinition, 0, len(program.Tokens)),
+	}
+
+	tokenStarts := make([]int, 0, len(program.Tokens))
+
+	for idx := range program.Tokens {
+		token := program.Tokens[idx]
+		fragment := builder.buildExpression(token.Expression)
+		accept := builder.newState(state{
+			kind:       stateAccept,
+			tokenIndex: idx,
+		})
+
+		builder.link(fragment.end, accept)
+		builder.tokens = append(builder.tokens, tokenDefinition{
+			name: token.Name,
+			skip: token.Skip,
+		})
+		tokenStarts = append(tokenStarts, fragment.start)
+	}
+
+	start := tokenStarts[0]
+
+	for idx := 1; idx < len(tokenStarts); idx++ {
+		start = builder.newState(state{
+			kind: stateSplit,
+			next: tokenStarts[idx],
+			alt:  start,
+		})
+	}
+
+	closures := buildClosures(builder.states)
+
 	return Scanner{
-		src: src,
+		tokens:       builder.tokens,
+		states:       builder.states,
+		start:        start,
+		startClosure: closures[start],
+		closures:     closures,
 	}
 }
 
-// Next returns the next syntax token from the source text.
-func (scanner *Scanner) Next() syntax.Token {
-	scanner.skipTrivia()
+// Scan tokenizes src and returns the emitted tokens and any scanning diagnostics.
+func (scanner Scanner) Scan(src string) ([]Token, []Diagnostic) {
+	tokens := make([]Token, 0, len(src))
+	offset := 0
 
-	if scanner.offset >= len(scanner.src) {
-		return scanner.token(syntax.TokenEOF, scanner.offset, scanner.offset)
+	for offset < len(src) {
+		match, ok := scanner.match(src, offset)
+
+		if !ok {
+			return tokens, []Diagnostic{{
+				Message: "No token matched at byte offset " + strconv.Itoa(offset) + ".",
+				Span: location.Span{
+					Start: location.Position(offset),
+					End:   location.Position(offset + 1),
+				},
+			}}
+		}
+
+		definition := scanner.tokens[match.tokenIndex]
+
+		if !definition.skip {
+			tokens = append(tokens, Token{
+				Name: definition.name,
+				Text: src[offset:match.end],
+				Span: location.Span{
+					Start: location.Position(offset),
+					End:   location.Position(match.end),
+				},
+			})
+		}
+
+		offset = match.end
 	}
 
-	start := scanner.offset
-
-	switch scanner.src[scanner.offset] {
-	case '"':
-		return scanner.scanString(start)
-
-	case '\'':
-		return scanner.scanCharacter(start)
-
-	case '.':
-		scanner.offset++
-
-		if scanner.offset < len(scanner.src) && scanner.src[scanner.offset] == '.' {
-			scanner.offset++
-
-			return scanner.token(syntax.TokenDotDot, start, scanner.offset)
-		}
-
-		return scanner.token(syntax.TokenDot, start, scanner.offset)
-
-	case '=':
-		scanner.offset++
-
-		if scanner.offset < len(scanner.src) && scanner.src[scanner.offset] == '=' {
-			scanner.offset++
-
-			return scanner.token(syntax.TokenEqualEqual, start, scanner.offset)
-		}
-
-		return scanner.token(syntax.TokenEqual, start, scanner.offset)
-
-	case '!':
-		scanner.offset++
-
-		if scanner.offset < len(scanner.src) && scanner.src[scanner.offset] == '=' {
-			scanner.offset++
-
-			return scanner.token(syntax.TokenBangEqual, start, scanner.offset)
-		}
-
-		return scanner.token(syntax.TokenInvalid, start, scanner.offset)
-
-	case '<':
-		scanner.offset++
-
-		if scanner.offset < len(scanner.src) && scanner.src[scanner.offset] == '=' {
-			scanner.offset++
-
-			return scanner.token(syntax.TokenLessEqual, start, scanner.offset)
-		}
-
-		return scanner.token(syntax.TokenLess, start, scanner.offset)
-
-	case '>':
-		scanner.offset++
-
-		if scanner.offset < len(scanner.src) && scanner.src[scanner.offset] == '=' {
-			scanner.offset++
-
-			return scanner.token(syntax.TokenGreaterEqual, start, scanner.offset)
-		}
-
-		return scanner.token(syntax.TokenGreater, start, scanner.offset)
-
-	case '(':
-		scanner.offset++
-
-		return scanner.token(syntax.TokenLeftParen, start, scanner.offset)
-
-	case ')':
-		scanner.offset++
-
-		return scanner.token(syntax.TokenRightParen, start, scanner.offset)
-
-	case '{':
-		scanner.offset++
-
-		return scanner.token(syntax.TokenLeftBrace, start, scanner.offset)
-
-	case '}':
-		scanner.offset++
-
-		return scanner.token(syntax.TokenRightBrace, start, scanner.offset)
-
-	case '|':
-		scanner.offset++
-
-		return scanner.token(syntax.TokenPipe, start, scanner.offset)
-
-	case '?':
-		scanner.offset++
-
-		return scanner.token(syntax.TokenQuestion, start, scanner.offset)
-
-	case '*':
-		scanner.offset++
-
-		return scanner.token(syntax.TokenStar, start, scanner.offset)
-
-	case '+':
-		scanner.offset++
-
-		return scanner.token(syntax.TokenPlus, start, scanner.offset)
-	}
-
-	if isIdentifierStart(scanner.src[scanner.offset]) {
-		return scanner.scanIdentifier(start)
-	}
-
-	if isDigit(scanner.src[scanner.offset]) {
-		return scanner.scanInteger(start)
-	}
-
-	scanner.offset++
-
-	return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+	return tokens, nil
 }
 
-func (scanner *Scanner) skipTrivia() {
-	for scanner.offset < len(scanner.src) {
-		switch scanner.src[scanner.offset] {
-		case ' ', '\t', '\r', '\n':
-			scanner.offset++
+type tokenDefinition struct {
+	name string
+	skip bool
+}
 
-		case '/':
-			if scanner.peek(1) != '/' {
-				return
-			}
+type match struct {
+	tokenIndex int
+	end        int
+}
 
-			scanner.skipLineComment()
+func (scanner Scanner) match(src string, start int) (match, bool) {
+	best := match{
+		tokenIndex: -1,
+		end:        start,
+	}
+	active := scanner.startClosure
+	scratch := scanScratch{
+		nextSeen: make([]bool, len(scanner.states)),
+	}
 
-		default:
-			return
+	// Active always contains the epsilon-closed set of states reachable at the
+	// current offset. That lets the main loop focus on only two operations:
+	// consume one byte, then re-expand through epsilon transitions.
+	scanner.recordAccepts(active, start, &best)
+
+	for offset := start; offset < len(src); offset++ {
+		next := scanner.step(active, src[offset], &scratch)
+
+		if len(next) == 0 {
+			break
+		}
+
+		scanner.recordAccepts(next, offset+1, &best)
+		active = next
+	}
+
+	if best.tokenIndex == -1 {
+		return match{}, false
+	}
+
+	return best, true
+}
+
+func (scanner Scanner) recordAccepts(active []int, end int, best *match) {
+	for idx := range active {
+		state := scanner.states[active[idx]]
+
+		if state.kind != stateAccept {
+			continue
+		}
+
+		if best.tokenIndex == -1 || end > best.end || (end == best.end && state.tokenIndex < best.tokenIndex) {
+			best.tokenIndex = state.tokenIndex
+			best.end = end
 		}
 	}
 }
 
-func (scanner *Scanner) skipLineComment() {
-	scanner.offset += 2
+func (scanner Scanner) step(active []int, ch byte, scratch *scanScratch) []int {
+	scratch.reset()
 
-	for scanner.offset < len(scanner.src) && scanner.src[scanner.offset] != '\n' {
-		scanner.offset++
-	}
-}
+	for idx := range active {
+		state := scanner.states[active[idx]]
 
-func (scanner Scanner) peek(delta int) byte {
-	offset := scanner.offset + delta
-
-	if offset >= len(scanner.src) {
-		return 0
-	}
-
-	return scanner.src[offset]
-}
-
-func (scanner *Scanner) scanIdentifier(start int) syntax.Token {
-	scanner.offset++
-
-	for scanner.offset < len(scanner.src) && isIdentifierPart(scanner.src[scanner.offset]) {
-		scanner.offset++
-	}
-
-	kind, ok := keywordMap[scanner.src[start:scanner.offset]]
-
-	if !ok {
-		kind = syntax.TokenIdentifier
-	}
-
-	return scanner.token(kind, start, scanner.offset)
-}
-
-func (scanner *Scanner) scanInteger(start int) syntax.Token {
-	scanner.offset++
-
-	for scanner.offset < len(scanner.src) && isDigit(scanner.src[scanner.offset]) {
-		scanner.offset++
-	}
-
-	return scanner.token(syntax.TokenInteger, start, scanner.offset)
-}
-
-func (scanner *Scanner) scanCharacter(start int) syntax.Token {
-	scanner.offset++
-
-	if scanner.offset >= len(scanner.src) {
-		return scanner.token(syntax.TokenInvalid, start, scanner.offset)
-	}
-
-	switch scanner.src[scanner.offset] {
-	case '\\':
-		if !scanner.hasValidCharacterEscape() {
-			scanner.offset++
-
-			return scanner.token(syntax.TokenInvalid, start, scanner.offset)
+		if !state.matches(ch) {
+			continue
 		}
 
-		scanner.offset += 2
-
-	case '\n', '\r':
-		return scanner.token(syntax.TokenInvalid, start, scanner.offset)
-
-	default:
-		scanner.offset++
+		// A consuming transition advances to exactly one target state. The target
+		// closure is then merged into the next active set so the following loop
+		// iteration sees every epsilon-reachable continuation.
+		scratch.addClosures(scanner.closures[state.next])
 	}
 
-	if scanner.offset >= len(scanner.src) || scanner.src[scanner.offset] != '\'' {
-		return scanner.token(syntax.TokenInvalid, start, scanner.offset)
-	}
-
-	scanner.offset++
-
-	return scanner.token(syntax.TokenCharacter, start, scanner.offset)
+	return scratch.next
 }
 
-func (scanner Scanner) hasValidCharacterEscape() bool {
-	switch scanner.peek(1) {
-	case '\\', '\'', 'n', 'r', 't':
-		return true
-
-	default:
-		return false
-	}
+type scanScratch struct {
+	next     []int
+	nextSeen []bool
 }
 
-func (scanner *Scanner) scanString(start int) syntax.Token {
-	scanner.offset++
+func (scratch *scanScratch) reset() {
+	for idx := range scratch.next {
+		scratch.nextSeen[scratch.next[idx]] = false
+	}
 
-	for scanner.offset < len(scanner.src) {
-		switch scanner.src[scanner.offset] {
-		case '"':
-			scanner.offset++
+	scratch.next = scratch.next[:0]
+}
 
-			return scanner.token(syntax.TokenString, start, scanner.offset)
+func (scratch *scanScratch) addClosures(states []int) {
+	for idx := range states {
+		stateIndex := states[idx]
 
-		case '\\':
-			if !scanner.hasValidStringEscape() {
-				scanner.offset++
-
-				return scanner.token(syntax.TokenInvalid, start, scanner.offset)
-			}
-
-			scanner.offset += 2
-
-		case '\n', '\r':
-			return scanner.token(syntax.TokenInvalid, start, scanner.offset)
-
-		default:
-			scanner.offset++
+		if scratch.nextSeen[stateIndex] {
+			continue
 		}
+
+		scratch.nextSeen[stateIndex] = true
+		scratch.next = append(scratch.next, stateIndex)
 	}
-
-	return scanner.token(syntax.TokenInvalid, start, scanner.offset)
-}
-
-func (scanner Scanner) hasValidStringEscape() bool {
-	switch scanner.peek(1) {
-	case '\\', '"', 'n', 'r', 't':
-		return true
-
-	default:
-		return false
-	}
-}
-
-func (scanner Scanner) token(kind syntax.TokenKind, start, end int) syntax.Token {
-	return syntax.Token{
-		Kind: kind,
-		Text: scanner.src[start:end],
-		Span: location.Span{
-			Start: location.Position(start),
-			End:   location.Position(end),
-		},
-	}
-}
-
-func isIdentifierStart(ch byte) bool {
-	return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z')
-}
-
-func isIdentifierPart(ch byte) bool {
-	return isIdentifierStart(ch) || ('0' <= ch && ch <= '9') || ch == '_'
-}
-
-func isDigit(ch byte) bool {
-	return '0' <= ch && ch <= '9'
 }
