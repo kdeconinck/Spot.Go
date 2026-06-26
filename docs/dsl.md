@@ -546,7 +546,6 @@ definitions {
 
 * Token expressions must not be empty.
 * Token expressions must be able to consume at least one character.
-* Recursive token definitions are invalid.
 * `skip` may only appear at the end of a token declaration.
 
 Invalid:

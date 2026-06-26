@@ -30,6 +30,8 @@ func validateDefinitions(definitions syntax.DefinitionsSection, diagnostics []Di
 		diagnostics = validateDefinitionExpression(definitions.Definitions[idx].Expression, names, diagnostics)
 	}
 
+	diagnostics = validateDefinitionRecursion(definitions, diagnostics)
+
 	return diagnostics
 }
 
@@ -87,4 +89,100 @@ func characterValue(token syntax.Token) byte {
 	default:
 		return token.Text[2]
 	}
+}
+
+func validateDefinitionRecursion(definitions syntax.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
+	if len(definitions.Definitions) == 0 {
+		return diagnostics
+	}
+
+	if len(definitions.Definitions) == 1 {
+		definition := definitions.Definitions[0]
+
+		return validateDefinitionSelfReference(definition.Name.Text, definition.Expression, diagnostics)
+	}
+
+	definitionByName := map[string]syntax.Definition{}
+
+	for idx := range definitions.Definitions {
+		definition := definitions.Definitions[idx]
+
+		if _, ok := definitionByName[definition.Name.Text]; !ok {
+			definitionByName[definition.Name.Text] = definition
+		}
+	}
+
+	states := map[string]uint8{}
+
+	for idx := range definitions.Definitions {
+		diagnostics = validateDefinitionCycle(definitions.Definitions[idx].Name.Text, definitionByName, states, diagnostics)
+	}
+
+	return diagnostics
+}
+
+func validateDefinitionSelfReference(name string, expression syntax.DefinitionExpression, diagnostics []Diagnostic) []Diagnostic {
+	switch expression.Kind {
+	case syntax.DefinitionExpressionReference:
+		if expression.Start.Text == name {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: `Definition "` + expression.Start.Text + `" is recursive.`,
+				Span:    expression.Start.Span,
+			})
+		}
+
+	case syntax.DefinitionExpressionAlternation, syntax.DefinitionExpressionConcatenation:
+		for idx := range expression.Terms {
+			diagnostics = validateDefinitionSelfReference(name, expression.Terms[idx], diagnostics)
+		}
+
+	case syntax.DefinitionExpressionGroup, syntax.DefinitionExpressionRepetition:
+		diagnostics = validateDefinitionSelfReference(name, *expression.Inner, diagnostics)
+	}
+
+	return diagnostics
+}
+
+func validateDefinitionCycle(name string, definitions map[string]syntax.Definition, states map[string]uint8, diagnostics []Diagnostic) []Diagnostic {
+	switch states[name] {
+	case 1, 2:
+		return diagnostics
+	}
+
+	definition, ok := definitions[name]
+	if !ok {
+		return diagnostics
+	}
+
+	states[name] = 1
+	diagnostics = validateDefinitionExpressionCycle(definition.Expression, definitions, states, diagnostics)
+	states[name] = 2
+
+	return diagnostics
+}
+
+func validateDefinitionExpressionCycle(expression syntax.DefinitionExpression, definitions map[string]syntax.Definition, states map[string]uint8, diagnostics []Diagnostic) []Diagnostic {
+	switch expression.Kind {
+	case syntax.DefinitionExpressionReference:
+		if states[expression.Start.Text] == 1 {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: `Definition "` + expression.Start.Text + `" is recursive.`,
+				Span:    expression.Start.Span,
+			})
+
+			return diagnostics
+		}
+
+		diagnostics = validateDefinitionCycle(expression.Start.Text, definitions, states, diagnostics)
+
+	case syntax.DefinitionExpressionAlternation, syntax.DefinitionExpressionConcatenation:
+		for idx := range expression.Terms {
+			diagnostics = validateDefinitionExpressionCycle(expression.Terms[idx], definitions, states, diagnostics)
+		}
+
+	case syntax.DefinitionExpressionGroup, syntax.DefinitionExpressionRepetition:
+		diagnostics = validateDefinitionExpressionCycle(*expression.Inner, definitions, states, diagnostics)
+	}
+
+	return diagnostics
 }

@@ -83,6 +83,27 @@ func Test_Validate_Definitions(t *testing.T) {
 			},
 		},
 		{
+			name:     "When a definition directly references itself, a diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { a = a }",
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "a" is recursive.`, 46, 47),
+			},
+		},
+		{
+			name:     "When definitions reference each other, a diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { a = b b = a }",
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "a" is recursive.`, 52, 53),
+			},
+		},
+		{
+			name:     "When grouped repetition references a recursive definition, a diagnostic is returned.",
+			inSource: "scope { include \"**/*.go\" } definitions { a = (b | 'x')+ b = a }",
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "a" is recursive.`, 61, 62),
+			},
+		},
+		{
 			name:     "When a character range start is less than the end, no diagnostic is returned.",
 			inSource: "scope { include \"**/*.go\" } definitions { letter = 'a'..'z' }",
 		},
