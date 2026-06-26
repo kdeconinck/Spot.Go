@@ -82,6 +82,17 @@ func Test_Validate_Rules(t *testing.T) {
 			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.text == "public" report warn at Identifier "x" } }`,
 		},
 		{
+			name:     "When a text property uses an inequality operator, no diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.text != "public" report warn at Identifier "x" } }`,
+		},
+		{
+			name:     "When a text property uses an ordering operator, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.text > "public" report warn at Identifier "x" } }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Token property "text" only supports equality operators.`, 128, 129),
+			},
+		},
+		{
 			name:     "When a where clause references the length property, no diagnostic is returned.",
 			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.length > 1 report warn at Identifier "x" } }`,
 		},

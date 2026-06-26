@@ -432,16 +432,12 @@ Supported token properties:
 | `text`   | The exact source text of the token. |
 | `length` | The byte length of the token text.  |
 
-Supported comparison operators:
+Supported comparison operators depend on the property:
 
-| Operator | Meaning                |
-| -------- | ---------------------- |
-| `==`     | Equal.                 |
-| `!=`     | Not equal.             |
-| `<`      | Less than.             |
-| `<=`     | Less than or equal.    |
-| `>`      | Greater than.          |
-| `>=`     | Greater than or equal. |
+| Property | Operators                        |
+| -------- | -------------------------------- |
+| `text`   | `==`, `!=`                       |
+| `length` | `==`, `!=`, `<`, `<=`, `>`, `>=` |
 
 Examples:
 

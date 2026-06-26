@@ -80,6 +80,15 @@ func validateRuleReferences(rule syntax.Rule, tokens syntax.TokensSection, diagn
 		})
 	}
 
+	if rule.Where.Property.Text == "text" &&
+		rule.Where.Operator.Kind != syntax.TokenEqualEqual &&
+		rule.Where.Operator.Kind != syntax.TokenBangEqual {
+		diagnostics = append(diagnostics, Diagnostic{
+			Message: `Token property "text" only supports equality operators.`,
+			Span:    rule.Where.Operator.Span,
+		})
+	}
+
 	if rule.Where.Property.Text == "text" && rule.Where.Value.Kind != syntax.TokenString {
 		diagnostics = append(diagnostics, Diagnostic{
 			Message: `Token property "text" must be compared with a string literal.`,
