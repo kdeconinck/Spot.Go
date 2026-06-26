@@ -12,8 +12,8 @@ import "github.com/kdeconinck/spot/syntax"
 func Validate(document syntax.Document) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	validateScope(document.Scope, &diagnostics)
-	validateDefinitions(document.Definitions, &diagnostics)
+	diagnostics = validateScope(document.Scope, diagnostics)
+	diagnostics = validateDefinitions(document.Definitions, diagnostics)
 
 	return diagnostics
 }

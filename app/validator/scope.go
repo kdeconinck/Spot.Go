@@ -8,7 +8,7 @@ package validator
 
 import "github.com/kdeconinck/spot/syntax"
 
-func validateScope(scope syntax.ScopeSection, diagnostics *[]Diagnostic) {
+func validateScope(scope syntax.ScopeSection, diagnostics []Diagnostic) []Diagnostic {
 	hasInclude := false
 
 	for idx := range scope.Entries {
@@ -19,7 +19,7 @@ func validateScope(scope syntax.ScopeSection, diagnostics *[]Diagnostic) {
 		}
 
 		if entry.Pattern.Text == `""` {
-			*diagnostics = append(*diagnostics, Diagnostic{
+			diagnostics = append(diagnostics, Diagnostic{
 				Message: "Scope pattern must not be empty.",
 				Span:    entry.Pattern.Span,
 			})
@@ -27,9 +27,11 @@ func validateScope(scope syntax.ScopeSection, diagnostics *[]Diagnostic) {
 	}
 
 	if !hasInclude {
-		*diagnostics = append(*diagnostics, Diagnostic{
+		diagnostics = append(diagnostics, Diagnostic{
 			Message: "Scope must contain at least one include.",
 			Span:    scope.Span,
 		})
 	}
+
+	return diagnostics
 }
