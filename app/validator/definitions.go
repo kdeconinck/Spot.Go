@@ -8,12 +8,25 @@ package validator
 
 import "github.com/kdeconinck/spot/syntax"
 
-// Validate validates parsed DSL syntax and returns semantic diagnostics.
-func Validate(document syntax.Document) []Diagnostic {
-	var diagnostics []Diagnostic
+func validateDefinitions(definitions syntax.DefinitionsSection, diagnostics *[]Diagnostic) {
+	if len(definitions.Definitions) < 2 {
+		return
+	}
 
-	validateScope(document.Scope, &diagnostics)
-	validateDefinitions(document.Definitions, &diagnostics)
+	names := map[string]struct{}{}
 
-	return diagnostics
+	for idx := range definitions.Definitions {
+		name := definitions.Definitions[idx].Name
+
+		if _, ok := names[name.Text]; ok {
+			*diagnostics = append(*diagnostics, Diagnostic{
+				Message: `Definition "` + name.Text + `" is already declared.`,
+				Span:    name.Span,
+			})
+
+			continue
+		}
+
+		names[name.Text] = struct{}{}
+	}
 }
