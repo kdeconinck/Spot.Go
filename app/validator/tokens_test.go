@@ -58,6 +58,13 @@ func Test_Validate_Tokens(t *testing.T) {
 			},
 		},
 		{
+			name:     "When a token references an undeclared definition and other definitions exist, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } definitions { digit = '0' } tokens { Identifier = missing }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "missing" is not declared.`, 78, 85),
+			},
+		},
+		{
 			name:     "When a token grouped repetition references undeclared definitions, diagnostics are returned.",
 			inSource: `scope { include "**/*.go" } tokens { Identifier = (letter | digit)+ }`,
 			wantDiagnostics: []validator.Diagnostic{
@@ -77,6 +84,63 @@ func Test_Validate_Tokens(t *testing.T) {
 		{
 			name:     "When a token expression is a string literal, no definition lookup diagnostic is returned.",
 			inSource: `scope { include "**/*.go" } tokens { Keyword = "public" }`,
+		},
+		{
+			name:     "When a token expression uses zero-or-more repetition, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } definitions { digit = '0'..'9' } tokens { Empty = digit* }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Token expression must not match empty input.", 78, 84),
+			},
+		},
+		{
+			name:     "When a token expression uses zero-or-one repetition, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } definitions { digit = '0'..'9' } tokens { Optional = digit? }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Token expression must not match empty input.", 81, 87),
+			},
+		},
+		{
+			name:     "When a grouped token expression uses zero-or-one repetition, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } definitions { digit = '0'..'9' } tokens { Maybe = (digit | '_')? }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Token expression must not match empty input.", 78, 92),
+			},
+		},
+		{
+			name:     "When a token expression concatenates only optional terms, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } definitions { digit = '0' } tokens { Maybe = digit? digit? }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Token expression must not match empty input.", 73, 86),
+			},
+		},
+		{
+			name:     "When a token expression has an alternative that matches empty input, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } definitions { digit = '0' letter = 'a' } tokens { Maybe = digit* | letter }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Token expression must not match empty input.", 86, 101),
+			},
+		},
+		{
+			name:     "When a token expression is an empty string literal, a diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } tokens { Empty = "" }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic("Token expression must not match empty input.", 45, 47),
+			},
+		},
+		{
+			name:     "When a token expression uses one-or-more repetition, no empty input diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } definitions { digit = '0'..'9' } tokens { Number = digit+ }`,
+		},
+		{
+			name:     "When a token expression concatenates required and optional terms, no empty input diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } definitions { letter = 'a' digit = '0' } tokens { Identifier = letter digit* }`,
+		},
+		{
+			name:     "When a token expression references a recursive definition, no empty input diagnostic is returned.",
+			inSource: `scope { include "**/*.go" } definitions { a = b b = a } tokens { Value = a }`,
+			wantDiagnostics: []validator.Diagnostic{
+				diagnostic(`Definition "a" is recursive.`, 52, 53),
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
