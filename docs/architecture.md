@@ -182,6 +182,11 @@ The scanner answers the question:
 
 > What tokens exist in this source file?
 
+Implementation note:
+
+* Spot's current runtime scanner is implemented as an Nfa-backed matcher.
+* The scanner design and construction details are documented in `docs/nfa.md`.
+
 ## Rule Engine
 
 Input:

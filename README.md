@@ -46,6 +46,7 @@ The repository documentation is organized as follows:
 | `AGENTS.md`            | Instructions for contributors and AI agents.           |
 | `docs/dsl.md`          | DSL syntax, semantics, validation rules, and examples. |
 | `docs/architecture.md` | Pipeline stages, responsibilities, and data flow.      |
+| `docs/nfa.md`          | Nfa scanner theory, implementation, and examples.      |
 | `docs/roadmap.md`      | Milestones, priorities, and future work.               |
 
 When documentation conflicts:
@@ -218,6 +219,7 @@ When contributing to Spot:
 
 * `docs/dsl.md` — DSL syntax, semantics, validation rules, and examples.
 * `docs/architecture.md` — Architecture, package ownership, data flow, and implementation decisions.
+* `docs/nfa.md` — Technical explanation of the NFA-backed scanner implementation.
 * `docs/roadmap.md` — Planned milestones, future capabilities, and project direction.
 
 ## Status
