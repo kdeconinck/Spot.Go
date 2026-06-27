@@ -11,18 +11,18 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func (parser *parser) parseOptionalDefinitionsSection() ast.DefinitionsSection {
-	if !parser.at(token.TokenDefinitions) {
+func (p *parser) parseOptionalDefinitionsSection() ast.DefinitionsSection {
+	if !p.at(token.TokenDefinitions) {
 		return ast.DefinitionsSection{}
 	}
 
-	return parser.parseDefinitionsSection()
+	return p.parseDefinitionsSection()
 }
 
-func (parser *parser) parseDefinitionsSection() ast.DefinitionsSection {
-	start := parser.expect(token.TokenDefinitions)
+func (p *parser) parseDefinitionsSection() ast.DefinitionsSection {
+	start := p.expect(token.TokenDefinitions)
 
-	if !parser.match(token.TokenLeftBrace) {
+	if !p.match(token.TokenLeftBrace) {
 		return ast.DefinitionsSection{
 			Span: start.Span,
 		}
@@ -30,11 +30,11 @@ func (parser *parser) parseDefinitionsSection() ast.DefinitionsSection {
 
 	var definitions []ast.Definition
 
-	for parser.at(token.TokenIdentifier) {
-		definitions = append(definitions, parser.parseDefinition())
+	for p.at(token.TokenIdentifier) {
+		definitions = append(definitions, p.parseDefinition())
 	}
 
-	end := parser.expectSectionEnd(token.TokenIdentifier)
+	end := p.expectSectionEnd(token.TokenIdentifier)
 
 	return ast.DefinitionsSection{
 		Definitions: definitions,
@@ -42,10 +42,10 @@ func (parser *parser) parseDefinitionsSection() ast.DefinitionsSection {
 	}
 }
 
-func (parser *parser) parseDefinition() ast.Definition {
-	name := parser.expect(token.TokenIdentifier)
-	parser.expect(token.TokenEqual)
-	expression := parser.parseExpression(false)
+func (p *parser) parseDefinition() ast.Definition {
+	name := p.expect(token.TokenIdentifier)
+	p.expect(token.TokenEqual)
+	expression := p.parseExpression(false)
 
 	return ast.Definition{
 		Name:       name,

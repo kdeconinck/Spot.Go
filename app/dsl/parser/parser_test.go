@@ -24,39 +24,108 @@ func Test_Parse_DSL(t *testing.T) {
 	t.Parallel()
 
 	// Arrange.
-	source := dsl(1)
-	wantDocument := ast.Document{
-		Scope: ast.ScopeSection{
-			Entries: []ast.ScopeEntry{
-				scopeEntry(ast.ScopeEntryInclude, token.TokenString, "\"**/*.go\"", 20, 29, 12, 29),
-				scopeEntry(ast.ScopeEntryExclude, token.TokenString, "\"vendor/**\"", 42, 53, 34, 53),
-			},
-			Span: span(0, 55),
-		},
-		Definitions: ast.DefinitionsSection{
-			Definitions: []ast.Definition{
-				alternationDefinition("letter", 74, 80, 74, 102, rangeExpression("'a'", 83, 86, token.TokenCharacter, "'z'", 88, 91), rangeExpression("'A'", 94, 97, token.TokenCharacter, "'Z'", 99, 102)),
-				alternationDefinition("identifierStart", 107, 122, 107, 137, referenceExpression("letter", 125, 131), characterExpression(token.TokenCharacter, "'_'", 134, 137)),
-				concatenationDefinition("value", 142, 147, 142, 169, referenceExpression("letter", 150, 156), repetitionExpression(groupExpression(alternationExpression(characterExpression(token.TokenCharacter, "'a'", 158, 161), characterExpression(token.TokenCharacter, "'b'", 164, 167)), 157, 168), token.TokenPlus, "+", 168, 169)),
-			},
-			Span: span(56, 171),
-		},
-		Tokens: ast.TokensSection{
-			Tokens: []ast.TokenDefinition{
-				tokenDefinition("Identifier", 185, 195, concatenationExpression(referenceExpression("identifierStart", 198, 213), repetitionExpression(referenceExpression("value", 214, 219), token.TokenStar, "*", 219, 220)), 185, 220),
-				tokenDefinition("KeywordPublic", 225, 238, stringExpression("\"public\"", 241, 249), 225, 249),
-				tokenDefinitionWithSkip("Whitespace", 254, 264, repetitionExpression(groupExpression(alternationExpression(characterExpression(token.TokenCharacter, "' '", 268, 271), characterExpression(token.TokenCharacter, "'\\t'", 274, 278)), 267, 279), token.TokenPlus, "+", 279, 280), 281, 285, 254, 285),
-			},
-			Span: span(172, 287),
-		},
-		Rules: ast.RulesSection{
-			Rules: []ast.Rule{
-				ruleWithWhere("PublicIdentifier", 305, 321, ruleMatch("Identifier", 338, 348, 332, 348), ruleCondition("Identifier", 363, 373, "text", 374, 378, token.TokenEqualEqual, "==", 379, 381, token.TokenString, "\"public\"", 382, 390, 357, 390), ruleReport(token.TokenWarn, "warn", 406, 410, "Identifier", 414, 424, "\"Public identifier found\"", 425, 450, 399, 450), 300, 456),
-			},
-			Span: span(288, 458),
-		},
-		Span: span(0, 458),
-	}
+	source := makeDsl(1)
+	wantDocument := document(
+		span(0, 458),
+		scopeSection(
+			span(0, 55),
+			includeScopeEntry(`"**/*.go"`, span(20, 29), span(12, 29)),
+			excludeScopeEntry(`"vendor/**"`, span(42, 53), span(34, 53)),
+		),
+		definitionsSection(
+			span(56, 171),
+			defineAlternation(
+				"letter",
+				span(74, 80),
+				span(74, 102),
+				rangeExpr("'a'", span(83, 86), "'z'", span(88, 91)),
+				rangeExpr("'A'", span(94, 97), "'Z'", span(99, 102)),
+			),
+			defineAlternation(
+				"identifierStart",
+				span(107, 122),
+				span(107, 137),
+				refExpr("letter", span(125, 131)),
+				charExpr("'_'", span(134, 137)),
+			),
+			defineConcatenation(
+				"value",
+				span(142, 147),
+				span(142, 169),
+				refExpr("letter", span(150, 156)),
+				oneOrMore(
+					groupExpr(
+						alternationExpr(
+							charExpr("'a'", span(158, 161)),
+							charExpr("'b'", span(164, 167)),
+						),
+						span(157, 168),
+					),
+					span(168, 169),
+				),
+			),
+		),
+		tokensSection(
+			span(172, 287),
+			defineToken(
+				"Identifier",
+				span(185, 195),
+				span(185, 220),
+				concatenationExpr(
+					refExpr("identifierStart", span(198, 213)),
+					zeroOrMore(refExpr("value", span(214, 219)), span(219, 220)),
+				),
+			),
+			defineToken(
+				"KeywordPublic",
+				span(225, 238),
+				span(225, 249),
+				stringExpr(`"public"`, span(241, 249)),
+			),
+			defineSkippedToken(
+				"Whitespace",
+				span(254, 264),
+				span(281, 285),
+				span(254, 285),
+				oneOrMore(
+					groupExpr(
+						alternationExpr(
+							charExpr("' '", span(268, 271)),
+							charExpr(`'\t'`, span(274, 278)),
+						),
+						span(267, 279),
+					),
+					span(279, 280),
+				),
+			),
+		),
+		rulesSection(
+			span(288, 458),
+			defineRuleWithWhere(
+				"PublicIdentifier",
+				span(305, 321),
+				span(300, 456),
+				matchRule("Identifier", span(338, 348), span(332, 348)),
+				whereCondition(
+					identifierToken("Identifier", span(363, 373)),
+					identifierToken("text", span(374, 378)),
+					operatorToken(token.TokenEqualEqual, "==", span(379, 381)),
+					literalToken(token.TokenString, `"public"`, span(382, 390)),
+					span(357, 390),
+				),
+				reportRule(
+					token.TokenWarn,
+					"warn",
+					span(406, 410),
+					"Identifier",
+					span(414, 424),
+					`"Public identifier found"`,
+					span(425, 450),
+					span(399, 450),
+				),
+			),
+		),
+	)
 
 	// Act.
 	gotDocument, gotDiagnostics := parser.Parse(source)
@@ -83,21 +152,43 @@ func Benchmark_Parse_DSL_1000(b *testing.B) { benchmark_Parse_DSL(b, 1000) }
 func benchmark_Parse_DSL(b *testing.B, size int) {
 	b.Helper()
 
-	benchmark_Parse(b, dsl(size))
+	benchmark_Parse(b, makeDsl(size))
 }
 
-func dsl(size int) string {
-	return "scope {\n" +
-		strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) +
+func makeDsl(size int) string {
+	const scopeBlock = `    include "**/*.go"
+    exclude "vendor/**"
+`
+
+	const definitionsBlock = `    letter = 'a'..'z' | 'A'..'Z'
+    identifierStart = letter | '_'
+    value = letter ('a' | 'b')+
+`
+
+	const tokensBlock = `    Identifier = identifierStart value*
+    KeywordPublic = "public"
+    Whitespace = (' ' | '\t')+ skip
+`
+
+	const rulesBlock = `    rule PublicIdentifier {
+        match Identifier
+        where Identifier.text == "public"
+        report warn at Identifier "Public identifier found"
+    }
+`
+
+	return "" +
+		"scope {\n" +
+		strings.Repeat(scopeBlock, size) +
 		"}\n" +
 		"definitions {\n" +
-		strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    identifierStart = letter | '_'\n    value = letter ('a' | 'b')+\n", size) +
+		strings.Repeat(definitionsBlock, size) +
 		"}\n" +
 		"tokens {\n" +
-		strings.Repeat("    Identifier = identifierStart value*\n    KeywordPublic = \"public\"\n    Whitespace = (' ' | '\\t')+ skip\n", size) +
+		strings.Repeat(tokensBlock, size) +
 		"}\n" +
 		"rules {\n" +
-		strings.Repeat("    rule PublicIdentifier {\n        match Identifier\n        where Identifier.text == \"public\"\n        report warn at Identifier \"Public identifier found\"\n    }\n", size) +
+		strings.Repeat(rulesBlock, size) +
 		"}"
 }
 
@@ -108,11 +199,61 @@ func diagnostic(message string, start, end location.Position) parser.Diagnostic 
 	}
 }
 
+func document(span location.Span, scope ast.ScopeSection, definitions ast.DefinitionsSection, tokens ast.TokensSection, rules ast.RulesSection) ast.Document {
+	return ast.Document{
+		Scope:       scope,
+		Definitions: definitions,
+		Tokens:      tokens,
+		Rules:       rules,
+		Span:        span,
+	}
+}
+
+func scopeSection(sectionSpan location.Span, entries ...ast.ScopeEntry) ast.ScopeSection {
+	return ast.ScopeSection{
+		Entries: entries,
+		Span:    sectionSpan,
+	}
+}
+
+func definitionsSection(sectionSpan location.Span, definitions ...ast.Definition) ast.DefinitionsSection {
+	return ast.DefinitionsSection{
+		Definitions: definitions,
+		Span:        sectionSpan,
+	}
+}
+
+func tokensSection(sectionSpan location.Span, tokens ...ast.TokenDefinition) ast.TokensSection {
+	return ast.TokensSection{
+		Tokens: tokens,
+		Span:   sectionSpan,
+	}
+}
+
+func rulesSection(sectionSpan location.Span, rules ...ast.Rule) ast.RulesSection {
+	return ast.RulesSection{
+		Rules: rules,
+		Span:  sectionSpan,
+	}
+}
+
 func span(start, end location.Position) location.Span {
 	return location.Span{
 		Start: start,
 		End:   end,
 	}
+}
+
+func includeScopeEntry(pattern string, patternSpan, entrySpan location.Span) ast.ScopeEntry {
+	return scopeEntry(ast.ScopeEntryInclude, token.TokenString, pattern, patternSpan.Start, patternSpan.End, entrySpan.Start, entrySpan.End)
+}
+
+func excludeScopeEntry(pattern string, patternSpan, entrySpan location.Span) ast.ScopeEntry {
+	return scopeEntry(ast.ScopeEntryExclude, token.TokenString, pattern, patternSpan.Start, patternSpan.End, entrySpan.Start, entrySpan.End)
+}
+
+func invalidIncludeScopeEntry(patternKind token.TokenKind, pattern string, patternSpan, entrySpan location.Span) ast.ScopeEntry {
+	return scopeEntry(ast.ScopeEntryInclude, patternKind, pattern, patternSpan.Start, patternSpan.End, entrySpan.Start, entrySpan.End)
 }
 
 func scopeEntry(kind ast.ScopeEntryKind, patternKind token.TokenKind, pattern string, patternStart, patternEnd, entryStart, entryEnd location.Position) ast.ScopeEntry {
@@ -125,6 +266,14 @@ func scopeEntry(kind ast.ScopeEntryKind, patternKind token.TokenKind, pattern st
 		},
 		Span: span(entryStart, entryEnd),
 	}
+}
+
+func defineToken(name string, nameSpan, definitionSpan location.Span, expression ast.DefinitionExpression) ast.TokenDefinition {
+	return tokenDefinition(name, nameSpan.Start, nameSpan.End, expression, definitionSpan.Start, definitionSpan.End)
+}
+
+func defineSkippedToken(name string, nameSpan, skipSpan, definitionSpan location.Span, expression ast.DefinitionExpression) ast.TokenDefinition {
+	return tokenDefinitionWithSkip(name, nameSpan.Start, nameSpan.End, expression, skipSpan.Start, skipSpan.End, definitionSpan.Start, definitionSpan.End)
 }
 
 func tokenDefinition(name string, nameStart, nameEnd location.Position, expression ast.DefinitionExpression, definitionStart, definitionEnd location.Position) ast.TokenDefinition {
@@ -160,6 +309,10 @@ func rule(name string, nameStart, nameEnd location.Position, match ast.RuleMatch
 	return ruleWithWhere(name, nameStart, nameEnd, match, ast.RuleCondition{}, report, ruleStart, ruleEnd)
 }
 
+func defineRuleWithWhere(name string, nameSpan, ruleSpan location.Span, match ast.RuleMatch, where ast.RuleCondition, report ast.RuleReport) ast.Rule {
+	return ruleWithWhere(name, nameSpan.Start, nameSpan.End, match, where, report, ruleSpan.Start, ruleSpan.End)
+}
+
 func ruleWithWhere(name string, nameStart, nameEnd location.Position, match ast.RuleMatch, where ast.RuleCondition, report ast.RuleReport, ruleStart, ruleEnd location.Position) ast.Rule {
 	return ast.Rule{
 		Name: token.Token{
@@ -172,6 +325,48 @@ func ruleWithWhere(name string, nameStart, nameEnd location.Position, match ast.
 		Report: report,
 		Span:   span(ruleStart, ruleEnd),
 	}
+}
+
+func matchRule(tok string, tokenSpan, matchSpan location.Span) ast.RuleMatch {
+	return ruleMatch(tok, tokenSpan.Start, tokenSpan.End, matchSpan.Start, matchSpan.End)
+}
+
+func identifierToken(text string, tokenSpan location.Span) token.Token {
+	return token.Token{
+		Kind: token.TokenIdentifier,
+		Text: text,
+		Span: tokenSpan,
+	}
+}
+
+func operatorToken(kind token.TokenKind, text string, tokenSpan location.Span) token.Token {
+	return token.Token{
+		Kind: kind,
+		Text: text,
+		Span: tokenSpan,
+	}
+}
+
+func literalToken(kind token.TokenKind, text string, tokenSpan location.Span) token.Token {
+	return token.Token{
+		Kind: kind,
+		Text: text,
+		Span: tokenSpan,
+	}
+}
+
+func whereCondition(subject, property, operator, value token.Token, conditionSpan location.Span) ast.RuleCondition {
+	return ast.RuleCondition{
+		Subject:  subject,
+		Property: property,
+		Operator: operator,
+		Value:    value,
+		Span:     conditionSpan,
+	}
+}
+
+func reportRule(severityKind token.TokenKind, severity string, severitySpan location.Span, target string, targetSpan location.Span, message string, messageSpan, reportSpan location.Span) ast.RuleReport {
+	return ruleReport(severityKind, severity, severitySpan.Start, severitySpan.End, target, targetSpan.Start, targetSpan.End, message, messageSpan.Start, messageSpan.End, reportSpan.Start, reportSpan.End)
 }
 
 func ruleMatch(tok string, tokenStart, tokenEnd, matchStart, matchEnd location.Position) ast.RuleMatch {
@@ -280,6 +475,30 @@ func referenceDefinition(name string, nameStart, nameEnd location.Position, refe
 	}
 }
 
+func defineAlternation(name string, nameSpan, definitionSpan location.Span, terms ...ast.DefinitionExpression) ast.Definition {
+	return alternationDefinition(name, nameSpan.Start, nameSpan.End, definitionSpan.Start, definitionSpan.End, terms...)
+}
+
+func defineConcatenation(name string, nameSpan, definitionSpan location.Span, terms ...ast.DefinitionExpression) ast.Definition {
+	return concatenationDefinition(name, nameSpan.Start, nameSpan.End, definitionSpan.Start, definitionSpan.End, terms...)
+}
+
+func defineCharacter(name string, nameSpan, definitionSpan location.Span, expression ast.DefinitionExpression) ast.Definition {
+	return groupDefinition(name, nameSpan.Start, nameSpan.End, expression, definitionSpan.Start, definitionSpan.End)
+}
+
+func defineReference(name string, nameSpan, definitionSpan location.Span, expression ast.DefinitionExpression) ast.Definition {
+	return groupDefinition(name, nameSpan.Start, nameSpan.End, expression, definitionSpan.Start, definitionSpan.End)
+}
+
+func defineGroup(name string, nameSpan, definitionSpan location.Span, expression ast.DefinitionExpression) ast.Definition {
+	return groupDefinition(name, nameSpan.Start, nameSpan.End, expression, definitionSpan.Start, definitionSpan.End)
+}
+
+func defineRepetition(name string, nameSpan, definitionSpan location.Span, expression ast.DefinitionExpression) ast.Definition {
+	return repetitionDefinition(name, nameSpan.Start, nameSpan.End, expression, definitionSpan.Start, definitionSpan.End)
+}
+
 func groupDefinition(name string, nameStart, nameEnd location.Position, expression ast.DefinitionExpression, definitionStart, definitionEnd location.Position) ast.Definition {
 	return ast.Definition{
 		Name: token.Token{
@@ -328,6 +547,14 @@ func alternationDefinition(name string, nameStart, nameEnd, definitionStart, def
 	}
 }
 
+func concatenationExpr(terms ...ast.DefinitionExpression) ast.DefinitionExpression {
+	return concatenationExpression(terms...)
+}
+
+func alternationExpr(terms ...ast.DefinitionExpression) ast.DefinitionExpression {
+	return alternationExpression(terms...)
+}
+
 func concatenationExpression(terms ...ast.DefinitionExpression) ast.DefinitionExpression {
 	return ast.DefinitionExpression{
 		Kind:  ast.DefinitionExpressionConcatenation,
@@ -344,6 +571,30 @@ func alternationExpression(terms ...ast.DefinitionExpression) ast.DefinitionExpr
 	}
 }
 
+func charExpr(text string, tokenSpan location.Span) ast.DefinitionExpression {
+	return characterExpression(token.TokenCharacter, text, tokenSpan.Start, tokenSpan.End)
+}
+
+func stringExpr(text string, tokenSpan location.Span) ast.DefinitionExpression {
+	return stringExpression(text, tokenSpan.Start, tokenSpan.End)
+}
+
+func groupExpr(inner ast.DefinitionExpression, groupSpan location.Span) ast.DefinitionExpression {
+	return groupExpression(inner, groupSpan.Start, groupSpan.End)
+}
+
+func zeroOrMore(inner ast.DefinitionExpression, operatorSpan location.Span) ast.DefinitionExpression {
+	return repetitionExpression(inner, token.TokenStar, "*", operatorSpan.Start, operatorSpan.End)
+}
+
+func oneOrMore(inner ast.DefinitionExpression, operatorSpan location.Span) ast.DefinitionExpression {
+	return repetitionExpression(inner, token.TokenPlus, "+", operatorSpan.Start, operatorSpan.End)
+}
+
+func zeroOrOne(inner ast.DefinitionExpression, operatorSpan location.Span) ast.DefinitionExpression {
+	return repetitionExpression(inner, token.TokenQuestion, "?", operatorSpan.Start, operatorSpan.End)
+}
+
 func characterExpression(kind token.TokenKind, text string, start, end location.Position) ast.DefinitionExpression {
 	return ast.DefinitionExpression{
 		Kind: ast.DefinitionExpressionCharacter,
@@ -354,6 +605,14 @@ func characterExpression(kind token.TokenKind, text string, start, end location.
 		},
 		Span: span(start, end),
 	}
+}
+
+func refExpr(text string, tokenSpan location.Span) ast.DefinitionExpression {
+	return referenceExpression(text, tokenSpan.Start, tokenSpan.End)
+}
+
+func rangeExpr(start string, startSpan location.Span, end string, endSpan location.Span) ast.DefinitionExpression {
+	return rangeExpression(start, startSpan.Start, startSpan.End, token.TokenCharacter, end, endSpan.Start, endSpan.End)
 }
 
 func stringExpression(text string, start, end location.Position) ast.DefinitionExpression {

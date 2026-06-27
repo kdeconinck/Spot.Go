@@ -11,18 +11,18 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func (parser *parser) parseOptionalRulesSection() ast.RulesSection {
-	if !parser.at(token.TokenRules) {
+func (p *parser) parseOptionalRulesSection() ast.RulesSection {
+	if !p.at(token.TokenRules) {
 		return ast.RulesSection{}
 	}
 
-	return parser.parseRulesSection()
+	return p.parseRulesSection()
 }
 
-func (parser *parser) parseRulesSection() ast.RulesSection {
-	start := parser.expect(token.TokenRules)
+func (p *parser) parseRulesSection() ast.RulesSection {
+	start := p.expect(token.TokenRules)
 
-	if !parser.match(token.TokenLeftBrace) {
+	if !p.match(token.TokenLeftBrace) {
 		return ast.RulesSection{
 			Span: start.Span,
 		}
@@ -30,11 +30,11 @@ func (parser *parser) parseRulesSection() ast.RulesSection {
 
 	var rules []ast.Rule
 
-	for parser.at(token.TokenRule) {
-		rules = append(rules, parser.parseRule())
+	for p.at(token.TokenRule) {
+		rules = append(rules, p.parseRule())
 	}
 
-	end := parser.expectSectionEnd(token.TokenRule)
+	end := p.expectSectionEnd(token.TokenRule)
 
 	return ast.RulesSection{
 		Rules: rules,
@@ -42,21 +42,21 @@ func (parser *parser) parseRulesSection() ast.RulesSection {
 	}
 }
 
-func (parser *parser) parseRule() ast.Rule {
-	start := parser.expect(token.TokenRule)
-	name := parser.expect(token.TokenIdentifier)
+func (p *parser) parseRule() ast.Rule {
+	start := p.expect(token.TokenRule)
+	name := p.expect(token.TokenIdentifier)
 
-	if !parser.match(token.TokenLeftBrace) {
+	if !p.match(token.TokenLeftBrace) {
 		return ast.Rule{
 			Name: name,
 			Span: span(start.Span.Start, name.Span.End),
 		}
 	}
 
-	match := parser.parseRuleMatch()
-	where := parser.parseOptionalRuleCondition()
-	report := parser.parseRuleReport()
-	end := parser.expect(token.TokenRightBrace)
+	match := p.parseRuleMatch()
+	where := p.parseOptionalRuleCondition()
+	report := p.parseRuleReport()
+	end := p.expect(token.TokenRightBrace)
 
 	return ast.Rule{
 		Name:   name,
@@ -67,9 +67,9 @@ func (parser *parser) parseRule() ast.Rule {
 	}
 }
 
-func (parser *parser) parseRuleMatch() ast.RuleMatch {
-	start := parser.expect(token.TokenMatch)
-	tok := parser.expect(token.TokenIdentifier)
+func (p *parser) parseRuleMatch() ast.RuleMatch {
+	start := p.expect(token.TokenMatch)
+	tok := p.expect(token.TokenIdentifier)
 
 	return ast.RuleMatch{
 		Token: tok,
@@ -77,21 +77,21 @@ func (parser *parser) parseRuleMatch() ast.RuleMatch {
 	}
 }
 
-func (parser *parser) parseOptionalRuleCondition() ast.RuleCondition {
-	if !parser.at(token.TokenWhere) {
+func (p *parser) parseOptionalRuleCondition() ast.RuleCondition {
+	if !p.at(token.TokenWhere) {
 		return ast.RuleCondition{}
 	}
 
-	return parser.parseRuleCondition()
+	return p.parseRuleCondition()
 }
 
-func (parser *parser) parseRuleCondition() ast.RuleCondition {
-	start := parser.expect(token.TokenWhere)
-	subject := parser.expect(token.TokenIdentifier)
-	parser.expect(token.TokenDot)
-	property := parser.expect(token.TokenIdentifier)
-	operator := parser.expectComparisonOperator()
-	value := parser.expectConditionLiteral()
+func (p *parser) parseRuleCondition() ast.RuleCondition {
+	start := p.expect(token.TokenWhere)
+	subject := p.expect(token.TokenIdentifier)
+	p.expect(token.TokenDot)
+	property := p.expect(token.TokenIdentifier)
+	operator := p.expectComparisonOperator()
+	value := p.expectConditionLiteral()
 
 	return ast.RuleCondition{
 		Subject:  subject,
@@ -102,12 +102,12 @@ func (parser *parser) parseRuleCondition() ast.RuleCondition {
 	}
 }
 
-func (parser *parser) parseRuleReport() ast.RuleReport {
-	start := parser.expect(token.TokenReport)
-	severity := parser.expectSeverity()
-	parser.expect(token.TokenAt)
-	target := parser.expect(token.TokenIdentifier)
-	message := parser.expect(token.TokenString)
+func (p *parser) parseRuleReport() ast.RuleReport {
+	start := p.expect(token.TokenReport)
+	severity := p.expectSeverity()
+	p.expect(token.TokenAt)
+	target := p.expect(token.TokenIdentifier)
+	message := p.expect(token.TokenString)
 
 	return ast.RuleReport{
 		Severity: severity,
@@ -117,49 +117,49 @@ func (parser *parser) parseRuleReport() ast.RuleReport {
 	}
 }
 
-func (parser *parser) expectComparisonOperator() token.Token {
-	if parser.at(token.TokenEqualEqual) ||
-		parser.at(token.TokenBangEqual) ||
-		parser.at(token.TokenLess) ||
-		parser.at(token.TokenLessEqual) ||
-		parser.at(token.TokenGreater) ||
-		parser.at(token.TokenGreaterEqual) {
-		tok := parser.current
-		parser.advance()
+func (p *parser) expectComparisonOperator() token.Token {
+	if p.at(token.TokenEqualEqual) ||
+		p.at(token.TokenBangEqual) ||
+		p.at(token.TokenLess) ||
+		p.at(token.TokenLessEqual) ||
+		p.at(token.TokenGreater) ||
+		p.at(token.TokenGreaterEqual) {
+		tok := p.current
+		p.advance()
 
 		return tok
 	}
 
-	tok := parser.current
-	parser.addDiagnostic(token.TokenEqualEqual)
+	tok := p.current
+	p.addDiagnostic(token.TokenEqualEqual)
 
 	return tok
 }
 
-func (parser *parser) expectConditionLiteral() token.Token {
-	if parser.at(token.TokenString) || parser.at(token.TokenInteger) {
-		token := parser.current
-		parser.advance()
+func (p *parser) expectConditionLiteral() token.Token {
+	if p.at(token.TokenString) || p.at(token.TokenInteger) {
+		token := p.current
+		p.advance()
 
 		return token
 	}
 
-	tok := parser.current
-	parser.addDiagnostic(token.TokenString)
+	tok := p.current
+	p.addDiagnostic(token.TokenString)
 
 	return tok
 }
 
-func (parser *parser) expectSeverity() token.Token {
-	if parser.at(token.TokenInfo) || parser.at(token.TokenWarn) || parser.at(token.TokenErr) {
-		token := parser.current
-		parser.advance()
+func (p *parser) expectSeverity() token.Token {
+	if p.at(token.TokenInfo) || p.at(token.TokenWarn) || p.at(token.TokenErr) {
+		token := p.current
+		p.advance()
 
 		return token
 	}
 
-	tok := parser.current
-	parser.addDiagnostic(token.TokenWarn)
+	tok := p.current
+	p.addDiagnostic(token.TokenWarn)
 
 	return tok
 }

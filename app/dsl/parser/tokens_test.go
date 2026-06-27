@@ -29,138 +29,121 @@ func Test_Parse_Tokens(t *testing.T) {
 	}{
 		"When parsing an empty tokens block, a document is returned.": {
 			inSource: "scope {} tokens {}",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Tokens: ast.TokensSection{
-					Span: span(9, 18),
-				},
-				Span: span(0, 18),
-			},
+			wantDocument: document(
+				span(0, 18),
+				scopeSection(span(0, 8)),
+				ast.DefinitionsSection{},
+				tokensSection(span(9, 18)),
+				ast.RulesSection{},
+			),
 		},
 		"When parsing a definitions block followed by an empty tokens block, a document is returned.": {
 			inSource: "scope {} definitions {} tokens {}",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Definitions: ast.DefinitionsSection{
-					Span: span(9, 23),
-				},
-				Tokens: ast.TokensSection{
-					Span: span(24, 33),
-				},
-				Span: span(0, 33),
-			},
+			wantDocument: document(
+				span(0, 33),
+				scopeSection(span(0, 8)),
+				definitionsSection(span(9, 23)),
+				tokensSection(span(24, 33)),
+				ast.RulesSection{},
+			),
 		},
 		"When parsing a tokens block with a reference token, a document is returned.": {
 			inSource: "scope {} tokens { Identifier = letter }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Tokens: ast.TokensSection{
-					Tokens: []ast.TokenDefinition{
-						tokenDefinition("Identifier", 18, 28, referenceExpression("letter", 31, 37), 18, 37),
-					},
-					Span: span(9, 39),
-				},
-				Span: span(0, 39),
-			},
+			wantDocument: document(
+				span(0, 39),
+				scopeSection(span(0, 8)),
+				ast.DefinitionsSection{},
+				tokensSection(
+					span(9, 39),
+					defineToken(
+						"Identifier",
+						span(18, 28),
+						span(18, 37),
+						refExpr("letter", span(31, 37)),
+					),
+				),
+				ast.RulesSection{},
+			),
 		},
 		"When parsing a tokens block with a string token, a document is returned.": {
 			inSource: "scope {} tokens { KeywordPublic = \"public\" }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Tokens: ast.TokensSection{
-					Tokens: []ast.TokenDefinition{
-						tokenDefinition("KeywordPublic", 18, 31, stringExpression("\"public\"", 34, 42), 18, 42),
-					},
-					Span: span(9, 44),
-				},
-				Span: span(0, 44),
-			},
+			wantDocument: document(
+				span(0, 44),
+				scopeSection(span(0, 8)),
+				ast.DefinitionsSection{},
+				tokensSection(
+					span(9, 44),
+					defineToken(
+						"KeywordPublic",
+						span(18, 31),
+						span(18, 42),
+						stringExpr(`"public"`, span(34, 42)),
+					),
+				),
+				ast.RulesSection{},
+			),
 		},
 		"When parsing a tokens block with a skipped token, a document is returned.": {
 			inSource: "scope {} tokens { Whitespace = (' ' | '\\t')+ skip }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Tokens: ast.TokensSection{
-					Tokens: []ast.TokenDefinition{
-						tokenDefinitionWithSkip("Whitespace", 18, 28, repetitionExpression(groupExpression(alternationExpression(characterExpression(token.TokenCharacter, "' '", 32, 35), characterExpression(token.TokenCharacter, "'\\t'", 38, 42)), 31, 43), token.TokenPlus, "+", 43, 44), 45, 49, 18, 49),
-					},
-					Span: span(9, 51),
-				},
-				Span: span(0, 51),
-			},
+			wantDocument: document(
+				span(0, 51),
+				scopeSection(span(0, 8)),
+				ast.DefinitionsSection{},
+				tokensSection(
+					span(9, 51),
+					defineSkippedToken(
+						"Whitespace",
+						span(18, 28),
+						span(45, 49),
+						span(18, 49),
+						oneOrMore(
+							groupExpr(
+								alternationExpr(
+									charExpr("' '", span(32, 35)),
+									charExpr(`'\t'`, span(38, 42)),
+								),
+								span(31, 43),
+							),
+							span(43, 44),
+						),
+					),
+				),
+				ast.RulesSection{},
+			),
 		},
 		"When the tokens opening brace is missing, a diagnostic is returned.": {
-			inSource: "scope {} tokens }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Tokens: ast.TokensSection{
-					Span: span(9, 15),
-				},
-				Span: span(0, 15),
-			},
-			wantDiagnostics: []parser.Diagnostic{
-				diagnostic("Expected '{', found '}'.", 16, 17),
-			},
+			inSource:        "scope {} tokens }",
+			wantDocument:    document(span(0, 15), scopeSection(span(0, 8)), ast.DefinitionsSection{}, tokensSection(span(9, 15)), ast.RulesSection{}),
+			wantDiagnostics: []parser.Diagnostic{diagnostic("Expected '{', found '}'.", 16, 17)},
 		},
 		"When the tokens closing brace is missing, a diagnostic is returned.": {
-			inSource: "scope {} tokens {",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Tokens: ast.TokensSection{
-					Span: span(9, 17),
-				},
-				Span: span(0, 17),
-			},
-			wantDiagnostics: []parser.Diagnostic{
-				diagnostic("Expected '}', found 'EOF'.", 17, 17),
-			},
+			inSource:        "scope {} tokens {",
+			wantDocument:    document(span(0, 17), scopeSection(span(0, 8)), ast.DefinitionsSection{}, tokensSection(span(9, 17)), ast.RulesSection{}),
+			wantDiagnostics: []parser.Diagnostic{diagnostic("Expected '}', found 'EOF'.", 17, 17)},
 		},
 		"When an unexpected token appears inside tokens, a diagnostic is returned.": {
-			inSource: "scope {} tokens { 'a' }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Tokens: ast.TokensSection{
-					Span: span(9, 21),
-				},
-				Span: span(0, 21),
-			},
-			wantDiagnostics: []parser.Diagnostic{
-				diagnostic("Expected 'identifier', found 'character'.", 18, 21),
-			},
+			inSource:        "scope {} tokens { 'a' }",
+			wantDocument:    document(span(0, 21), scopeSection(span(0, 8)), ast.DefinitionsSection{}, tokensSection(span(9, 21)), ast.RulesSection{}),
+			wantDiagnostics: []parser.Diagnostic{diagnostic("Expected 'identifier', found 'character'.", 18, 21)},
 		},
 		"When a token is missing an expression, a diagnostic is returned.": {
 			inSource: "scope {} tokens { Identifier = }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Tokens: ast.TokensSection{
-					Tokens: []ast.TokenDefinition{
-						tokenDefinition("Identifier", 18, 28, characterExpression(token.TokenRightBrace, "}", 31, 32), 18, 32),
-					},
-					Span: span(9, 32),
-				},
-				Span: span(0, 32),
-			},
-			wantDiagnostics: []parser.Diagnostic{
-				diagnostic("Expected 'character', found '}'.", 31, 32),
-			},
+			wantDocument: document(
+				span(0, 32),
+				scopeSection(span(0, 8)),
+				ast.DefinitionsSection{},
+				tokensSection(
+					span(9, 32),
+					defineToken(
+						"Identifier",
+						span(18, 28),
+						span(18, 32),
+						characterExpression(token.TokenRightBrace, "}", 31, 32),
+					),
+				),
+				ast.RulesSection{},
+			),
+			wantDiagnostics: []parser.Diagnostic{diagnostic("Expected 'character', found '}'.", 31, 32)},
 		},
 	} {
 		t.Run(tcName, func(t *testing.T) {

@@ -28,125 +28,78 @@ func Test_Parse_Scope(t *testing.T) {
 		wantDiagnostics []parser.Diagnostic
 	}{
 		"When parsing an empty scope block, a document is returned.": {
-			inSource: "scope {}",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Span: span(0, 8),
-			},
+			inSource:     "scope {}",
+			wantDocument: document(span(0, 8), scopeSection(span(0, 8)), ast.DefinitionsSection{}, ast.TokensSection{}, ast.RulesSection{}),
 		},
 		"When parsing a scope block with an include entry, a document is returned.": {
 			inSource: "scope { include \"**/*.go\" }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Entries: []ast.ScopeEntry{
-						scopeEntry(ast.ScopeEntryInclude, token.TokenString, "\"**/*.go\"", 16, 25, 8, 25),
-					},
-					Span: span(0, 27),
-				},
-				Span: span(0, 27),
-			},
+			wantDocument: document(
+				span(0, 27),
+				scopeSection(span(0, 27), includeScopeEntry(`"**/*.go"`, span(16, 25), span(8, 25))),
+				ast.DefinitionsSection{},
+				ast.TokensSection{},
+				ast.RulesSection{},
+			),
 		},
 		"When parsing a scope block with an exclude entry, a document is returned.": {
 			inSource: "scope { exclude \"vendor/**\" }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Entries: []ast.ScopeEntry{
-						scopeEntry(ast.ScopeEntryExclude, token.TokenString, "\"vendor/**\"", 16, 27, 8, 27),
-					},
-					Span: span(0, 29),
-				},
-				Span: span(0, 29),
-			},
+			wantDocument: document(
+				span(0, 29),
+				scopeSection(span(0, 29), excludeScopeEntry(`"vendor/**"`, span(16, 27), span(8, 27))),
+				ast.DefinitionsSection{},
+				ast.TokensSection{},
+				ast.RulesSection{},
+			),
 		},
 		"When parsing a scope block with include and exclude entries, a document is returned.": {
 			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Entries: []ast.ScopeEntry{
-						scopeEntry(ast.ScopeEntryInclude, token.TokenString, "\"**/*.go\"", 16, 25, 8, 25),
-						scopeEntry(ast.ScopeEntryExclude, token.TokenString, "\"vendor/**\"", 34, 45, 26, 45),
-					},
-					Span: span(0, 47),
-				},
-				Span: span(0, 47),
-			},
+			wantDocument: document(
+				span(0, 47),
+				scopeSection(
+					span(0, 47),
+					includeScopeEntry(`"**/*.go"`, span(16, 25), span(8, 25)),
+					excludeScopeEntry(`"vendor/**"`, span(34, 45), span(26, 45)),
+				),
+				ast.DefinitionsSection{},
+				ast.TokensSection{},
+				ast.RulesSection{},
+			),
 		},
 		"When the scope keyword is missing, a diagnostic is returned.": {
-			inSource: "x",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 1),
-				},
-				Span: span(0, 1),
-			},
-			wantDiagnostics: []parser.Diagnostic{
-				diagnostic("Expected 'scope', found 'identifier'.", 0, 1),
-			},
+			inSource:        "x",
+			wantDocument:    document(span(0, 1), scopeSection(span(0, 1)), ast.DefinitionsSection{}, ast.TokensSection{}, ast.RulesSection{}),
+			wantDiagnostics: []parser.Diagnostic{diagnostic("Expected 'scope', found 'identifier'.", 0, 1)},
 		},
 		"When the opening brace is missing, a diagnostic is returned.": {
-			inSource: "scope }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 5),
-				},
-				Span: span(0, 5),
-			},
-			wantDiagnostics: []parser.Diagnostic{
-				diagnostic("Expected '{', found '}'.", 6, 7),
-			},
+			inSource:        "scope }",
+			wantDocument:    document(span(0, 5), scopeSection(span(0, 5)), ast.DefinitionsSection{}, ast.TokensSection{}, ast.RulesSection{}),
+			wantDiagnostics: []parser.Diagnostic{diagnostic("Expected '{', found '}'.", 6, 7)},
 		},
 		"When the closing brace is missing, a diagnostic is returned.": {
-			inSource: "scope {",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 7),
-				},
-				Span: span(0, 7),
-			},
-			wantDiagnostics: []parser.Diagnostic{
-				diagnostic("Expected '}', found 'EOF'.", 7, 7),
-			},
+			inSource:        "scope {",
+			wantDocument:    document(span(0, 7), scopeSection(span(0, 7)), ast.DefinitionsSection{}, ast.TokensSection{}, ast.RulesSection{}),
+			wantDiagnostics: []parser.Diagnostic{diagnostic("Expected '}', found 'EOF'.", 7, 7)},
 		},
 		"When an include entry has no string, a diagnostic is returned.": {
 			inSource: "scope { include }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Entries: []ast.ScopeEntry{
-						scopeEntry(ast.ScopeEntryInclude, token.TokenRightBrace, "}", 16, 17, 8, 17),
-					},
-					Span: span(0, 17),
-				},
-				Span: span(0, 17),
-			},
-			wantDiagnostics: []parser.Diagnostic{
-				diagnostic("Expected 'string', found '}'.", 16, 17),
-			},
+			wantDocument: document(
+				span(0, 17),
+				scopeSection(span(0, 17), invalidIncludeScopeEntry(token.TokenRightBrace, "}", span(16, 17), span(8, 17))),
+				ast.DefinitionsSection{},
+				ast.TokensSection{},
+				ast.RulesSection{},
+			),
+			wantDiagnostics: []parser.Diagnostic{diagnostic("Expected 'string', found '}'.", 16, 17)},
 		},
 		"When an unexpected token appears inside scope, a diagnostic is returned.": {
-			inSource: "scope { x }",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 9),
-				},
-				Span: span(0, 9),
-			},
-			wantDiagnostics: []parser.Diagnostic{
-				diagnostic("Expected 'include', found 'identifier'.", 8, 9),
-			},
+			inSource:        "scope { x }",
+			wantDocument:    document(span(0, 9), scopeSection(span(0, 9)), ast.DefinitionsSection{}, ast.TokensSection{}, ast.RulesSection{}),
+			wantDiagnostics: []parser.Diagnostic{diagnostic("Expected 'include', found 'identifier'.", 8, 9)},
 		},
 		"When a token appears after the scope block, a diagnostic is returned.": {
-			inSource: "scope {} x",
-			wantDocument: ast.Document{
-				Scope: ast.ScopeSection{
-					Span: span(0, 8),
-				},
-				Span: span(0, 10),
-			},
-			wantDiagnostics: []parser.Diagnostic{
-				diagnostic("Expected 'EOF', found 'identifier'.", 9, 10),
-			},
+			inSource:        "scope {} x",
+			wantDocument:    document(span(0, 10), scopeSection(span(0, 8)), ast.DefinitionsSection{}, ast.TokensSection{}, ast.RulesSection{}),
+			wantDiagnostics: []parser.Diagnostic{diagnostic("Expected 'EOF', found 'identifier'.", 9, 10)},
 		},
 	} {
 		t.Run(tcName, func(t *testing.T) {

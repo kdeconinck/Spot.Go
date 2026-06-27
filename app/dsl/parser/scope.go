@@ -11,18 +11,18 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func (parser *parser) parseScopeSection() ast.ScopeSection {
-	if !parser.at(token.TokenScope) {
-		parser.addDiagnostic(token.TokenScope)
+func (p *parser) parseScopeSection() ast.ScopeSection {
+	if !p.at(token.TokenScope) {
+		p.addDiagnostic(token.TokenScope)
 
 		return ast.ScopeSection{
-			Span: parser.current.Span,
+			Span: p.current.Span,
 		}
 	}
 
-	start := parser.expect(token.TokenScope)
+	start := p.expect(token.TokenScope)
 
-	if !parser.match(token.TokenLeftBrace) {
+	if !p.match(token.TokenLeftBrace) {
 		return ast.ScopeSection{
 			Span: start.Span,
 		}
@@ -30,11 +30,11 @@ func (parser *parser) parseScopeSection() ast.ScopeSection {
 
 	var entries []ast.ScopeEntry
 
-	for parser.at(token.TokenInclude) || parser.at(token.TokenExclude) {
-		entries = append(entries, parser.parseScopeEntry())
+	for p.at(token.TokenInclude) || p.at(token.TokenExclude) {
+		entries = append(entries, p.parseScopeEntry())
 	}
 
-	end := parser.expectSectionEnd(token.TokenInclude)
+	end := p.expectSectionEnd(token.TokenInclude)
 
 	return ast.ScopeSection{
 		Entries: entries,
@@ -42,16 +42,16 @@ func (parser *parser) parseScopeSection() ast.ScopeSection {
 	}
 }
 
-func (parser *parser) parseScopeEntry() ast.ScopeEntry {
-	start := parser.current
+func (p *parser) parseScopeEntry() ast.ScopeEntry {
+	start := p.current
 	kind := ast.ScopeEntryInclude
 
-	if parser.at(token.TokenExclude) {
+	if p.at(token.TokenExclude) {
 		kind = ast.ScopeEntryExclude
 	}
 
-	parser.advance()
-	pattern := parser.expect(token.TokenString)
+	p.advance()
+	pattern := p.expect(token.TokenString)
 
 	return ast.ScopeEntry{
 		Kind:    kind,

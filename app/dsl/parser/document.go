@@ -11,21 +11,21 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func (parser *parser) parseDocument() ast.Document {
-	diagnosticCount := len(parser.diagnostics)
-	scope := parser.parseScopeSection()
+func (p *parser) parseDocument() ast.Document {
+	diagnosticCount := len(p.diagnostics)
+	scope := p.parseScopeSection()
 
-	if len(parser.diagnostics) != diagnosticCount {
+	if len(p.diagnostics) != diagnosticCount {
 		return ast.Document{
 			Scope: scope,
 			Span:  scope.Span,
 		}
 	}
 
-	diagnosticCount = len(parser.diagnostics)
-	definitions := parser.parseOptionalDefinitionsSection()
+	diagnosticCount = len(p.diagnostics)
+	definitions := p.parseOptionalDefinitionsSection()
 
-	if len(parser.diagnostics) != diagnosticCount {
+	if len(p.diagnostics) != diagnosticCount {
 		return ast.Document{
 			Scope:       scope,
 			Definitions: definitions,
@@ -33,10 +33,10 @@ func (parser *parser) parseDocument() ast.Document {
 		}
 	}
 
-	diagnosticCount = len(parser.diagnostics)
-	tokens := parser.parseOptionalTokensSection()
+	diagnosticCount = len(p.diagnostics)
+	tokens := p.parseOptionalTokensSection()
 
-	if len(parser.diagnostics) != diagnosticCount {
+	if len(p.diagnostics) != diagnosticCount {
 		return ast.Document{
 			Scope:       scope,
 			Definitions: definitions,
@@ -45,10 +45,10 @@ func (parser *parser) parseDocument() ast.Document {
 		}
 	}
 
-	diagnosticCount = len(parser.diagnostics)
-	rules := parser.parseOptionalRulesSection()
+	diagnosticCount = len(p.diagnostics)
+	rules := p.parseOptionalRulesSection()
 
-	if len(parser.diagnostics) != diagnosticCount {
+	if len(p.diagnostics) != diagnosticCount {
 		return ast.Document{
 			Scope:       scope,
 			Definitions: definitions,
@@ -58,7 +58,7 @@ func (parser *parser) parseDocument() ast.Document {
 		}
 	}
 
-	end := parser.expect(token.TokenEOF)
+	end := p.expect(token.TokenEOF)
 
 	return ast.Document{
 		Scope:       scope,

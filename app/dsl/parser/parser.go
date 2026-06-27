@@ -33,70 +33,70 @@ type parser struct {
 	diagnostics []Diagnostic
 }
 
-func (parser *parser) expectSectionEnd(entryKind token.TokenKind) token.Token {
-	if parser.at(token.TokenRightBrace) {
-		return parser.expect(token.TokenRightBrace)
+func (p *parser) expectSectionEnd(entryKind token.TokenKind) token.Token {
+	if p.at(token.TokenRightBrace) {
+		return p.expect(token.TokenRightBrace)
 	}
 
-	if parser.at(token.TokenEOF) {
-		parser.addDiagnostic(token.TokenRightBrace)
+	if p.at(token.TokenEOF) {
+		p.addDiagnostic(token.TokenRightBrace)
 	} else {
-		parser.addDiagnostic(entryKind)
+		p.addDiagnostic(entryKind)
 	}
 
-	return parser.current
+	return p.current
 }
 
-func (parser *parser) expect(kind token.TokenKind) token.Token {
-	if parser.at(kind) {
-		token := parser.current
-		parser.advance()
+func (p *parser) expect(kind token.TokenKind) token.Token {
+	if p.at(kind) {
+		token := p.current
+		p.advance()
 
 		return token
 	}
 
-	token := parser.current
-	parser.addDiagnostic(kind)
+	token := p.current
+	p.addDiagnostic(kind)
 
 	return token
 }
 
-func (parser *parser) match(kind token.TokenKind) bool {
-	if !parser.at(kind) {
-		parser.addDiagnostic(kind)
+func (p *parser) match(kind token.TokenKind) bool {
+	if !p.at(kind) {
+		p.addDiagnostic(kind)
 
 		return false
 	}
 
-	parser.advance()
+	p.advance()
 
 	return true
 }
 
-func (parser *parser) consume(kind token.TokenKind) bool {
-	if !parser.at(kind) {
+func (p *parser) consume(kind token.TokenKind) bool {
+	if !p.at(kind) {
 		return false
 	}
 
-	parser.advance()
+	p.advance()
 
 	return true
 }
 
-func (parser *parser) at(kind token.TokenKind) bool {
-	return parser.current.Kind == kind
+func (p *parser) at(kind token.TokenKind) bool {
+	return p.current.Kind == kind
 }
 
-func (parser *parser) addDiagnostic(kind token.TokenKind) {
-	parser.diagnostics = append(parser.diagnostics, Diagnostic{
-		Message: "Expected '" + kind.String() + "', found '" + parser.current.Kind.String() + "'.",
-		Span:    parser.current.Span,
+func (p *parser) addDiagnostic(kind token.TokenKind) {
+	p.diagnostics = append(p.diagnostics, Diagnostic{
+		Message: "Expected '" + kind.String() + "', found '" + p.current.Kind.String() + "'.",
+		Span:    p.current.Span,
 	})
 }
 
-func (parser *parser) advance() {
-	parser.current = parser.next
-	parser.next = parser.lexer.Next()
+func (p *parser) advance() {
+	p.current = p.next
+	p.next = p.lexer.Next()
 }
 
 func span(start, end location.Position) location.Span {
