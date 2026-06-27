@@ -51,6 +51,7 @@ tokens {
 				token("Identifier", "alpha", 0, 5),
 				token("Identifier", "beta_2", 6, 12),
 			},
+			wantDiagnostics: []scanner.Diagnostic{},
 		},
 		{
 			name: "When two tokens match the same text, the earlier token wins.",
@@ -67,6 +68,7 @@ tokens {
 			wantTokens: []scanner.Token{
 				token("Keyword", "public", 0, 6),
 			},
+			wantDiagnostics: []scanner.Diagnostic{},
 		},
 		{
 			name: "When a token contains an optional prefix, the scanner accepts both present and skipped branches.",
@@ -92,6 +94,7 @@ tokens {
 			wantTokens: []scanner.Token{
 				token("Value", "b", 0, 1),
 			},
+			wantDiagnostics: []scanner.Diagnostic{},
 		},
 		{
 			name: "When an optional expression repeats before a required suffix, epsilon cycles are handled without revisiting states forever.",
@@ -103,6 +106,7 @@ tokens {
 			wantTokens: []scanner.Token{
 				token("Value", "aaab", 0, 4),
 			},
+			wantDiagnostics: []scanner.Diagnostic{},
 		},
 		{
 			name: "When tokens match different lengths, the longest match wins.",
@@ -115,6 +119,7 @@ tokens {
 			wantTokens: []scanner.Token{
 				token("EqualEqual", "==", 0, 2),
 			},
+			wantDiagnostics: []scanner.Diagnostic{},
 		},
 		{
 			name: "When two string tokens share a prefix, the longer string token wins.",
@@ -128,6 +133,7 @@ tokens {
 			wantTokens: []scanner.Token{
 				token("Spotted", "spotted", 0, 7),
 			},
+			wantDiagnostics: []scanner.Diagnostic{},
 		},
 		{
 			name: "When two branches consume the same bytes before reconverging, duplicate next-state closures are ignored.",
@@ -139,6 +145,7 @@ tokens {
 			wantTokens: []scanner.Token{
 				token("Value", "ab", 0, 2),
 			},
+			wantDiagnostics: []scanner.Diagnostic{},
 		},
 		{
 			name: "When a token uses alternation and repetition, the resulting spans are preserved.",
@@ -153,6 +160,7 @@ tokens {
 				token("Identifier", "abc", 0, 3),
 				token("Number", "123", 4, 7),
 			},
+			wantDiagnostics: []scanner.Diagnostic{},
 		},
 		{
 			name: "When alternatives reconverge before more input is consumed, the scanner still produces one token.",
@@ -164,6 +172,7 @@ tokens {
 			wantTokens: []scanner.Token{
 				token("Value", "ab", 0, 2),
 			},
+			wantDiagnostics: []scanner.Diagnostic{},
 		},
 		{
 			name:     "When no token matches at an offset, a diagnostic is returned.",
@@ -182,10 +191,96 @@ tokens {
 
 			// Arrange.
 			program := compileProgram(t, tc.inDSL)
-			scan := scanner.New(program)
+			scan := scanner.New(program, tc.inSource)
+			gotTokens := make([]scanner.Token, 0, len(tc.wantTokens))
+			gotDiagnostics := make([]scanner.Diagnostic, 0, len(tc.wantDiagnostics))
 
 			// Act.
-			gotTokens, gotDiagnostics := scan.Scan(tc.inSource)
+			for {
+				token, diagnostic, ok := scan.Next()
+
+				if !ok {
+					break
+				}
+
+				if diagnostic.Message != "" {
+					gotDiagnostics = append(gotDiagnostics, diagnostic)
+					break
+				}
+
+				gotTokens = append(gotTokens, token)
+			}
+
+			// Assert.
+			claim.DeepEqual(t, tc.name, tc.wantTokens, gotTokens, "Token")
+			claim.DeepEqual(t, tc.name, tc.wantDiagnostics, gotDiagnostics, "Diagnostic")
+		})
+	}
+}
+
+func Test_Scanner_Next(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name            string
+		inDSL           string
+		inSource        string
+		wantTokens      []scanner.Token
+		wantDiagnostics []scanner.Diagnostic
+	}{
+		{
+			name: "When the scanner streams over skipped tokens, only emitted tokens are returned.",
+			inDSL: `scope { include "**/*.go" }
+definitions {
+    letter = 'a'..'z'
+}
+tokens {
+    Whitespace = ' '+ skip
+    Identifier = letter+
+}`,
+			inSource: "a b",
+			wantTokens: []scanner.Token{
+				token("Identifier", "a", 0, 1),
+				token("Identifier", "b", 2, 3),
+			},
+			wantDiagnostics: []scanner.Diagnostic{},
+		},
+		{
+			name:     "When the scanner reaches an invalid byte while streaming, a diagnostic is returned and scanning stops.",
+			inDSL:    `scope { include "**/*.go" } tokens { Identifier = "a" }`,
+			inSource: "ab",
+			wantTokens: []scanner.Token{
+				token("Identifier", "a", 0, 1),
+			},
+			wantDiagnostics: []scanner.Diagnostic{
+				diagnostic("No token matched at byte offset 1.", 1, 2),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange.
+			program := compileProgram(t, tc.inDSL)
+			scan := scanner.New(program, tc.inSource)
+			gotTokens := make([]scanner.Token, 0, len(tc.wantTokens))
+			gotDiagnostics := make([]scanner.Diagnostic, 0, len(tc.wantDiagnostics))
+
+			// Act.
+			for {
+				token, diagnostic, ok := scan.Next()
+
+				if !ok {
+					break
+				}
+
+				if diagnostic.Message != "" {
+					gotDiagnostics = append(gotDiagnostics, diagnostic)
+					break
+				}
+
+				gotTokens = append(gotTokens, token)
+			}
 
 			// Assert.
 			claim.DeepEqual(t, tc.name, tc.wantTokens, gotTokens, "Token")
@@ -204,11 +299,19 @@ func benchmark_Scanner_Scan(b *testing.B, size int) {
 	b.Helper()
 
 	program := compileProgram(b, scannerDSL())
-	scan := scanner.New(program)
+	scan := scanner.New(program, "")
 	source := scannerInput(size)
 
 	for b.Loop() {
-		scan.Scan(source)
+		scan.Reset(source)
+
+		for {
+			_, _, ok := scan.Next()
+
+			if !ok {
+				break
+			}
+		}
 	}
 }
 

@@ -20,6 +20,9 @@ type Scanner struct {
 	start        int
 	startClosure []int
 	closures     [][]int
+	src          string
+	offset       int
+	scratch      scanScratch
 }
 
 // Token is a scanner output token.
@@ -43,8 +46,8 @@ type Diagnostic struct {
 	Span location.Span
 }
 
-// New returns a scanner backed by an NFA compiled from program.
-func New(program ir.Program) Scanner {
+// New returns a scanner backed by an NFA compiled from program and initialized for src.
+func New(program ir.Program, src string) Scanner {
 	builder := machineBuilder{
 		tokens: make([]tokenDefinition, 0, len(program.Tokens)),
 	}
@@ -85,44 +88,61 @@ func New(program ir.Program) Scanner {
 		start:        start,
 		startClosure: closures[start],
 		closures:     closures,
+		src:          src,
+		scratch: scanScratch{
+			nextSeen: make([]bool, len(builder.states)),
+		},
 	}
 }
 
-// Scan tokenizes src and returns the emitted tokens and any scanning diagnostics.
-func (scanner Scanner) Scan(src string) ([]Token, []Diagnostic) {
-	tokens := make([]Token, 0, len(src))
-	offset := 0
+// Reset prepares the scanner to tokenize a new source string.
+func (scanner *Scanner) Reset(src string) {
+	scanner.src = src
+	scanner.offset = 0
+	scanner.scratch.reset()
+}
 
-	for offset < len(src) {
-		match, ok := scanner.match(src, offset)
+// Next returns the next emitted token or scanning diagnostic.
+//
+// The returned boolean reports whether a token or diagnostic was produced.
+// When it is false, the scanner has reached the end of the source text.
+func (scanner *Scanner) Next() (Token, Diagnostic, bool) {
+	for scanner.offset < len(scanner.src) {
+		match, ok := scanner.match(scanner.offset)
 
 		if !ok {
-			return tokens, []Diagnostic{{
-				Message: "No token matched at byte offset " + strconv.Itoa(offset) + ".",
+			diagnostic := Diagnostic{
+				Message: "No token matched at byte offset " + strconv.Itoa(scanner.offset) + ".",
 				Span: location.Span{
-					Start: location.Position(offset),
-					End:   location.Position(offset + 1),
+					Start: location.Position(scanner.offset),
+					End:   location.Position(scanner.offset + 1),
 				},
-			}}
+			}
+			scanner.offset = len(scanner.src)
+
+			return Token{}, diagnostic, true
 		}
+
+		start := scanner.offset
+		scanner.offset = match.end
 
 		definition := scanner.tokens[match.tokenIndex]
 
-		if !definition.skip {
-			tokens = append(tokens, Token{
-				Name: definition.name,
-				Text: src[offset:match.end],
-				Span: location.Span{
-					Start: location.Position(offset),
-					End:   location.Position(match.end),
-				},
-			})
+		if definition.skip {
+			continue
 		}
 
-		offset = match.end
+		return Token{
+			Name: definition.name,
+			Text: scanner.src[start:match.end],
+			Span: location.Span{
+				Start: location.Position(start),
+				End:   location.Position(match.end),
+			},
+		}, Diagnostic{}, true
 	}
 
-	return tokens, nil
+	return Token{}, Diagnostic{}, false
 }
 
 type tokenDefinition struct {
@@ -135,23 +155,20 @@ type match struct {
 	end        int
 }
 
-func (scanner Scanner) match(src string, start int) (match, bool) {
+func (scanner *Scanner) match(start int) (match, bool) {
 	best := match{
 		tokenIndex: -1,
 		end:        start,
 	}
 	active := scanner.startClosure
-	scratch := scanScratch{
-		nextSeen: make([]bool, len(scanner.states)),
-	}
 
 	// Active always contains the epsilon-closed set of states reachable at the
 	// current offset. That lets the main loop focus on only two operations:
 	// consume one byte, then re-expand through epsilon transitions.
 	scanner.recordAccepts(active, start, &best)
 
-	for offset := start; offset < len(src); offset++ {
-		next := scanner.step(active, src[offset], &scratch)
+	for offset := start; offset < len(scanner.src); offset++ {
+		next := scanner.step(active, scanner.src[offset], &scanner.scratch)
 
 		if len(next) == 0 {
 			break
