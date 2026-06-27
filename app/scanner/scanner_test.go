@@ -289,6 +289,49 @@ tokens {
 	}
 }
 
+func Test_Scanner_Reset(t *testing.T) {
+	t.Parallel()
+
+	// Arrange.
+	program := compileProgram(t, `scope { include "**/*.go" }
+definitions {
+    letter = 'a'..'z'
+}
+tokens {
+    Whitespace = ' '+ skip
+    Identifier = letter+
+}`)
+	scan := scanner.New(program, "alpha beta")
+	firstRunTokens := make([]scanner.Token, 0, 2)
+
+	// Act.
+	for {
+		token, diagnostic, ok := scan.Next()
+
+		if !ok {
+			break
+		}
+
+		claim.Equal(t, "When resetting a scanner, the initial scan does not produce diagnostics.", scanner.Diagnostic{}, diagnostic, "Diagnostic")
+		firstRunTokens = append(firstRunTokens, token)
+	}
+
+	scan.Reset("gamma")
+
+	token, diagnostic, ok := scan.Next()
+	_, _, end := scan.Next()
+
+	// Assert.
+	claim.DeepEqual(t, "When resetting a scanner, the initial source is tokenized correctly.", []scanner.Token{
+		tokenValue("Identifier", "alpha", 0, 5),
+		tokenValue("Identifier", "beta", 6, 10),
+	}, firstRunTokens, "Initial Tokens")
+	claim.Equal(t, "When resetting a scanner, the new source produces a token.", true, ok, "Token Available")
+	claim.Equal(t, "When resetting a scanner, the next token comes from the new source.", tokenValue("Identifier", "gamma", 0, 5), token, "Reset Token")
+	claim.Equal(t, "When resetting a scanner, no diagnostic is returned for the new source.", scanner.Diagnostic{}, diagnostic, "Reset Diagnostic")
+	claim.Equal(t, "When resetting a scanner, the scanner reaches the end of the new source.", false, end, "End Of Source")
+}
+
 func Benchmark_Scanner_Scan_0(b *testing.B)    { benchmark_Scanner_Scan(b, 0) }
 func Benchmark_Scanner_Scan_1(b *testing.B)    { benchmark_Scanner_Scan(b, 1) }
 func Benchmark_Scanner_Scan_10(b *testing.B)   { benchmark_Scanner_Scan(b, 10) }
@@ -364,6 +407,10 @@ func scannerInput(size int) string {
 }
 
 func token(name, text string, start, end location.Position) scanner.Token {
+	return tokenValue(name, text, start, end)
+}
+
+func tokenValue(name, text string, start, end location.Position) scanner.Token {
 	return scanner.Token{
 		Name: name,
 		Text: text,
