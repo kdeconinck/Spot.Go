@@ -63,9 +63,6 @@ const (
 	// TokenAt marks a rule report target.
 	TokenAt
 
-	// TokenLeftBrace marks the start of a section block.
-	TokenLeftBrace
-
 	// TokenString marks a double-quoted string literal.
 	TokenString
 
@@ -77,6 +74,9 @@ const (
 
 	// TokenCharacter marks a single-quoted character literal.
 	TokenCharacter
+
+	// TokenLeftBrace marks the start of a section block.
+	TokenLeftBrace
 
 	// TokenRightBrace marks the end of a section block.
 	TokenRightBrace
@@ -126,6 +126,33 @@ const (
 	// TokenPlus marks one-or-more repetition.
 	TokenPlus
 )
+
+var keywordMap = map[string]TokenKind{
+	"scope":       TokenScope,
+	"include":     TokenInclude,
+	"exclude":     TokenExclude,
+	"definitions": TokenDefinitions,
+	"tokens":      TokenTokens,
+	"skip":        TokenSkip,
+	"rules":       TokenRules,
+	"rule":        TokenRule,
+	"match":       TokenMatch,
+	"where":       TokenWhere,
+	"report":      TokenReport,
+	"info":        TokenInfo,
+	"warn":        TokenWarn,
+	"err":         TokenErr,
+	"at":          TokenAt,
+}
+
+// LookupTokenKind returns the TokenKind corresponding to value of TokenIdentifier if value doesn't match any TokenKind.
+func LookupTokenKind(value string) TokenKind {
+	if v, ok := keywordMap[value]; ok {
+		return v
+	}
+
+	return TokenIdentifier
+}
 
 // Token is a lexical token from a Spot DSL source file.
 type Token struct {
