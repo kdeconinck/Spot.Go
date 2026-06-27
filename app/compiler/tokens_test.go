@@ -34,6 +34,7 @@ func Test_Compile_Tokens_PreservesSourceOrder(t *testing.T) {
 			{Name: "Second", Expression: ir.Expression{Kind: ir.ExpressionString, String: "b"}},
 			{Name: "Third", Expression: ir.Expression{Kind: ir.ExpressionString, String: "c"}},
 		},
+		Rules: []ir.Rule{},
 	}
 
 	// Act.
@@ -75,6 +76,7 @@ func Test_Compile_Tokens_ResolvesDefinitionReferences(t *testing.T) {
 				},
 			},
 		},
+		Rules: []ir.Rule{},
 	}
 
 	// Act.
@@ -98,6 +100,7 @@ func Test_Compile_Tokens_UnescapesLiterals(t *testing.T) {
 			{Name: "Newline", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\n'}},
 			{Name: "Text", Expression: ir.Expression{Kind: ir.ExpressionString, String: "a\tb\n\"c\\"}},
 		},
+		Rules: []ir.Rule{},
 	}
 
 	// Act.
@@ -124,6 +127,7 @@ func Test_Compile_Tokens_UnescapesCharacterEscapes(t *testing.T) {
 				Tokens: []ir.Token{
 					{Name: "Backslash", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\\'}},
 				},
+				Rules: []ir.Rule{},
 			},
 		},
 		{
@@ -133,6 +137,7 @@ func Test_Compile_Tokens_UnescapesCharacterEscapes(t *testing.T) {
 				Tokens: []ir.Token{
 					{Name: "Quote", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\''}},
 				},
+				Rules: []ir.Rule{},
 			},
 		},
 		{
@@ -142,6 +147,7 @@ func Test_Compile_Tokens_UnescapesCharacterEscapes(t *testing.T) {
 				Tokens: []ir.Token{
 					{Name: "CarriageReturn", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\r'}},
 				},
+				Rules: []ir.Rule{},
 			},
 		},
 	} {
@@ -174,6 +180,7 @@ func Test_Compile_Tokens_UnescapesStringEscapes(t *testing.T) {
 		Tokens: []ir.Token{
 			{Name: "Escapes", Expression: ir.Expression{Kind: ir.ExpressionString, String: "\\\"\r"}},
 		},
+		Rules: []ir.Rule{},
 	}
 
 	// Act.
@@ -211,6 +218,7 @@ func Test_Compile_Tokens_PreservesSkipFlags(t *testing.T) {
 			},
 			{Name: "Identifier", Expression: ir.Expression{Kind: ir.ExpressionString, String: "id"}},
 		},
+		Rules: []ir.Rule{},
 	}
 
 	// Act.
@@ -246,6 +254,7 @@ func Test_Compile_Tokens_PreservesZeroOrOneRepetition(t *testing.T) {
 				},
 			},
 		},
+		Rules: []ir.Rule{},
 	}
 
 	// Act.

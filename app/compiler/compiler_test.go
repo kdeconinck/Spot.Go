@@ -83,6 +83,22 @@ func Test_Compile_DSL(t *testing.T) {
 				Skip: true,
 			},
 		},
+		Rules: []ir.Rule{
+			{
+				Name:       "PublicIdentifier",
+				MatchToken: 0,
+				Where: ir.Condition{
+					Property: ir.ConditionPropertyText,
+					Operator: ir.ConditionOperatorEqual,
+					String:   "public",
+				},
+				Report: ir.Report{
+					Severity:    ir.SeverityWarn,
+					TargetToken: 0,
+					Message:     "Public identifier found",
+				},
+			},
+		},
 	}
 
 	// Act.
