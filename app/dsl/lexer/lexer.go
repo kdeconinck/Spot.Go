@@ -24,12 +24,12 @@ func New(src string) Lexer {
 	}
 }
 
-// Next returns the next syntax token from the source text.
+// Next returns the next token from the source text.
 func (lexer *Lexer) Next() token.Token {
 	lexer.skipTrivia()
 
 	if lexer.offset >= len(lexer.src) {
-		return lexer.token(token.TokenEOF, lexer.offset, lexer.offset)
+		return lexer.makeToken(token.TokenEOF, lexer.offset, lexer.offset)
 	}
 
 	start := lexer.offset
@@ -47,10 +47,10 @@ func (lexer *Lexer) Next() token.Token {
 		if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '.' {
 			lexer.offset++
 
-			return lexer.token(token.TokenDotDot, start, lexer.offset)
+			return lexer.makeToken(token.TokenDotDot, start, lexer.offset)
 		}
 
-		return lexer.token(token.TokenDot, start, lexer.offset)
+		return lexer.makeToken(token.TokenDot, start, lexer.offset)
 
 	case '=':
 		lexer.offset++
@@ -58,10 +58,10 @@ func (lexer *Lexer) Next() token.Token {
 		if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
 			lexer.offset++
 
-			return lexer.token(token.TokenEqualEqual, start, lexer.offset)
+			return lexer.makeToken(token.TokenEqualEqual, start, lexer.offset)
 		}
 
-		return lexer.token(token.TokenEqual, start, lexer.offset)
+		return lexer.makeToken(token.TokenEqual, start, lexer.offset)
 
 	case '!':
 		lexer.offset++
@@ -69,10 +69,10 @@ func (lexer *Lexer) Next() token.Token {
 		if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
 			lexer.offset++
 
-			return lexer.token(token.TokenBangEqual, start, lexer.offset)
+			return lexer.makeToken(token.TokenBangEqual, start, lexer.offset)
 		}
 
-		return lexer.token(token.TokenInvalid, start, lexer.offset)
+		return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
 
 	case '<':
 		lexer.offset++
@@ -80,10 +80,10 @@ func (lexer *Lexer) Next() token.Token {
 		if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
 			lexer.offset++
 
-			return lexer.token(token.TokenLessEqual, start, lexer.offset)
+			return lexer.makeToken(token.TokenLessEqual, start, lexer.offset)
 		}
 
-		return lexer.token(token.TokenLess, start, lexer.offset)
+		return lexer.makeToken(token.TokenLess, start, lexer.offset)
 
 	case '>':
 		lexer.offset++
@@ -91,50 +91,50 @@ func (lexer *Lexer) Next() token.Token {
 		if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
 			lexer.offset++
 
-			return lexer.token(token.TokenGreaterEqual, start, lexer.offset)
+			return lexer.makeToken(token.TokenGreaterEqual, start, lexer.offset)
 		}
 
-		return lexer.token(token.TokenGreater, start, lexer.offset)
+		return lexer.makeToken(token.TokenGreater, start, lexer.offset)
 
 	case '(':
 		lexer.offset++
 
-		return lexer.token(token.TokenLeftParen, start, lexer.offset)
+		return lexer.makeToken(token.TokenLeftParen, start, lexer.offset)
 
 	case ')':
 		lexer.offset++
 
-		return lexer.token(token.TokenRightParen, start, lexer.offset)
+		return lexer.makeToken(token.TokenRightParen, start, lexer.offset)
 
 	case '{':
 		lexer.offset++
 
-		return lexer.token(token.TokenLeftBrace, start, lexer.offset)
+		return lexer.makeToken(token.TokenLeftBrace, start, lexer.offset)
 
 	case '}':
 		lexer.offset++
 
-		return lexer.token(token.TokenRightBrace, start, lexer.offset)
+		return lexer.makeToken(token.TokenRightBrace, start, lexer.offset)
 
 	case '|':
 		lexer.offset++
 
-		return lexer.token(token.TokenPipe, start, lexer.offset)
+		return lexer.makeToken(token.TokenPipe, start, lexer.offset)
 
 	case '?':
 		lexer.offset++
 
-		return lexer.token(token.TokenQuestion, start, lexer.offset)
+		return lexer.makeToken(token.TokenQuestion, start, lexer.offset)
 
 	case '*':
 		lexer.offset++
 
-		return lexer.token(token.TokenStar, start, lexer.offset)
+		return lexer.makeToken(token.TokenStar, start, lexer.offset)
 
 	case '+':
 		lexer.offset++
 
-		return lexer.token(token.TokenPlus, start, lexer.offset)
+		return lexer.makeToken(token.TokenPlus, start, lexer.offset)
 	}
 
 	if isIdentifierStart(lexer.src[lexer.offset]) {
@@ -147,7 +147,7 @@ func (lexer *Lexer) Next() token.Token {
 
 	lexer.offset++
 
-	return lexer.token(token.TokenInvalid, start, lexer.offset)
+	return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
 }
 
 func (lexer *Lexer) skipTrivia() {
@@ -196,7 +196,7 @@ func (lexer *Lexer) scanIdentifier(start int) token.Token {
 
 	tokKind := token.LookupTokenKind(lexer.src[start:lexer.offset])
 
-	return lexer.token(tokKind, start, lexer.offset)
+	return lexer.makeToken(tokKind, start, lexer.offset)
 }
 
 func (lexer *Lexer) scanInteger(start int) token.Token {
@@ -206,14 +206,14 @@ func (lexer *Lexer) scanInteger(start int) token.Token {
 		lexer.offset++
 	}
 
-	return lexer.token(token.TokenInteger, start, lexer.offset)
+	return lexer.makeToken(token.TokenInteger, start, lexer.offset)
 }
 
 func (lexer *Lexer) scanCharacter(start int) token.Token {
 	lexer.offset++
 
 	if lexer.offset >= len(lexer.src) {
-		return lexer.token(token.TokenInvalid, start, lexer.offset)
+		return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
 	}
 
 	switch lexer.src[lexer.offset] {
@@ -221,25 +221,25 @@ func (lexer *Lexer) scanCharacter(start int) token.Token {
 		if !lexer.hasValidCharacterEscape() {
 			lexer.offset++
 
-			return lexer.token(token.TokenInvalid, start, lexer.offset)
+			return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
 		}
 
 		lexer.offset += 2
 
 	case '\n', '\r':
-		return lexer.token(token.TokenInvalid, start, lexer.offset)
+		return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
 
 	default:
 		lexer.offset++
 	}
 
 	if lexer.offset >= len(lexer.src) || lexer.src[lexer.offset] != '\'' {
-		return lexer.token(token.TokenInvalid, start, lexer.offset)
+		return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
 	}
 
 	lexer.offset++
 
-	return lexer.token(token.TokenCharacter, start, lexer.offset)
+	return lexer.makeToken(token.TokenCharacter, start, lexer.offset)
 }
 
 func (lexer Lexer) hasValidCharacterEscape() bool {
@@ -260,26 +260,26 @@ func (lexer *Lexer) scanString(start int) token.Token {
 		case '"':
 			lexer.offset++
 
-			return lexer.token(token.TokenString, start, lexer.offset)
+			return lexer.makeToken(token.TokenString, start, lexer.offset)
 
 		case '\\':
 			if !lexer.hasValidStringEscape() {
 				lexer.offset++
 
-				return lexer.token(token.TokenInvalid, start, lexer.offset)
+				return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
 			}
 
 			lexer.offset += 2
 
 		case '\n', '\r':
-			return lexer.token(token.TokenInvalid, start, lexer.offset)
+			return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
 
 		default:
 			lexer.offset++
 		}
 	}
 
-	return lexer.token(token.TokenInvalid, start, lexer.offset)
+	return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
 }
 
 func (lexer Lexer) hasValidStringEscape() bool {
@@ -292,7 +292,7 @@ func (lexer Lexer) hasValidStringEscape() bool {
 	}
 }
 
-func (lexer Lexer) token(kind token.TokenKind, start, end int) token.Token {
+func (lexer Lexer) makeToken(kind token.TokenKind, start, end int) token.Token {
 	return token.Token{
 		Kind: kind,
 		Text: lexer.src[start:end],
