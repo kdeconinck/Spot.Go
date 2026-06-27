@@ -196,7 +196,67 @@ A file is analyzed when:
 1. It matches at least one `include` pattern.
 2. It does not match any `exclude` pattern.
 
-Pattern syntax is intentionally simple and should be documented further when implemented.
+Patterns are matched against the file path relative to the analyzed root directory.
+Paths are normalized to use `/` as the separator, even on operating systems that use a different path separator.
+
+## Scope Pattern Syntax
+
+Scope patterns support a small glob syntax.
+
+### `*`
+
+`*` matches zero or more characters within a single path segment.
+It does not cross `/`.
+
+Examples:
+
+```text
+*.go
+file*
+*_generated.go
+```
+
+### `?`
+
+`?` matches exactly one character within a single path segment.
+It does not cross `/`.
+
+Examples:
+
+```text
+file?.go
+v?
+```
+
+### `**`
+
+`**` matches zero or more complete path segments.
+It may cross `/`.
+`**` only has this recursive meaning when it occupies an entire path segment.
+
+Examples:
+
+```text
+**/*.go
+vendor/**
+internal/**/testdata/*.json
+```
+
+## Scope Examples
+
+```spot
+scope {
+    include "**/*.go"
+    exclude "vendor/**"
+    exclude "**/*_generated.go"
+}
+```
+
+With these rules:
+
+* `cmd/spot/main.go` is included.
+* `vendor/example/main.go` is excluded.
+* `pkg/model/user_generated.go` is excluded.
 
 # Definitions Section
 
