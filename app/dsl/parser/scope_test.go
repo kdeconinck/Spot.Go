@@ -22,14 +22,12 @@ import (
 func Test_Parse_Scope(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		name            string
+	for tcName, tc := range map[string]struct {
 		inSource        string
 		wantDocument    ast.Document
 		wantDiagnostics []parser.Diagnostic
 	}{
-		{
-			name:     "When parsing an empty scope block, a document is returned.",
+		"When parsing an empty scope block, a document is returned.": {
 			inSource: "scope {}",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -38,8 +36,7 @@ func Test_Parse_Scope(t *testing.T) {
 				Span: span(0, 8),
 			},
 		},
-		{
-			name:     "When parsing a scope block with an include entry, a document is returned.",
+		"When parsing a scope block with an include entry, a document is returned.": {
 			inSource: "scope { include \"**/*.go\" }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -51,8 +48,7 @@ func Test_Parse_Scope(t *testing.T) {
 				Span: span(0, 27),
 			},
 		},
-		{
-			name:     "When parsing a scope block with an exclude entry, a document is returned.",
+		"When parsing a scope block with an exclude entry, a document is returned.": {
 			inSource: "scope { exclude \"vendor/**\" }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -64,8 +60,7 @@ func Test_Parse_Scope(t *testing.T) {
 				Span: span(0, 29),
 			},
 		},
-		{
-			name:     "When parsing a scope block with include and exclude entries, a document is returned.",
+		"When parsing a scope block with include and exclude entries, a document is returned.": {
 			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -78,8 +73,7 @@ func Test_Parse_Scope(t *testing.T) {
 				Span: span(0, 47),
 			},
 		},
-		{
-			name:     "When the scope keyword is missing, a diagnostic is returned.",
+		"When the scope keyword is missing, a diagnostic is returned.": {
 			inSource: "x",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -91,8 +85,7 @@ func Test_Parse_Scope(t *testing.T) {
 				diagnostic("Expected 'scope', found 'identifier'.", 0, 1),
 			},
 		},
-		{
-			name:     "When the opening brace is missing, a diagnostic is returned.",
+		"When the opening brace is missing, a diagnostic is returned.": {
 			inSource: "scope }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -104,8 +97,7 @@ func Test_Parse_Scope(t *testing.T) {
 				diagnostic("Expected '{', found '}'.", 6, 7),
 			},
 		},
-		{
-			name:     "When the closing brace is missing, a diagnostic is returned.",
+		"When the closing brace is missing, a diagnostic is returned.": {
 			inSource: "scope {",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -117,8 +109,7 @@ func Test_Parse_Scope(t *testing.T) {
 				diagnostic("Expected '}', found 'EOF'.", 7, 7),
 			},
 		},
-		{
-			name:     "When an include entry has no string, a diagnostic is returned.",
+		"When an include entry has no string, a diagnostic is returned.": {
 			inSource: "scope { include }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -133,8 +124,7 @@ func Test_Parse_Scope(t *testing.T) {
 				diagnostic("Expected 'string', found '}'.", 16, 17),
 			},
 		},
-		{
-			name:     "When an unexpected token appears inside scope, a diagnostic is returned.",
+		"When an unexpected token appears inside scope, a diagnostic is returned.": {
 			inSource: "scope { x }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -146,8 +136,7 @@ func Test_Parse_Scope(t *testing.T) {
 				diagnostic("Expected 'include', found 'identifier'.", 8, 9),
 			},
 		},
-		{
-			name:     "When a token appears after the scope block, a diagnostic is returned.",
+		"When a token appears after the scope block, a diagnostic is returned.": {
 			inSource: "scope {} x",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -160,18 +149,18 @@ func Test_Parse_Scope(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()
 
 			// Act.
 			gotDocument, gotDiagnostics := parser.Parse(tc.inSource)
 
 			// Assert.
-			claim.DeepEqual(t, tc.name, tc.wantDocument, gotDocument, "Document")
-			claim.Equal(t, tc.name, len(tc.wantDiagnostics), len(gotDiagnostics), "Diagnostic Count")
+			claim.DeepEqual(t, tcName, tc.wantDocument, gotDocument, "Document")
+			claim.Equal(t, tcName, len(tc.wantDiagnostics), len(gotDiagnostics), "Diagnostic Count")
 
 			for idx := range tc.wantDiagnostics {
-				claim.Equal(t, tc.name, tc.wantDiagnostics[idx], gotDiagnostics[idx], "Diagnostic")
+				claim.Equal(t, tcName, tc.wantDiagnostics[idx], gotDiagnostics[idx], "Diagnostic")
 			}
 		})
 	}

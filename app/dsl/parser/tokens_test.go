@@ -22,14 +22,12 @@ import (
 func Test_Parse_Tokens(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		name            string
+	for tcName, tc := range map[string]struct {
 		inSource        string
 		wantDocument    ast.Document
 		wantDiagnostics []parser.Diagnostic
 	}{
-		{
-			name:     "When parsing an empty tokens block, a document is returned.",
+		"When parsing an empty tokens block, a document is returned.": {
 			inSource: "scope {} tokens {}",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -41,8 +39,7 @@ func Test_Parse_Tokens(t *testing.T) {
 				Span: span(0, 18),
 			},
 		},
-		{
-			name:     "When parsing a definitions block followed by an empty tokens block, a document is returned.",
+		"When parsing a definitions block followed by an empty tokens block, a document is returned.": {
 			inSource: "scope {} definitions {} tokens {}",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -57,8 +54,7 @@ func Test_Parse_Tokens(t *testing.T) {
 				Span: span(0, 33),
 			},
 		},
-		{
-			name:     "When parsing a tokens block with a reference token, a document is returned.",
+		"When parsing a tokens block with a reference token, a document is returned.": {
 			inSource: "scope {} tokens { Identifier = letter }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -73,8 +69,7 @@ func Test_Parse_Tokens(t *testing.T) {
 				Span: span(0, 39),
 			},
 		},
-		{
-			name:     "When parsing a tokens block with a string token, a document is returned.",
+		"When parsing a tokens block with a string token, a document is returned.": {
 			inSource: "scope {} tokens { KeywordPublic = \"public\" }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -89,8 +84,7 @@ func Test_Parse_Tokens(t *testing.T) {
 				Span: span(0, 44),
 			},
 		},
-		{
-			name:     "When parsing a tokens block with a skipped token, a document is returned.",
+		"When parsing a tokens block with a skipped token, a document is returned.": {
 			inSource: "scope {} tokens { Whitespace = (' ' | '\\t')+ skip }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -105,8 +99,7 @@ func Test_Parse_Tokens(t *testing.T) {
 				Span: span(0, 51),
 			},
 		},
-		{
-			name:     "When the tokens opening brace is missing, a diagnostic is returned.",
+		"When the tokens opening brace is missing, a diagnostic is returned.": {
 			inSource: "scope {} tokens }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -121,8 +114,7 @@ func Test_Parse_Tokens(t *testing.T) {
 				diagnostic("Expected '{', found '}'.", 16, 17),
 			},
 		},
-		{
-			name:     "When the tokens closing brace is missing, a diagnostic is returned.",
+		"When the tokens closing brace is missing, a diagnostic is returned.": {
 			inSource: "scope {} tokens {",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -137,8 +129,7 @@ func Test_Parse_Tokens(t *testing.T) {
 				diagnostic("Expected '}', found 'EOF'.", 17, 17),
 			},
 		},
-		{
-			name:     "When an unexpected token appears inside tokens, a diagnostic is returned.",
+		"When an unexpected token appears inside tokens, a diagnostic is returned.": {
 			inSource: "scope {} tokens { 'a' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -153,8 +144,7 @@ func Test_Parse_Tokens(t *testing.T) {
 				diagnostic("Expected 'identifier', found 'character'.", 18, 21),
 			},
 		},
-		{
-			name:     "When a token is missing an expression, a diagnostic is returned.",
+		"When a token is missing an expression, a diagnostic is returned.": {
 			inSource: "scope {} tokens { Identifier = }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -173,18 +163,18 @@ func Test_Parse_Tokens(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()
 
 			// Act.
 			gotDocument, gotDiagnostics := parser.Parse(tc.inSource)
 
 			// Assert.
-			claim.DeepEqual(t, tc.name, tc.wantDocument, gotDocument, "Document")
-			claim.Equal(t, tc.name, len(tc.wantDiagnostics), len(gotDiagnostics), "Diagnostic Count")
+			claim.DeepEqual(t, tcName, tc.wantDocument, gotDocument, "Document")
+			claim.Equal(t, tcName, len(tc.wantDiagnostics), len(gotDiagnostics), "Diagnostic Count")
 
 			for idx := range tc.wantDiagnostics {
-				claim.Equal(t, tc.name, tc.wantDiagnostics[idx], gotDiagnostics[idx], "Diagnostic")
+				claim.Equal(t, tcName, tc.wantDiagnostics[idx], gotDiagnostics[idx], "Diagnostic")
 			}
 		})
 	}

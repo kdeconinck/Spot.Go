@@ -18,14 +18,12 @@ import (
 func Test_Parse_Rules(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		name            string
+	for tcName, tc := range map[string]struct {
 		inSource        string
 		wantDocument    ast.Document
 		wantDiagnostics []parser.Diagnostic
 	}{
-		{
-			name:     "When parsing an empty rules block, a document is returned.",
+		"When parsing an empty rules block, a document is returned.": {
 			inSource: "scope {} rules {}",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -37,8 +35,7 @@ func Test_Parse_Rules(t *testing.T) {
 				Span: span(0, 17),
 			},
 		},
-		{
-			name:     "When parsing a rules block with a rule, a document is returned.",
+		"When parsing a rules block with a rule, a document is returned.": {
 			inSource: "scope {} rules { rule PublicIdentifier { match Identifier report warn at Identifier \"Public identifier found\" } }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -53,8 +50,7 @@ func Test_Parse_Rules(t *testing.T) {
 				Span: span(0, 113),
 			},
 		},
-		{
-			name:     "When parsing a rules block with a string condition, a document is returned.",
+		"When parsing a rules block with a string condition, a document is returned.": {
 			inSource: "scope {} rules { rule PublicIdentifier { match Identifier where Identifier.text == \"public\" report warn at Identifier \"Public identifier found\" } }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -69,8 +65,7 @@ func Test_Parse_Rules(t *testing.T) {
 				Span: span(0, 147),
 			},
 		},
-		{
-			name:     "When parsing a rules block with an integer condition, a document is returned.",
+		"When parsing a rules block with an integer condition, a document is returned.": {
 			inSource: "scope {} rules { rule LongIdentifier { match Identifier where Identifier.length > 3 report warn at Identifier \"Long identifier found\" } }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -85,8 +80,7 @@ func Test_Parse_Rules(t *testing.T) {
 				Span: span(0, 137),
 			},
 		},
-		{
-			name:     "When the rules opening brace is missing, a diagnostic is returned.",
+		"When the rules opening brace is missing, a diagnostic is returned.": {
 			inSource: "scope {} rules }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -101,8 +95,7 @@ func Test_Parse_Rules(t *testing.T) {
 				diagnostic("Expected '{', found '}'.", 15, 16),
 			},
 		},
-		{
-			name:     "When the rules closing brace is missing, a diagnostic is returned.",
+		"When the rules closing brace is missing, a diagnostic is returned.": {
 			inSource: "scope {} rules {",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -117,8 +110,7 @@ func Test_Parse_Rules(t *testing.T) {
 				diagnostic("Expected '}', found 'EOF'.", 16, 16),
 			},
 		},
-		{
-			name:     "When an unexpected token appears inside rules, a diagnostic is returned.",
+		"When an unexpected token appears inside rules, a diagnostic is returned.": {
 			inSource: "scope {} rules { x }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -133,8 +125,7 @@ func Test_Parse_Rules(t *testing.T) {
 				diagnostic("Expected 'rule', found 'identifier'.", 17, 18),
 			},
 		},
-		{
-			name:     "When a rule opening brace is missing, a diagnostic is returned.",
+		"When a rule opening brace is missing, a diagnostic is returned.": {
 			inSource: "scope {} rules { rule PublicIdentifier }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -152,8 +143,7 @@ func Test_Parse_Rules(t *testing.T) {
 				diagnostic("Expected '{', found '}'.", 39, 40),
 			},
 		},
-		{
-			name:     "When a rule is missing a match statement, diagnostics are returned.",
+		"When a rule is missing a match statement, diagnostics are returned.": {
 			inSource: "scope {} rules { rule PublicIdentifier { report warn at Identifier \"x\" } }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -172,8 +162,7 @@ func Test_Parse_Rules(t *testing.T) {
 				diagnostic("Expected 'identifier', found 'report'.", 41, 47),
 			},
 		},
-		{
-			name:     "When a report severity is missing, a diagnostic is returned.",
+		"When a report severity is missing, a diagnostic is returned.": {
 			inSource: "scope {} rules { rule PublicIdentifier { match Identifier report at Identifier \"x\" } }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -191,8 +180,7 @@ func Test_Parse_Rules(t *testing.T) {
 				diagnostic("Expected 'warn', found 'at'.", 65, 67),
 			},
 		},
-		{
-			name:     "When a where property is missing, a diagnostic is returned.",
+		"When a where property is missing, a diagnostic is returned.": {
 			inSource: "scope {} rules { rule PublicIdentifier { match Identifier where Identifier. == \"public\" report warn at Identifier \"x\" } }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -210,8 +198,7 @@ func Test_Parse_Rules(t *testing.T) {
 				diagnostic("Expected 'identifier', found '=='.", 76, 78),
 			},
 		},
-		{
-			name:     "When a where operator is missing, a diagnostic is returned.",
+		"When a where operator is missing, a diagnostic is returned.": {
 			inSource: "scope {} rules { rule PublicIdentifier { match Identifier where Identifier.text \"public\" report warn at Identifier \"x\" } }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -229,8 +216,7 @@ func Test_Parse_Rules(t *testing.T) {
 				diagnostic("Expected '==', found 'string'.", 80, 88),
 			},
 		},
-		{
-			name:     "When a where literal is missing, a diagnostic is returned.",
+		"When a where literal is missing, a diagnostic is returned.": {
 			inSource: "scope {} rules { rule PublicIdentifier { match Identifier where Identifier.text == report warn at Identifier \"x\" } }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -249,18 +235,18 @@ func Test_Parse_Rules(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()
 
 			// Act.
 			gotDocument, gotDiagnostics := parser.Parse(tc.inSource)
 
 			// Assert.
-			claim.DeepEqual(t, tc.name, tc.wantDocument, gotDocument, "Document")
-			claim.Equal(t, tc.name, len(tc.wantDiagnostics), len(gotDiagnostics), "Diagnostic Count")
+			claim.DeepEqual(t, tcName, tc.wantDocument, gotDocument, "Document")
+			claim.Equal(t, tcName, len(tc.wantDiagnostics), len(gotDiagnostics), "Diagnostic Count")
 
 			for idx := range tc.wantDiagnostics {
-				claim.Equal(t, tc.name, tc.wantDiagnostics[idx], gotDiagnostics[idx], "Diagnostic")
+				claim.Equal(t, tcName, tc.wantDiagnostics[idx], gotDiagnostics[idx], "Diagnostic")
 			}
 		})
 	}

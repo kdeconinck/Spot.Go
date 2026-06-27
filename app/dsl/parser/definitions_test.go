@@ -22,14 +22,12 @@ import (
 func Test_Parse_Definitions(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		name            string
+	for tcName, tc := range map[string]struct {
 		inSource        string
 		wantDocument    ast.Document
 		wantDiagnostics []parser.Diagnostic
 	}{
-		{
-			name:     "When parsing an empty definitions block, a document is returned.",
+		"When parsing an empty definitions block, a document is returned.": {
 			inSource: "scope {} definitions {}",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -41,8 +39,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 23),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with a character definition, a document is returned.",
+		"When parsing a definitions block with a character definition, a document is returned.": {
 			inSource: "scope {} definitions { letter = 'a' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -57,8 +54,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 37),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with a character range definition, a document is returned.",
+		"When parsing a definitions block with a character range definition, a document is returned.": {
 			inSource: "scope {} definitions { letter = 'a'..'z' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -73,8 +69,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 42),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with a reference definition, a document is returned.",
+		"When parsing a definitions block with a reference definition, a document is returned.": {
 			inSource: "scope {} definitions { identifierStart = letter }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -89,8 +84,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 49),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with character concatenation, a document is returned.",
+		"When parsing a definitions block with character concatenation, a document is returned.": {
 			inSource: "scope {} definitions { value = 'a' 'b' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -105,8 +99,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 40),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with repeated reference concatenation, a document is returned.",
+		"When parsing a definitions block with repeated reference concatenation, a document is returned.": {
 			inSource: "scope {} definitions { value = letter digit* }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -121,8 +114,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 46),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with grouped repetition concatenation, a document is returned.",
+		"When parsing a definitions block with grouped repetition concatenation, a document is returned.": {
 			inSource: "scope {} definitions { value = letter ('_' | digit)+ }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -137,8 +129,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 54),
 			},
 		},
-		{
-			name:     "When parsing multiple definitions after concatenation, a document is returned.",
+		"When parsing multiple definitions after concatenation, a document is returned.": {
 			inSource: "scope {} definitions { letter = 'a' value = letter digit }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -154,8 +145,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 58),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with character alternation, a document is returned.",
+		"When parsing a definitions block with character alternation, a document is returned.": {
 			inSource: "scope {} definitions { value = 'a' | 'b' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -170,8 +160,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 42),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with range alternation, a document is returned.",
+		"When parsing a definitions block with range alternation, a document is returned.": {
 			inSource: "scope {} definitions { letter = 'a'..'z' | 'A'..'Z' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -186,8 +175,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 53),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with reference alternation, a document is returned.",
+		"When parsing a definitions block with reference alternation, a document is returned.": {
 			inSource: "scope {} definitions { identifierStart = letter | '_' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -202,8 +190,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 55),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with concatenation before alternation, a document is returned.",
+		"When parsing a definitions block with concatenation before alternation, a document is returned.": {
 			inSource: "scope {} definitions { value = letter digit | '_' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -218,8 +205,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 51),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with a grouped expression, a document is returned.",
+		"When parsing a definitions block with a grouped expression, a document is returned.": {
 			inSource: "scope {} definitions { value = ('a' | 'b') }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -234,8 +220,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 44),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with zero-or-one repetition, a document is returned.",
+		"When parsing a definitions block with zero-or-one repetition, a document is returned.": {
 			inSource: "scope {} definitions { value = 'a'? }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -250,8 +235,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 37),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with zero-or-more repetition, a document is returned.",
+		"When parsing a definitions block with zero-or-more repetition, a document is returned.": {
 			inSource: "scope {} definitions { value = letter* }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -266,8 +250,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 40),
 			},
 		},
-		{
-			name:     "When parsing a definitions block with one-or-more repetition, a document is returned.",
+		"When parsing a definitions block with one-or-more repetition, a document is returned.": {
 			inSource: "scope {} definitions { value = ('a' | 'b')+ }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -282,8 +265,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				Span: span(0, 45),
 			},
 		},
-		{
-			name:     "When the definitions opening brace is missing, a diagnostic is returned.",
+		"When the definitions opening brace is missing, a diagnostic is returned.": {
 			inSource: "scope {} definitions }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -298,8 +280,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				diagnostic("Expected '{', found '}'.", 21, 22),
 			},
 		},
-		{
-			name:     "When the definitions closing brace is missing, a diagnostic is returned.",
+		"When the definitions closing brace is missing, a diagnostic is returned.": {
 			inSource: "scope {} definitions {",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -314,8 +295,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				diagnostic("Expected '}', found 'EOF'.", 22, 22),
 			},
 		},
-		{
-			name:     "When an unexpected token appears inside definitions, a diagnostic is returned.",
+		"When an unexpected token appears inside definitions, a diagnostic is returned.": {
 			inSource: "scope {} definitions { 'a' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -330,8 +310,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				diagnostic("Expected 'identifier', found 'character'.", 23, 26),
 			},
 		},
-		{
-			name:     "When a definition is missing an equal sign, a diagnostic is returned.",
+		"When a definition is missing an equal sign, a diagnostic is returned.": {
 			inSource: "scope {} definitions { letter 'a' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -349,8 +328,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				diagnostic("Expected '=', found 'character'.", 30, 33),
 			},
 		},
-		{
-			name:     "When a definition is missing an expression, a diagnostic is returned.",
+		"When a definition is missing an expression, a diagnostic is returned.": {
 			inSource: "scope {} definitions { letter = }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -368,8 +346,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				diagnostic("Expected 'character', found '}'.", 32, 33),
 			},
 		},
-		{
-			name:     "When a character range is missing an end character, a diagnostic is returned.",
+		"When a character range is missing an end character, a diagnostic is returned.": {
 			inSource: "scope {} definitions { letter = 'a'.. }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -387,8 +364,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				diagnostic("Expected 'character', found '}'.", 38, 39),
 			},
 		},
-		{
-			name:     "When alternation is missing a right expression, a diagnostic is returned.",
+		"When alternation is missing a right expression, a diagnostic is returned.": {
 			inSource: "scope {} definitions { value = 'a' | }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -406,8 +382,7 @@ func Test_Parse_Definitions(t *testing.T) {
 				diagnostic("Expected 'character', found '}'.", 37, 38),
 			},
 		},
-		{
-			name:     "When a grouped expression is missing a closing parenthesis, a diagnostic is returned.",
+		"When a grouped expression is missing a closing parenthesis, a diagnostic is returned.": {
 			inSource: "scope {} definitions { value = ('a' | 'b' }",
 			wantDocument: ast.Document{
 				Scope: ast.ScopeSection{
@@ -426,18 +401,18 @@ func Test_Parse_Definitions(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()
 
 			// Act.
 			gotDocument, gotDiagnostics := parser.Parse(tc.inSource)
 
 			// Assert.
-			claim.DeepEqual(t, tc.name, tc.wantDocument, gotDocument, "Document")
-			claim.Equal(t, tc.name, len(tc.wantDiagnostics), len(gotDiagnostics), "Diagnostic Count")
+			claim.DeepEqual(t, tcName, tc.wantDocument, gotDocument, "Document")
+			claim.Equal(t, tcName, len(tc.wantDiagnostics), len(gotDiagnostics), "Diagnostic Count")
 
 			for idx := range tc.wantDiagnostics {
-				claim.Equal(t, tc.name, tc.wantDiagnostics[idx], gotDiagnostics[idx], "Diagnostic")
+				claim.Equal(t, tcName, tc.wantDiagnostics[idx], gotDiagnostics[idx], "Diagnostic")
 			}
 		})
 	}
