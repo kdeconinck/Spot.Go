@@ -11,24 +11,6 @@ import (
 	"github.com/kdeconinck/spot/syntax"
 )
 
-var keywordMap = map[string]syntax.TokenKind{
-	"scope":       syntax.TokenScope,
-	"include":     syntax.TokenInclude,
-	"exclude":     syntax.TokenExclude,
-	"definitions": syntax.TokenDefinitions,
-	"tokens":      syntax.TokenTokens,
-	"skip":        syntax.TokenSkip,
-	"rules":       syntax.TokenRules,
-	"rule":        syntax.TokenRule,
-	"match":       syntax.TokenMatch,
-	"where":       syntax.TokenWhere,
-	"report":      syntax.TokenReport,
-	"info":        syntax.TokenInfo,
-	"warn":        syntax.TokenWarn,
-	"err":         syntax.TokenErr,
-	"at":          syntax.TokenAt,
-}
-
 // Lexer reads Spot DSL source text one token at a time.
 type Lexer struct {
 	src    string
@@ -212,13 +194,9 @@ func (lexer *Lexer) scanIdentifier(start int) syntax.Token {
 		lexer.offset++
 	}
 
-	kind, ok := keywordMap[lexer.src[start:lexer.offset]]
+	tokKind := syntax.LookupTokenKind(lexer.src[start:lexer.offset])
 
-	if !ok {
-		kind = syntax.TokenIdentifier
-	}
-
-	return lexer.token(kind, start, lexer.offset)
+	return lexer.token(tokKind, start, lexer.offset)
 }
 
 func (lexer *Lexer) scanInteger(start int) syntax.Token {
