@@ -15,12 +15,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kdeconinck/spot/compiler"
-	"github.com/kdeconinck/spot/engine"
+	"github.com/kdeconinck/spot/dsl/compiler"
+	"github.com/kdeconinck/spot/dsl/parser"
+	"github.com/kdeconinck/spot/dsl/token"
+	"github.com/kdeconinck/spot/dsl/validator"
 	"github.com/kdeconinck/spot/location"
-	"github.com/kdeconinck/spot/parser"
-	"github.com/kdeconinck/spot/syntax"
-	"github.com/kdeconinck/spot/validator"
+	"github.com/kdeconinck/spot/runtime/engine"
 )
 
 func main() {
@@ -150,7 +150,7 @@ type scope struct {
 	excludes []string
 }
 
-func compileScope(section syntax.ScopeSection) (scope, error) {
+func compileScope(section token.ScopeSection) (scope, error) {
 	compiled := scope{
 		includes: make([]string, 0, len(section.Entries)),
 		excludes: make([]string, 0, len(section.Entries)),
@@ -163,7 +163,7 @@ func compileScope(section syntax.ScopeSection) (scope, error) {
 			return scope{}, err
 		}
 
-		if section.Entries[idx].Kind == syntax.ScopeEntryInclude {
+		if section.Entries[idx].Kind == token.ScopeEntryInclude {
 			compiled.includes = append(compiled.includes, pattern)
 			continue
 		}
