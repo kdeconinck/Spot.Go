@@ -18,9 +18,8 @@ func (p *parser) parseExpression(allowString bool) ast.DefinitionExpression {
 		return first
 	}
 
-	terms := []ast.DefinitionExpression{
-		first,
-	}
+	terms := make([]ast.DefinitionExpression, 0, 2)
+	terms = append(terms, first)
 
 	for p.consume(token.TokenPipe) {
 		terms = append(terms, p.parseConcatenation(allowString))
@@ -40,9 +39,8 @@ func (p *parser) parseConcatenation(allowString bool) ast.DefinitionExpression {
 		return first
 	}
 
-	terms := []ast.DefinitionExpression{
-		first,
-	}
+	terms := make([]ast.DefinitionExpression, 0, 2)
+	terms = append(terms, first)
 
 	for p.atExpressionContinuationStart(allowString) {
 		terms = append(terms, p.parseRepetition(allowString))

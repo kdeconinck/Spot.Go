@@ -24,7 +24,7 @@ func Test_Parse_DSL(t *testing.T) {
 	t.Parallel()
 
 	// Arrange.
-	source := makeDsl(1)
+	source := testDsl()
 	wantDocument := document(
 		span(0, 458),
 		scopeSection(
@@ -160,6 +160,58 @@ func makeDsl(size int) string {
     exclude "vendor/**"
 `
 
+	const definitionsBlock = `    lower = 'a'..'z'
+    upper = 'A'..'Z'
+    letter = lower | upper
+    underscore = '_'
+    identifierStart = letter | underscore
+    optionalLetter = letter?
+    repeatedLetter = letter*
+    value = letter ('a' | 'b')+
+`
+
+	const tokensBlock = `    Identifier = identifierStart value*
+    KeywordPublic = "public"
+    KeywordInternal = "internal"
+    Whitespace = (' ' | '\t')+ skip
+`
+
+	const rulesBlock = `    rule PublicIdentifier {
+        match Identifier
+        where Identifier.text == "public"
+        report warn at Identifier "Public identifier found"
+    }
+    rule LongIdentifier {
+        match Identifier
+        where Identifier.length > 3
+        report err at Identifier "Long identifier found"
+    }
+    rule AnyIdentifier {
+        match Identifier
+        report info at Identifier "Identifier found"
+    }
+`
+
+	return "" +
+		"scope {\n" +
+		strings.Repeat(scopeBlock, size) +
+		"}\n" +
+		"definitions {\n" +
+		strings.Repeat(definitionsBlock, size) +
+		"}\n" +
+		"tokens {\n" +
+		strings.Repeat(tokensBlock, size) +
+		"}\n" +
+		"rules {\n" +
+		strings.Repeat(rulesBlock, size) +
+		"}"
+}
+
+func testDsl() string {
+	const scopeBlock = `    include "**/*.go"
+    exclude "vendor/**"
+`
+
 	const definitionsBlock = `    letter = 'a'..'z' | 'A'..'Z'
     identifierStart = letter | '_'
     value = letter ('a' | 'b')+
@@ -179,16 +231,16 @@ func makeDsl(size int) string {
 
 	return "" +
 		"scope {\n" +
-		strings.Repeat(scopeBlock, size) +
+		scopeBlock +
 		"}\n" +
 		"definitions {\n" +
-		strings.Repeat(definitionsBlock, size) +
+		definitionsBlock +
 		"}\n" +
 		"tokens {\n" +
-		strings.Repeat(tokensBlock, size) +
+		tokensBlock +
 		"}\n" +
 		"rules {\n" +
-		strings.Repeat(rulesBlock, size) +
+		rulesBlock +
 		"}"
 }
 
