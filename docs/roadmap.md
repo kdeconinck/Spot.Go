@@ -204,6 +204,84 @@ Reusing previous analysis results.
 
 Reusable DSL configurations for common languages.
 
+# Long-Term Vision
+
+The current Spot engine is token-based.
+It tokenizes source text, evaluates rules over those tokens, and emits diagnostics.
+That is the first vertical slice.
+
+The long-term ambition is broader:
+
+* Spot should remain DSL-driven.
+* The DSL should remain the source of truth.
+* The engine should be able to analyze many kinds of text formats, including programming languages, configuration files, and documentation formats.
+
+If Spot grows toward Sonar-style analysis, the DSL will likely need to describe more than tokens.
+The likely long-term shape is a layered DSL:
+
+1. Lexical layer.
+   Tokens describe how source text is split into lexical units.
+2. Structural layer.
+   Nodes describe how tokens form larger syntactic constructs.
+3. Binding layer.
+   Symbols, scopes, declarations, and references describe how structure gains semantic meaning.
+4. Rule layer.
+   Rules describe diagnostics over tokens, nodes, symbols, or derived flow facts.
+
+Conceptually, that future pipeline would look like:
+
+```text
+DSL
+    ↓
+Token Definitions
+    ↓
+Node Definitions
+    ↓
+Binding Definitions
+    ↓
+Compiled Analysis Model
+    ↓
+Source Text
+    ↓
+Tokenization
+    ↓
+Parsing
+    ↓
+Binding / Semantic Model
+    ↓
+Rule Evaluation
+    ↓
+Diagnostics
+```
+
+In that model, the DSL remains the only user-provided input.
+However, the engine is still responsible for compiling the DSL into runtime machinery such as:
+
+* scanners
+* parsers
+* symbol tables
+* reference resolution
+* control-flow or data-flow structures
+
+The future rule model may therefore evolve beyond today's single-token rules.
+Possible future rule targets include:
+
+* tokens
+* token sequences
+* syntax nodes
+* symbols
+* references
+* flow facts
+
+Examples of rules this vision aims to support eventually:
+
+* structural rules, such as ensuring a `using` directive appears inside a namespace declaration
+* symbol rules, such as detecting unused parameters
+* semantic rules, such as detecting broken `async` / `await` patterns
+
+This is a long-term direction, not a current milestone.
+The engine should only move toward it incrementally, with benchmark evidence and the simplest design that satisfies each new requirement.
+
 # Non-Goals
 
 The following are intentionally outside the current roadmap:
