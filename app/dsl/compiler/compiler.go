@@ -9,13 +9,14 @@ package compiler
 import (
 	"strconv"
 
+	"github.com/kdeconinck/spot/dsl/ast"
 	"github.com/kdeconinck/spot/dsl/token"
 	"github.com/kdeconinck/spot/runtime/ir"
 )
 
 // Compile compiles a validated Spot DSL document into a runtime program.
-func Compile(document token.Document) ir.Program {
-	definitions := map[string]token.Definition{}
+func Compile(document ast.Document) ir.Program {
+	definitions := map[string]ast.Definition{}
 	tokenIndexes := map[string]int{}
 
 	for idx := range document.Definitions.Definitions {
@@ -45,7 +46,7 @@ func Compile(document token.Document) ir.Program {
 	return program
 }
 
-func compileRule(rule token.Rule, tokenIndexes map[string]int) ir.Rule {
+func compileRule(rule ast.Rule, tokenIndexes map[string]int) ir.Rule {
 	return ir.Rule{
 		Name:       rule.Name.Text,
 		MatchToken: tokenIndexes[rule.Match.Token.Text],
@@ -54,7 +55,7 @@ func compileRule(rule token.Rule, tokenIndexes map[string]int) ir.Rule {
 	}
 }
 
-func compileCondition(condition token.RuleCondition) ir.Condition {
+func compileCondition(condition ast.RuleCondition) ir.Condition {
 	if condition.Property.Text == "" {
 		return ir.Condition{
 			Property: ir.ConditionPropertyNone,
@@ -77,7 +78,7 @@ func compileCondition(condition token.RuleCondition) ir.Condition {
 	return compiled
 }
 
-func compileReport(report token.RuleReport, tokenIndexes map[string]int) ir.Report {
+func compileReport(report ast.RuleReport, tokenIndexes map[string]int) ir.Report {
 	return ir.Report{
 		Severity:    severityValue(report.Severity),
 		TargetToken: tokenIndexes[report.Target.Text],
@@ -85,43 +86,43 @@ func compileReport(report token.RuleReport, tokenIndexes map[string]int) ir.Repo
 	}
 }
 
-func compileExpression(expression token.DefinitionExpression, definitions map[string]token.Definition) ir.Expression {
+func compileExpression(expression ast.DefinitionExpression, definitions map[string]ast.Definition) ir.Expression {
 	switch expression.Kind {
-	case token.DefinitionExpressionCharacter:
+	case ast.DefinitionExpressionCharacter:
 		return ir.Expression{
 			Kind:      ir.ExpressionCharacter,
 			Character: characterValue(expression.Start),
 		}
 
-	case token.DefinitionExpressionString:
+	case ast.DefinitionExpressionString:
 		return ir.Expression{
 			Kind:   ir.ExpressionString,
 			String: stringValue(expression.Start),
 		}
 
-	case token.DefinitionExpressionRange:
+	case ast.DefinitionExpressionRange:
 		return ir.Expression{
 			Kind:       ir.ExpressionRange,
 			RangeStart: characterValue(expression.Start),
 			RangeEnd:   characterValue(expression.End),
 		}
 
-	case token.DefinitionExpressionReference:
+	case ast.DefinitionExpressionReference:
 		return compileExpression(definitions[expression.Start.Text].Expression, definitions)
 
-	case token.DefinitionExpressionConcatenation:
+	case ast.DefinitionExpressionConcatenation:
 		return ir.Expression{
 			Kind:  ir.ExpressionConcatenation,
 			Terms: compileTerms(expression.Terms, definitions),
 		}
 
-	case token.DefinitionExpressionAlternation:
+	case ast.DefinitionExpressionAlternation:
 		return ir.Expression{
 			Kind:  ir.ExpressionAlternation,
 			Terms: compileTerms(expression.Terms, definitions),
 		}
 
-	case token.DefinitionExpressionGroup:
+	case ast.DefinitionExpressionGroup:
 		return compileExpression(*expression.Inner, definitions)
 
 	default:
@@ -133,7 +134,7 @@ func compileExpression(expression token.DefinitionExpression, definitions map[st
 	}
 }
 
-func compileTerms(expressions []token.DefinitionExpression, definitions map[string]token.Definition) []ir.Expression {
+func compileTerms(expressions []ast.DefinitionExpression, definitions map[string]ast.Definition) []ir.Expression {
 	terms := make([]ir.Expression, 0, len(expressions))
 
 	for idx := range expressions {

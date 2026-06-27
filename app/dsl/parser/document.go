@@ -6,14 +6,17 @@
 // Package parser parses Spot DSL source text into syntax data structures.
 package parser
 
-import "github.com/kdeconinck/spot/dsl/token"
+import (
+	"github.com/kdeconinck/spot/dsl/ast"
+	"github.com/kdeconinck/spot/dsl/token"
+)
 
-func (parser *parser) parseDocument() token.Document {
+func (parser *parser) parseDocument() ast.Document {
 	diagnosticCount := len(parser.diagnostics)
 	scope := parser.parseScopeSection()
 
 	if len(parser.diagnostics) != diagnosticCount {
-		return token.Document{
+		return ast.Document{
 			Scope: scope,
 			Span:  scope.Span,
 		}
@@ -23,7 +26,7 @@ func (parser *parser) parseDocument() token.Document {
 	definitions := parser.parseOptionalDefinitionsSection()
 
 	if len(parser.diagnostics) != diagnosticCount {
-		return token.Document{
+		return ast.Document{
 			Scope:       scope,
 			Definitions: definitions,
 			Span:        span(scope.Span.Start, definitions.Span.End),
@@ -34,7 +37,7 @@ func (parser *parser) parseDocument() token.Document {
 	tokens := parser.parseOptionalTokensSection()
 
 	if len(parser.diagnostics) != diagnosticCount {
-		return token.Document{
+		return ast.Document{
 			Scope:       scope,
 			Definitions: definitions,
 			Tokens:      tokens,
@@ -46,7 +49,7 @@ func (parser *parser) parseDocument() token.Document {
 	rules := parser.parseOptionalRulesSection()
 
 	if len(parser.diagnostics) != diagnosticCount {
-		return token.Document{
+		return ast.Document{
 			Scope:       scope,
 			Definitions: definitions,
 			Tokens:      tokens,
@@ -57,7 +60,7 @@ func (parser *parser) parseDocument() token.Document {
 
 	end := parser.expect(token.TokenEOF)
 
-	return token.Document{
+	return ast.Document{
 		Scope:       scope,
 		Definitions: definitions,
 		Tokens:      tokens,

@@ -7,10 +7,11 @@
 package validator
 
 import (
+	"github.com/kdeconinck/spot/dsl/ast"
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func validateDefinitions(definitions token.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitions(definitions ast.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
 	names := map[string]struct{}{}
 
 	for idx := range definitions.Definitions {
@@ -37,9 +38,9 @@ func validateDefinitions(definitions token.DefinitionsSection, diagnostics []Dia
 	return diagnostics
 }
 
-func validateDefinitionExpression(expression token.DefinitionExpression, names map[string]struct{}, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitionExpression(expression ast.DefinitionExpression, names map[string]struct{}, diagnostics []Diagnostic) []Diagnostic {
 	switch expression.Kind {
-	case token.DefinitionExpressionRange:
+	case ast.DefinitionExpressionRange:
 		if characterValue(expression.Start) > characterValue(expression.End) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Message: "Character range start must be less than or equal to end.",
@@ -47,7 +48,7 @@ func validateDefinitionExpression(expression token.DefinitionExpression, names m
 			})
 		}
 
-	case token.DefinitionExpressionReference:
+	case ast.DefinitionExpressionReference:
 		if _, ok := names[expression.Start.Text]; !ok {
 			diagnostics = append(diagnostics, Diagnostic{
 				Message: `Definition "` + expression.Start.Text + `" is not declared.`,
@@ -55,12 +56,12 @@ func validateDefinitionExpression(expression token.DefinitionExpression, names m
 			})
 		}
 
-	case token.DefinitionExpressionAlternation, token.DefinitionExpressionConcatenation:
+	case ast.DefinitionExpressionAlternation, ast.DefinitionExpressionConcatenation:
 		for idx := range expression.Terms {
 			diagnostics = validateDefinitionExpression(expression.Terms[idx], names, diagnostics)
 		}
 
-	case token.DefinitionExpressionGroup, token.DefinitionExpressionRepetition:
+	case ast.DefinitionExpressionGroup, ast.DefinitionExpressionRepetition:
 		diagnostics = validateDefinitionExpression(*expression.Inner, names, diagnostics)
 	}
 
@@ -89,7 +90,7 @@ func characterValue(token token.Token) byte {
 	return '\t'
 }
 
-func validateDefinitionRecursion(definitions token.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitionRecursion(definitions ast.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
 	if len(definitions.Definitions) == 0 {
 		return diagnostics
 	}
@@ -100,7 +101,7 @@ func validateDefinitionRecursion(definitions token.DefinitionsSection, diagnosti
 		return validateDefinitionSelfReference(definition.Name.Text, definition.Expression, diagnostics)
 	}
 
-	definitionByName := map[string]token.Definition{}
+	definitionByName := map[string]ast.Definition{}
 
 	for idx := range definitions.Definitions {
 		definition := definitions.Definitions[idx]
@@ -119,9 +120,9 @@ func validateDefinitionRecursion(definitions token.DefinitionsSection, diagnosti
 	return diagnostics
 }
 
-func validateDefinitionSelfReference(name string, expression token.DefinitionExpression, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitionSelfReference(name string, expression ast.DefinitionExpression, diagnostics []Diagnostic) []Diagnostic {
 	switch expression.Kind {
-	case token.DefinitionExpressionReference:
+	case ast.DefinitionExpressionReference:
 		if expression.Start.Text == name {
 			diagnostics = append(diagnostics, Diagnostic{
 				Message: `Definition "` + expression.Start.Text + `" is recursive.`,
@@ -129,19 +130,19 @@ func validateDefinitionSelfReference(name string, expression token.DefinitionExp
 			})
 		}
 
-	case token.DefinitionExpressionAlternation, token.DefinitionExpressionConcatenation:
+	case ast.DefinitionExpressionAlternation, ast.DefinitionExpressionConcatenation:
 		for idx := range expression.Terms {
 			diagnostics = validateDefinitionSelfReference(name, expression.Terms[idx], diagnostics)
 		}
 
-	case token.DefinitionExpressionGroup, token.DefinitionExpressionRepetition:
+	case ast.DefinitionExpressionGroup, ast.DefinitionExpressionRepetition:
 		diagnostics = validateDefinitionSelfReference(name, *expression.Inner, diagnostics)
 	}
 
 	return diagnostics
 }
 
-func validateDefinitionCycle(name string, definitions map[string]token.Definition, states map[string]uint8, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitionCycle(name string, definitions map[string]ast.Definition, states map[string]uint8, diagnostics []Diagnostic) []Diagnostic {
 	switch states[name] {
 	case 1, 2:
 		return diagnostics
@@ -159,9 +160,9 @@ func validateDefinitionCycle(name string, definitions map[string]token.Definitio
 	return diagnostics
 }
 
-func validateDefinitionExpressionCycle(expression token.DefinitionExpression, definitions map[string]token.Definition, states map[string]uint8, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitionExpressionCycle(expression ast.DefinitionExpression, definitions map[string]ast.Definition, states map[string]uint8, diagnostics []Diagnostic) []Diagnostic {
 	switch expression.Kind {
-	case token.DefinitionExpressionReference:
+	case ast.DefinitionExpressionReference:
 		if states[expression.Start.Text] == 1 {
 			diagnostics = append(diagnostics, Diagnostic{
 				Message: `Definition "` + expression.Start.Text + `" is recursive.`,
@@ -173,12 +174,12 @@ func validateDefinitionExpressionCycle(expression token.DefinitionExpression, de
 
 		diagnostics = validateDefinitionCycle(expression.Start.Text, definitions, states, diagnostics)
 
-	case token.DefinitionExpressionAlternation, token.DefinitionExpressionConcatenation:
+	case ast.DefinitionExpressionAlternation, ast.DefinitionExpressionConcatenation:
 		for idx := range expression.Terms {
 			diagnostics = validateDefinitionExpressionCycle(expression.Terms[idx], definitions, states, diagnostics)
 		}
 
-	case token.DefinitionExpressionGroup, token.DefinitionExpressionRepetition:
+	case ast.DefinitionExpressionGroup, ast.DefinitionExpressionRepetition:
 		diagnostics = validateDefinitionExpressionCycle(*expression.Inner, definitions, states, diagnostics)
 	}
 

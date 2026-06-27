@@ -6,10 +6,10 @@
 // Package validator validates parsed Spot DSL syntax.
 package validator
 
-import "github.com/kdeconinck/spot/dsl/token"
+import "github.com/kdeconinck/spot/dsl/ast"
 
 // Validate validates parsed DSL syntax and returns semantic diagnostics.
-func Validate(document token.Document) []Diagnostic {
+func Validate(document ast.Document) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	diagnostics = validateScope(document.Scope, diagnostics)

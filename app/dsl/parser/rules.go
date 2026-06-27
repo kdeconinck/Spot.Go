@@ -6,26 +6,29 @@
 // Package parser parses Spot DSL source text into syntax data structures.
 package parser
 
-import "github.com/kdeconinck/spot/dsl/token"
+import (
+	"github.com/kdeconinck/spot/dsl/ast"
+	"github.com/kdeconinck/spot/dsl/token"
+)
 
-func (parser *parser) parseOptionalRulesSection() token.RulesSection {
+func (parser *parser) parseOptionalRulesSection() ast.RulesSection {
 	if !parser.at(token.TokenRules) {
-		return token.RulesSection{}
+		return ast.RulesSection{}
 	}
 
 	return parser.parseRulesSection()
 }
 
-func (parser *parser) parseRulesSection() token.RulesSection {
+func (parser *parser) parseRulesSection() ast.RulesSection {
 	start := parser.expect(token.TokenRules)
 
 	if !parser.match(token.TokenLeftBrace) {
-		return token.RulesSection{
+		return ast.RulesSection{
 			Span: start.Span,
 		}
 	}
 
-	var rules []token.Rule
+	var rules []ast.Rule
 
 	for parser.at(token.TokenRule) {
 		rules = append(rules, parser.parseRule())
@@ -33,18 +36,18 @@ func (parser *parser) parseRulesSection() token.RulesSection {
 
 	end := parser.expectSectionEnd(token.TokenRule)
 
-	return token.RulesSection{
+	return ast.RulesSection{
 		Rules: rules,
 		Span:  span(start.Span.Start, end.Span.End),
 	}
 }
 
-func (parser *parser) parseRule() token.Rule {
+func (parser *parser) parseRule() ast.Rule {
 	start := parser.expect(token.TokenRule)
 	name := parser.expect(token.TokenIdentifier)
 
 	if !parser.match(token.TokenLeftBrace) {
-		return token.Rule{
+		return ast.Rule{
 			Name: name,
 			Span: span(start.Span.Start, name.Span.End),
 		}
@@ -55,7 +58,7 @@ func (parser *parser) parseRule() token.Rule {
 	report := parser.parseRuleReport()
 	end := parser.expect(token.TokenRightBrace)
 
-	return token.Rule{
+	return ast.Rule{
 		Name:   name,
 		Match:  match,
 		Where:  where,
@@ -64,25 +67,25 @@ func (parser *parser) parseRule() token.Rule {
 	}
 }
 
-func (parser *parser) parseRuleMatch() token.RuleMatch {
+func (parser *parser) parseRuleMatch() ast.RuleMatch {
 	start := parser.expect(token.TokenMatch)
 	tok := parser.expect(token.TokenIdentifier)
 
-	return token.RuleMatch{
+	return ast.RuleMatch{
 		Token: tok,
 		Span:  span(start.Span.Start, tok.Span.End),
 	}
 }
 
-func (parser *parser) parseOptionalRuleCondition() token.RuleCondition {
+func (parser *parser) parseOptionalRuleCondition() ast.RuleCondition {
 	if !parser.at(token.TokenWhere) {
-		return token.RuleCondition{}
+		return ast.RuleCondition{}
 	}
 
 	return parser.parseRuleCondition()
 }
 
-func (parser *parser) parseRuleCondition() token.RuleCondition {
+func (parser *parser) parseRuleCondition() ast.RuleCondition {
 	start := parser.expect(token.TokenWhere)
 	subject := parser.expect(token.TokenIdentifier)
 	parser.expect(token.TokenDot)
@@ -90,7 +93,7 @@ func (parser *parser) parseRuleCondition() token.RuleCondition {
 	operator := parser.expectComparisonOperator()
 	value := parser.expectConditionLiteral()
 
-	return token.RuleCondition{
+	return ast.RuleCondition{
 		Subject:  subject,
 		Property: property,
 		Operator: operator,
@@ -99,14 +102,14 @@ func (parser *parser) parseRuleCondition() token.RuleCondition {
 	}
 }
 
-func (parser *parser) parseRuleReport() token.RuleReport {
+func (parser *parser) parseRuleReport() ast.RuleReport {
 	start := parser.expect(token.TokenReport)
 	severity := parser.expectSeverity()
 	parser.expect(token.TokenAt)
 	target := parser.expect(token.TokenIdentifier)
 	message := parser.expect(token.TokenString)
 
-	return token.RuleReport{
+	return ast.RuleReport{
 		Severity: severity,
 		Target:   target,
 		Message:  message,

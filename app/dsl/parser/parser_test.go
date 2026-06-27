@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kdeconinck/spot/dsl/ast"
 	"github.com/kdeconinck/spot/dsl/parser"
 	"github.com/kdeconinck/spot/dsl/token"
 	"github.com/kdeconinck/spot/location"
@@ -24,32 +25,32 @@ func Test_Parse_DSL(t *testing.T) {
 
 	// Arrange.
 	source := dsl(1)
-	wantDocument := token.Document{
-		Scope: token.ScopeSection{
-			Entries: []token.ScopeEntry{
-				scopeEntry(token.ScopeEntryInclude, token.TokenString, "\"**/*.go\"", 20, 29, 12, 29),
-				scopeEntry(token.ScopeEntryExclude, token.TokenString, "\"vendor/**\"", 42, 53, 34, 53),
+	wantDocument := ast.Document{
+		Scope: ast.ScopeSection{
+			Entries: []ast.ScopeEntry{
+				scopeEntry(ast.ScopeEntryInclude, token.TokenString, "\"**/*.go\"", 20, 29, 12, 29),
+				scopeEntry(ast.ScopeEntryExclude, token.TokenString, "\"vendor/**\"", 42, 53, 34, 53),
 			},
 			Span: span(0, 55),
 		},
-		Definitions: token.DefinitionsSection{
-			Definitions: []token.Definition{
+		Definitions: ast.DefinitionsSection{
+			Definitions: []ast.Definition{
 				alternationDefinition("letter", 74, 80, 74, 102, rangeExpression("'a'", 83, 86, token.TokenCharacter, "'z'", 88, 91), rangeExpression("'A'", 94, 97, token.TokenCharacter, "'Z'", 99, 102)),
 				alternationDefinition("identifierStart", 107, 122, 107, 137, referenceExpression("letter", 125, 131), characterExpression(token.TokenCharacter, "'_'", 134, 137)),
 				concatenationDefinition("value", 142, 147, 142, 169, referenceExpression("letter", 150, 156), repetitionExpression(groupExpression(alternationExpression(characterExpression(token.TokenCharacter, "'a'", 158, 161), characterExpression(token.TokenCharacter, "'b'", 164, 167)), 157, 168), token.TokenPlus, "+", 168, 169)),
 			},
 			Span: span(56, 171),
 		},
-		Tokens: token.TokensSection{
-			Tokens: []token.TokenDefinition{
+		Tokens: ast.TokensSection{
+			Tokens: []ast.TokenDefinition{
 				tokenDefinition("Identifier", 185, 195, concatenationExpression(referenceExpression("identifierStart", 198, 213), repetitionExpression(referenceExpression("value", 214, 219), token.TokenStar, "*", 219, 220)), 185, 220),
 				tokenDefinition("KeywordPublic", 225, 238, stringExpression("\"public\"", 241, 249), 225, 249),
 				tokenDefinitionWithSkip("Whitespace", 254, 264, repetitionExpression(groupExpression(alternationExpression(characterExpression(token.TokenCharacter, "' '", 268, 271), characterExpression(token.TokenCharacter, "'\\t'", 274, 278)), 267, 279), token.TokenPlus, "+", 279, 280), 281, 285, 254, 285),
 			},
 			Span: span(172, 287),
 		},
-		Rules: token.RulesSection{
-			Rules: []token.Rule{
+		Rules: ast.RulesSection{
+			Rules: []ast.Rule{
 				ruleWithWhere("PublicIdentifier", 305, 321, ruleMatch("Identifier", 338, 348, 332, 348), ruleCondition("Identifier", 363, 373, "text", 374, 378, token.TokenEqualEqual, "==", 379, 381, token.TokenString, "\"public\"", 382, 390, 357, 390), ruleReport(token.TokenWarn, "warn", 406, 410, "Identifier", 414, 424, "\"Public identifier found\"", 425, 450, 399, 450), 300, 456),
 			},
 			Span: span(288, 458),
@@ -114,8 +115,8 @@ func span(start, end location.Position) location.Span {
 	}
 }
 
-func scopeEntry(kind token.ScopeEntryKind, patternKind token.TokenKind, pattern string, patternStart, patternEnd, entryStart, entryEnd location.Position) token.ScopeEntry {
-	return token.ScopeEntry{
+func scopeEntry(kind ast.ScopeEntryKind, patternKind token.TokenKind, pattern string, patternStart, patternEnd, entryStart, entryEnd location.Position) ast.ScopeEntry {
+	return ast.ScopeEntry{
 		Kind: kind,
 		Pattern: token.Token{
 			Kind: patternKind,
@@ -126,8 +127,8 @@ func scopeEntry(kind token.ScopeEntryKind, patternKind token.TokenKind, pattern 
 	}
 }
 
-func tokenDefinition(name string, nameStart, nameEnd location.Position, expression token.DefinitionExpression, definitionStart, definitionEnd location.Position) token.TokenDefinition {
-	return token.TokenDefinition{
+func tokenDefinition(name string, nameStart, nameEnd location.Position, expression ast.DefinitionExpression, definitionStart, definitionEnd location.Position) ast.TokenDefinition {
+	return ast.TokenDefinition{
 		Name: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: name,
@@ -138,8 +139,8 @@ func tokenDefinition(name string, nameStart, nameEnd location.Position, expressi
 	}
 }
 
-func tokenDefinitionWithSkip(name string, nameStart, nameEnd location.Position, expression token.DefinitionExpression, skipStart, skipEnd, definitionStart, definitionEnd location.Position) token.TokenDefinition {
-	return token.TokenDefinition{
+func tokenDefinitionWithSkip(name string, nameStart, nameEnd location.Position, expression ast.DefinitionExpression, skipStart, skipEnd, definitionStart, definitionEnd location.Position) ast.TokenDefinition {
+	return ast.TokenDefinition{
 		Name: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: name,
@@ -155,12 +156,12 @@ func tokenDefinitionWithSkip(name string, nameStart, nameEnd location.Position, 
 	}
 }
 
-func rule(name string, nameStart, nameEnd location.Position, match token.RuleMatch, report token.RuleReport, ruleStart, ruleEnd location.Position) token.Rule {
-	return ruleWithWhere(name, nameStart, nameEnd, match, token.RuleCondition{}, report, ruleStart, ruleEnd)
+func rule(name string, nameStart, nameEnd location.Position, match ast.RuleMatch, report ast.RuleReport, ruleStart, ruleEnd location.Position) ast.Rule {
+	return ruleWithWhere(name, nameStart, nameEnd, match, ast.RuleCondition{}, report, ruleStart, ruleEnd)
 }
 
-func ruleWithWhere(name string, nameStart, nameEnd location.Position, match token.RuleMatch, where token.RuleCondition, report token.RuleReport, ruleStart, ruleEnd location.Position) token.Rule {
-	return token.Rule{
+func ruleWithWhere(name string, nameStart, nameEnd location.Position, match ast.RuleMatch, where ast.RuleCondition, report ast.RuleReport, ruleStart, ruleEnd location.Position) ast.Rule {
+	return ast.Rule{
 		Name: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: name,
@@ -173,12 +174,12 @@ func ruleWithWhere(name string, nameStart, nameEnd location.Position, match toke
 	}
 }
 
-func ruleMatch(tok string, tokenStart, tokenEnd, matchStart, matchEnd location.Position) token.RuleMatch {
+func ruleMatch(tok string, tokenStart, tokenEnd, matchStart, matchEnd location.Position) ast.RuleMatch {
 	return ruleMatchWithKind(token.TokenIdentifier, tok, tokenStart, tokenEnd, matchStart, matchEnd)
 }
 
-func ruleMatchWithKind(kind token.TokenKind, tok string, tokenStart, tokenEnd, matchStart, matchEnd location.Position) token.RuleMatch {
-	return token.RuleMatch{
+func ruleMatchWithKind(kind token.TokenKind, tok string, tokenStart, tokenEnd, matchStart, matchEnd location.Position) ast.RuleMatch {
+	return ast.RuleMatch{
 		Token: token.Token{
 			Kind: kind,
 			Text: tok,
@@ -188,12 +189,12 @@ func ruleMatchWithKind(kind token.TokenKind, tok string, tokenStart, tokenEnd, m
 	}
 }
 
-func ruleCondition(subject string, subjectStart, subjectEnd location.Position, property string, propertyStart, propertyEnd location.Position, operatorKind token.TokenKind, operator string, operatorStart, operatorEnd location.Position, valueKind token.TokenKind, value string, valueStart, valueEnd, conditionStart, conditionEnd location.Position) token.RuleCondition {
+func ruleCondition(subject string, subjectStart, subjectEnd location.Position, property string, propertyStart, propertyEnd location.Position, operatorKind token.TokenKind, operator string, operatorStart, operatorEnd location.Position, valueKind token.TokenKind, value string, valueStart, valueEnd, conditionStart, conditionEnd location.Position) ast.RuleCondition {
 	return ruleConditionWithKinds(subject, token.TokenIdentifier, subjectStart, subjectEnd, property, token.TokenIdentifier, propertyStart, propertyEnd, operator, operatorKind, operatorStart, operatorEnd, value, valueKind, valueStart, valueEnd, conditionStart, conditionEnd)
 }
 
-func ruleConditionWithKinds(subject string, subjectKind token.TokenKind, subjectStart, subjectEnd location.Position, property string, propertyKind token.TokenKind, propertyStart, propertyEnd location.Position, operator string, operatorKind token.TokenKind, operatorStart, operatorEnd location.Position, value string, valueKind token.TokenKind, valueStart, valueEnd, conditionStart, conditionEnd location.Position) token.RuleCondition {
-	return token.RuleCondition{
+func ruleConditionWithKinds(subject string, subjectKind token.TokenKind, subjectStart, subjectEnd location.Position, property string, propertyKind token.TokenKind, propertyStart, propertyEnd location.Position, operator string, operatorKind token.TokenKind, operatorStart, operatorEnd location.Position, value string, valueKind token.TokenKind, valueStart, valueEnd, conditionStart, conditionEnd location.Position) ast.RuleCondition {
+	return ast.RuleCondition{
 		Subject: token.Token{
 			Kind: subjectKind,
 			Text: subject,
@@ -218,8 +219,8 @@ func ruleConditionWithKinds(subject string, subjectKind token.TokenKind, subject
 	}
 }
 
-func ruleReport(severityKind token.TokenKind, severity string, severityStart, severityEnd location.Position, target string, targetStart, targetEnd location.Position, message string, messageStart, messageEnd, reportStart, reportEnd location.Position) token.RuleReport {
-	return token.RuleReport{
+func ruleReport(severityKind token.TokenKind, severity string, severityStart, severityEnd location.Position, target string, targetStart, targetEnd location.Position, message string, messageStart, messageEnd, reportStart, reportEnd location.Position) ast.RuleReport {
+	return ast.RuleReport{
 		Severity: token.Token{
 			Kind: severityKind,
 			Text: severity,
@@ -239,8 +240,8 @@ func ruleReport(severityKind token.TokenKind, severity string, severityStart, se
 	}
 }
 
-func characterDefinition(name string, nameStart, nameEnd location.Position, expressionKind token.TokenKind, expression string, expressionStart, expressionEnd, definitionStart, definitionEnd location.Position) token.Definition {
-	return token.Definition{
+func characterDefinition(name string, nameStart, nameEnd location.Position, expressionKind token.TokenKind, expression string, expressionStart, expressionEnd, definitionStart, definitionEnd location.Position) ast.Definition {
+	return ast.Definition{
 		Name: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: name,
@@ -251,12 +252,12 @@ func characterDefinition(name string, nameStart, nameEnd location.Position, expr
 	}
 }
 
-func rangeDefinition(name string, nameStart, nameEnd location.Position, start string, startStart, startEnd location.Position, end string, endStart, endEnd, definitionStart, definitionEnd location.Position) token.Definition {
+func rangeDefinition(name string, nameStart, nameEnd location.Position, start string, startStart, startEnd location.Position, end string, endStart, endEnd, definitionStart, definitionEnd location.Position) ast.Definition {
 	return rangeDefinitionWithEndKind(name, nameStart, nameEnd, start, startStart, startEnd, token.TokenCharacter, end, endStart, endEnd, definitionStart, definitionEnd)
 }
 
-func rangeDefinitionWithEndKind(name string, nameStart, nameEnd location.Position, start string, startStart, startEnd location.Position, endKind token.TokenKind, end string, endStart, endEnd, definitionStart, definitionEnd location.Position) token.Definition {
-	return token.Definition{
+func rangeDefinitionWithEndKind(name string, nameStart, nameEnd location.Position, start string, startStart, startEnd location.Position, endKind token.TokenKind, end string, endStart, endEnd, definitionStart, definitionEnd location.Position) ast.Definition {
+	return ast.Definition{
 		Name: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: name,
@@ -267,8 +268,8 @@ func rangeDefinitionWithEndKind(name string, nameStart, nameEnd location.Positio
 	}
 }
 
-func referenceDefinition(name string, nameStart, nameEnd location.Position, reference string, referenceStart, referenceEnd, definitionStart, definitionEnd location.Position) token.Definition {
-	return token.Definition{
+func referenceDefinition(name string, nameStart, nameEnd location.Position, reference string, referenceStart, referenceEnd, definitionStart, definitionEnd location.Position) ast.Definition {
+	return ast.Definition{
 		Name: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: name,
@@ -279,8 +280,8 @@ func referenceDefinition(name string, nameStart, nameEnd location.Position, refe
 	}
 }
 
-func groupDefinition(name string, nameStart, nameEnd location.Position, expression token.DefinitionExpression, definitionStart, definitionEnd location.Position) token.Definition {
-	return token.Definition{
+func groupDefinition(name string, nameStart, nameEnd location.Position, expression ast.DefinitionExpression, definitionStart, definitionEnd location.Position) ast.Definition {
+	return ast.Definition{
 		Name: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: name,
@@ -291,8 +292,8 @@ func groupDefinition(name string, nameStart, nameEnd location.Position, expressi
 	}
 }
 
-func repetitionDefinition(name string, nameStart, nameEnd location.Position, expression token.DefinitionExpression, definitionStart, definitionEnd location.Position) token.Definition {
-	return token.Definition{
+func repetitionDefinition(name string, nameStart, nameEnd location.Position, expression ast.DefinitionExpression, definitionStart, definitionEnd location.Position) ast.Definition {
+	return ast.Definition{
 		Name: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: name,
@@ -303,8 +304,8 @@ func repetitionDefinition(name string, nameStart, nameEnd location.Position, exp
 	}
 }
 
-func concatenationDefinition(name string, nameStart, nameEnd, definitionStart, definitionEnd location.Position, terms ...token.DefinitionExpression) token.Definition {
-	return token.Definition{
+func concatenationDefinition(name string, nameStart, nameEnd, definitionStart, definitionEnd location.Position, terms ...ast.DefinitionExpression) ast.Definition {
+	return ast.Definition{
 		Name: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: name,
@@ -315,8 +316,8 @@ func concatenationDefinition(name string, nameStart, nameEnd, definitionStart, d
 	}
 }
 
-func alternationDefinition(name string, nameStart, nameEnd, definitionStart, definitionEnd location.Position, terms ...token.DefinitionExpression) token.Definition {
-	return token.Definition{
+func alternationDefinition(name string, nameStart, nameEnd, definitionStart, definitionEnd location.Position, terms ...ast.DefinitionExpression) ast.Definition {
+	return ast.Definition{
 		Name: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: name,
@@ -327,25 +328,25 @@ func alternationDefinition(name string, nameStart, nameEnd, definitionStart, def
 	}
 }
 
-func concatenationExpression(terms ...token.DefinitionExpression) token.DefinitionExpression {
-	return token.DefinitionExpression{
-		Kind:  token.DefinitionExpressionConcatenation,
+func concatenationExpression(terms ...ast.DefinitionExpression) ast.DefinitionExpression {
+	return ast.DefinitionExpression{
+		Kind:  ast.DefinitionExpressionConcatenation,
 		Terms: terms,
 		Span:  span(terms[0].Span.Start, terms[len(terms)-1].Span.End),
 	}
 }
 
-func alternationExpression(terms ...token.DefinitionExpression) token.DefinitionExpression {
-	return token.DefinitionExpression{
-		Kind:  token.DefinitionExpressionAlternation,
+func alternationExpression(terms ...ast.DefinitionExpression) ast.DefinitionExpression {
+	return ast.DefinitionExpression{
+		Kind:  ast.DefinitionExpressionAlternation,
 		Terms: terms,
 		Span:  span(terms[0].Span.Start, terms[len(terms)-1].Span.End),
 	}
 }
 
-func characterExpression(kind token.TokenKind, text string, start, end location.Position) token.DefinitionExpression {
-	return token.DefinitionExpression{
-		Kind: token.DefinitionExpressionCharacter,
+func characterExpression(kind token.TokenKind, text string, start, end location.Position) ast.DefinitionExpression {
+	return ast.DefinitionExpression{
+		Kind: ast.DefinitionExpressionCharacter,
 		Start: token.Token{
 			Kind: kind,
 			Text: text,
@@ -355,9 +356,9 @@ func characterExpression(kind token.TokenKind, text string, start, end location.
 	}
 }
 
-func stringExpression(text string, start, end location.Position) token.DefinitionExpression {
-	return token.DefinitionExpression{
-		Kind: token.DefinitionExpressionString,
+func stringExpression(text string, start, end location.Position) ast.DefinitionExpression {
+	return ast.DefinitionExpression{
+		Kind: ast.DefinitionExpressionString,
 		Start: token.Token{
 			Kind: token.TokenString,
 			Text: text,
@@ -367,17 +368,17 @@ func stringExpression(text string, start, end location.Position) token.Definitio
 	}
 }
 
-func groupExpression(inner token.DefinitionExpression, start, end location.Position) token.DefinitionExpression {
-	return token.DefinitionExpression{
-		Kind:  token.DefinitionExpressionGroup,
+func groupExpression(inner ast.DefinitionExpression, start, end location.Position) ast.DefinitionExpression {
+	return ast.DefinitionExpression{
+		Kind:  ast.DefinitionExpressionGroup,
 		Inner: &inner,
 		Span:  span(start, end),
 	}
 }
 
-func repetitionExpression(inner token.DefinitionExpression, operatorKind token.TokenKind, operator string, operatorStart, operatorEnd location.Position) token.DefinitionExpression {
-	return token.DefinitionExpression{
-		Kind: token.DefinitionExpressionRepetition,
+func repetitionExpression(inner ast.DefinitionExpression, operatorKind token.TokenKind, operator string, operatorStart, operatorEnd location.Position) ast.DefinitionExpression {
+	return ast.DefinitionExpression{
+		Kind: ast.DefinitionExpressionRepetition,
 		Operator: token.Token{
 			Kind: operatorKind,
 			Text: operator,
@@ -388,9 +389,9 @@ func repetitionExpression(inner token.DefinitionExpression, operatorKind token.T
 	}
 }
 
-func referenceExpression(text string, start, end location.Position) token.DefinitionExpression {
-	return token.DefinitionExpression{
-		Kind: token.DefinitionExpressionReference,
+func referenceExpression(text string, start, end location.Position) ast.DefinitionExpression {
+	return ast.DefinitionExpression{
+		Kind: ast.DefinitionExpressionReference,
 		Start: token.Token{
 			Kind: token.TokenIdentifier,
 			Text: text,
@@ -400,9 +401,9 @@ func referenceExpression(text string, start, end location.Position) token.Defini
 	}
 }
 
-func rangeExpression(start string, startStart, startEnd location.Position, endKind token.TokenKind, end string, endStart, endEnd location.Position) token.DefinitionExpression {
-	return token.DefinitionExpression{
-		Kind: token.DefinitionExpressionRange,
+func rangeExpression(start string, startStart, startEnd location.Position, endKind token.TokenKind, end string, endStart, endEnd location.Position) ast.DefinitionExpression {
+	return ast.DefinitionExpression{
+		Kind: ast.DefinitionExpressionRange,
 		Start: token.Token{
 			Kind: token.TokenCharacter,
 			Text: start,

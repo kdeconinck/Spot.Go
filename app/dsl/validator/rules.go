@@ -6,9 +6,12 @@
 // Package validator validates parsed Spot DSL token.
 package validator
 
-import "github.com/kdeconinck/spot/dsl/token"
+import (
+	"github.com/kdeconinck/spot/dsl/ast"
+	"github.com/kdeconinck/spot/dsl/token"
+)
 
-func validateRules(rules token.RulesSection, tokens token.TokensSection, diagnostics []Diagnostic) []Diagnostic {
+func validateRules(rules ast.RulesSection, tokens ast.TokensSection, diagnostics []Diagnostic) []Diagnostic {
 	if len(rules.Rules) > 1 {
 		names := map[string]struct{}{}
 
@@ -35,7 +38,7 @@ func validateRules(rules token.RulesSection, tokens token.TokensSection, diagnos
 	return diagnostics
 }
 
-func validateRuleReferences(rule token.Rule, tokens token.TokensSection, diagnostics []Diagnostic) []Diagnostic {
+func validateRuleReferences(rule ast.Rule, tokens ast.TokensSection, diagnostics []Diagnostic) []Diagnostic {
 	hasMatch := ruleHasMatch(rule)
 	hasReport := ruleHasReport(rule)
 
@@ -113,15 +116,15 @@ func validateRuleReferences(rule token.Rule, tokens token.TokensSection, diagnos
 	return diagnostics
 }
 
-func ruleHasMatch(rule token.Rule) bool {
+func ruleHasMatch(rule ast.Rule) bool {
 	return rule.Match.Span.Start != rule.Match.Token.Span.Start
 }
 
-func ruleHasReport(rule token.Rule) bool {
+func ruleHasReport(rule ast.Rule) bool {
 	return rule.Report.Span.Start != rule.Report.Severity.Span.Start
 }
 
-func tokenDeclared(tokens token.TokensSection, name string) bool {
+func tokenDeclared(tokens ast.TokensSection, name string) bool {
 	for idx := range tokens.Tokens {
 		if tokens.Tokens[idx].Name.Text == name {
 			return true

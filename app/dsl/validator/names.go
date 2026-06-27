@@ -6,9 +6,11 @@
 // Package validator validates parsed Spot DSL token.
 package validator
 
-import "github.com/kdeconinck/spot/dsl/token"
+import (
+	"github.com/kdeconinck/spot/dsl/ast"
+)
 
-func validateNames(definitions token.DefinitionsSection, tokens token.TokensSection, diagnostics []Diagnostic) []Diagnostic {
+func validateNames(definitions ast.DefinitionsSection, tokens ast.TokensSection, diagnostics []Diagnostic) []Diagnostic {
 	if len(definitions.Definitions) == 0 || len(tokens.Tokens) == 0 {
 		return diagnostics
 	}

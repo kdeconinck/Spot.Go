@@ -7,13 +7,14 @@
 package parser
 
 import (
+	"github.com/kdeconinck/spot/dsl/ast"
 	"github.com/kdeconinck/spot/dsl/lexer"
 	"github.com/kdeconinck/spot/dsl/token"
 	"github.com/kdeconinck/spot/location"
 )
 
 // Parse parses DSL source text into a syntax document.
-func Parse(src string) (token.Document, []Diagnostic) {
+func Parse(src string) (ast.Document, []Diagnostic) {
 	parser := parser{
 		lexer: lexer.New(src),
 	}

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kdeconinck/spot/dsl/ast"
 	"github.com/kdeconinck/spot/dsl/parser"
 	"github.com/kdeconinck/spot/dsl/token"
 	"github.com/kdeconinck/spot/qa/claim"
@@ -24,14 +25,14 @@ func Test_Parse_Scope(t *testing.T) {
 	for _, tc := range []struct {
 		name            string
 		inSource        string
-		wantDocument    token.Document
+		wantDocument    ast.Document
 		wantDiagnostics []parser.Diagnostic
 	}{
 		{
 			name:     "When parsing an empty scope block, a document is returned.",
 			inSource: "scope {}",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
 				Span: span(0, 8),
@@ -40,10 +41,10 @@ func Test_Parse_Scope(t *testing.T) {
 		{
 			name:     "When parsing a scope block with an include entry, a document is returned.",
 			inSource: "scope { include \"**/*.go\" }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
-					Entries: []token.ScopeEntry{
-						scopeEntry(token.ScopeEntryInclude, token.TokenString, "\"**/*.go\"", 16, 25, 8, 25),
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
+					Entries: []ast.ScopeEntry{
+						scopeEntry(ast.ScopeEntryInclude, token.TokenString, "\"**/*.go\"", 16, 25, 8, 25),
 					},
 					Span: span(0, 27),
 				},
@@ -53,10 +54,10 @@ func Test_Parse_Scope(t *testing.T) {
 		{
 			name:     "When parsing a scope block with an exclude entry, a document is returned.",
 			inSource: "scope { exclude \"vendor/**\" }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
-					Entries: []token.ScopeEntry{
-						scopeEntry(token.ScopeEntryExclude, token.TokenString, "\"vendor/**\"", 16, 27, 8, 27),
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
+					Entries: []ast.ScopeEntry{
+						scopeEntry(ast.ScopeEntryExclude, token.TokenString, "\"vendor/**\"", 16, 27, 8, 27),
 					},
 					Span: span(0, 29),
 				},
@@ -66,11 +67,11 @@ func Test_Parse_Scope(t *testing.T) {
 		{
 			name:     "When parsing a scope block with include and exclude entries, a document is returned.",
 			inSource: "scope { include \"**/*.go\" exclude \"vendor/**\" }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
-					Entries: []token.ScopeEntry{
-						scopeEntry(token.ScopeEntryInclude, token.TokenString, "\"**/*.go\"", 16, 25, 8, 25),
-						scopeEntry(token.ScopeEntryExclude, token.TokenString, "\"vendor/**\"", 34, 45, 26, 45),
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
+					Entries: []ast.ScopeEntry{
+						scopeEntry(ast.ScopeEntryInclude, token.TokenString, "\"**/*.go\"", 16, 25, 8, 25),
+						scopeEntry(ast.ScopeEntryExclude, token.TokenString, "\"vendor/**\"", 34, 45, 26, 45),
 					},
 					Span: span(0, 47),
 				},
@@ -80,8 +81,8 @@ func Test_Parse_Scope(t *testing.T) {
 		{
 			name:     "When the scope keyword is missing, a diagnostic is returned.",
 			inSource: "x",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 1),
 				},
 				Span: span(0, 1),
@@ -93,8 +94,8 @@ func Test_Parse_Scope(t *testing.T) {
 		{
 			name:     "When the opening brace is missing, a diagnostic is returned.",
 			inSource: "scope }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 5),
 				},
 				Span: span(0, 5),
@@ -106,8 +107,8 @@ func Test_Parse_Scope(t *testing.T) {
 		{
 			name:     "When the closing brace is missing, a diagnostic is returned.",
 			inSource: "scope {",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 7),
 				},
 				Span: span(0, 7),
@@ -119,10 +120,10 @@ func Test_Parse_Scope(t *testing.T) {
 		{
 			name:     "When an include entry has no string, a diagnostic is returned.",
 			inSource: "scope { include }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
-					Entries: []token.ScopeEntry{
-						scopeEntry(token.ScopeEntryInclude, token.TokenRightBrace, "}", 16, 17, 8, 17),
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
+					Entries: []ast.ScopeEntry{
+						scopeEntry(ast.ScopeEntryInclude, token.TokenRightBrace, "}", 16, 17, 8, 17),
 					},
 					Span: span(0, 17),
 				},
@@ -135,8 +136,8 @@ func Test_Parse_Scope(t *testing.T) {
 		{
 			name:     "When an unexpected token appears inside scope, a diagnostic is returned.",
 			inSource: "scope { x }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 9),
 				},
 				Span: span(0, 9),
@@ -148,8 +149,8 @@ func Test_Parse_Scope(t *testing.T) {
 		{
 			name:     "When a token appears after the scope block, a diagnostic is returned.",
 			inSource: "scope {} x",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
 				Span: span(0, 10),

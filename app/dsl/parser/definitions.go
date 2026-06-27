@@ -6,26 +6,29 @@
 // Package parser parses Spot DSL source text into syntax data structures.
 package parser
 
-import "github.com/kdeconinck/spot/dsl/token"
+import (
+	"github.com/kdeconinck/spot/dsl/ast"
+	"github.com/kdeconinck/spot/dsl/token"
+)
 
-func (parser *parser) parseOptionalDefinitionsSection() token.DefinitionsSection {
+func (parser *parser) parseOptionalDefinitionsSection() ast.DefinitionsSection {
 	if !parser.at(token.TokenDefinitions) {
-		return token.DefinitionsSection{}
+		return ast.DefinitionsSection{}
 	}
 
 	return parser.parseDefinitionsSection()
 }
 
-func (parser *parser) parseDefinitionsSection() token.DefinitionsSection {
+func (parser *parser) parseDefinitionsSection() ast.DefinitionsSection {
 	start := parser.expect(token.TokenDefinitions)
 
 	if !parser.match(token.TokenLeftBrace) {
-		return token.DefinitionsSection{
+		return ast.DefinitionsSection{
 			Span: start.Span,
 		}
 	}
 
-	var definitions []token.Definition
+	var definitions []ast.Definition
 
 	for parser.at(token.TokenIdentifier) {
 		definitions = append(definitions, parser.parseDefinition())
@@ -33,18 +36,18 @@ func (parser *parser) parseDefinitionsSection() token.DefinitionsSection {
 
 	end := parser.expectSectionEnd(token.TokenIdentifier)
 
-	return token.DefinitionsSection{
+	return ast.DefinitionsSection{
 		Definitions: definitions,
 		Span:        span(start.Span.Start, end.Span.End),
 	}
 }
 
-func (parser *parser) parseDefinition() token.Definition {
+func (parser *parser) parseDefinition() ast.Definition {
 	name := parser.expect(token.TokenIdentifier)
 	parser.expect(token.TokenEqual)
 	expression := parser.parseExpression(false)
 
-	return token.Definition{
+	return ast.Definition{
 		Name:       name,
 		Expression: expression,
 		Span:       span(name.Span.Start, expression.Span.End),

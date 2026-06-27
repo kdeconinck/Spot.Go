@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kdeconinck/spot/dsl/ast"
 	"github.com/kdeconinck/spot/dsl/parser"
 	"github.com/kdeconinck/spot/dsl/token"
 	"github.com/kdeconinck/spot/qa/claim"
@@ -24,17 +25,17 @@ func Test_Parse_Tokens(t *testing.T) {
 	for _, tc := range []struct {
 		name            string
 		inSource        string
-		wantDocument    token.Document
+		wantDocument    ast.Document
 		wantDiagnostics []parser.Diagnostic
 	}{
 		{
 			name:     "When parsing an empty tokens block, a document is returned.",
 			inSource: "scope {} tokens {}",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
-				Tokens: token.TokensSection{
+				Tokens: ast.TokensSection{
 					Span: span(9, 18),
 				},
 				Span: span(0, 18),
@@ -43,14 +44,14 @@ func Test_Parse_Tokens(t *testing.T) {
 		{
 			name:     "When parsing a definitions block followed by an empty tokens block, a document is returned.",
 			inSource: "scope {} definitions {} tokens {}",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
-				Definitions: token.DefinitionsSection{
+				Definitions: ast.DefinitionsSection{
 					Span: span(9, 23),
 				},
-				Tokens: token.TokensSection{
+				Tokens: ast.TokensSection{
 					Span: span(24, 33),
 				},
 				Span: span(0, 33),
@@ -59,12 +60,12 @@ func Test_Parse_Tokens(t *testing.T) {
 		{
 			name:     "When parsing a tokens block with a reference token, a document is returned.",
 			inSource: "scope {} tokens { Identifier = letter }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
-				Tokens: token.TokensSection{
-					Tokens: []token.TokenDefinition{
+				Tokens: ast.TokensSection{
+					Tokens: []ast.TokenDefinition{
 						tokenDefinition("Identifier", 18, 28, referenceExpression("letter", 31, 37), 18, 37),
 					},
 					Span: span(9, 39),
@@ -75,12 +76,12 @@ func Test_Parse_Tokens(t *testing.T) {
 		{
 			name:     "When parsing a tokens block with a string token, a document is returned.",
 			inSource: "scope {} tokens { KeywordPublic = \"public\" }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
-				Tokens: token.TokensSection{
-					Tokens: []token.TokenDefinition{
+				Tokens: ast.TokensSection{
+					Tokens: []ast.TokenDefinition{
 						tokenDefinition("KeywordPublic", 18, 31, stringExpression("\"public\"", 34, 42), 18, 42),
 					},
 					Span: span(9, 44),
@@ -91,12 +92,12 @@ func Test_Parse_Tokens(t *testing.T) {
 		{
 			name:     "When parsing a tokens block with a skipped token, a document is returned.",
 			inSource: "scope {} tokens { Whitespace = (' ' | '\\t')+ skip }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
-				Tokens: token.TokensSection{
-					Tokens: []token.TokenDefinition{
+				Tokens: ast.TokensSection{
+					Tokens: []ast.TokenDefinition{
 						tokenDefinitionWithSkip("Whitespace", 18, 28, repetitionExpression(groupExpression(alternationExpression(characterExpression(token.TokenCharacter, "' '", 32, 35), characterExpression(token.TokenCharacter, "'\\t'", 38, 42)), 31, 43), token.TokenPlus, "+", 43, 44), 45, 49, 18, 49),
 					},
 					Span: span(9, 51),
@@ -107,11 +108,11 @@ func Test_Parse_Tokens(t *testing.T) {
 		{
 			name:     "When the tokens opening brace is missing, a diagnostic is returned.",
 			inSource: "scope {} tokens }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
-				Tokens: token.TokensSection{
+				Tokens: ast.TokensSection{
 					Span: span(9, 15),
 				},
 				Span: span(0, 15),
@@ -123,11 +124,11 @@ func Test_Parse_Tokens(t *testing.T) {
 		{
 			name:     "When the tokens closing brace is missing, a diagnostic is returned.",
 			inSource: "scope {} tokens {",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
-				Tokens: token.TokensSection{
+				Tokens: ast.TokensSection{
 					Span: span(9, 17),
 				},
 				Span: span(0, 17),
@@ -139,11 +140,11 @@ func Test_Parse_Tokens(t *testing.T) {
 		{
 			name:     "When an unexpected token appears inside tokens, a diagnostic is returned.",
 			inSource: "scope {} tokens { 'a' }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
-				Tokens: token.TokensSection{
+				Tokens: ast.TokensSection{
 					Span: span(9, 21),
 				},
 				Span: span(0, 21),
@@ -155,12 +156,12 @@ func Test_Parse_Tokens(t *testing.T) {
 		{
 			name:     "When a token is missing an expression, a diagnostic is returned.",
 			inSource: "scope {} tokens { Identifier = }",
-			wantDocument: token.Document{
-				Scope: token.ScopeSection{
+			wantDocument: ast.Document{
+				Scope: ast.ScopeSection{
 					Span: span(0, 8),
 				},
-				Tokens: token.TokensSection{
-					Tokens: []token.TokenDefinition{
+				Tokens: ast.TokensSection{
+					Tokens: []ast.TokenDefinition{
 						tokenDefinition("Identifier", 18, 28, characterExpression(token.TokenRightBrace, "}", 31, 32), 18, 32),
 					},
 					Span: span(9, 32),

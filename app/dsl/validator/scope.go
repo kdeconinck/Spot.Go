@@ -6,15 +6,15 @@
 // Package validator validates parsed Spot DSL syntax.
 package validator
 
-import "github.com/kdeconinck/spot/dsl/token"
+import "github.com/kdeconinck/spot/dsl/ast"
 
-func validateScope(scope token.ScopeSection, diagnostics []Diagnostic) []Diagnostic {
+func validateScope(scope ast.ScopeSection, diagnostics []Diagnostic) []Diagnostic {
 	hasInclude := false
 
 	for idx := range scope.Entries {
 		entry := scope.Entries[idx]
 
-		if entry.Kind == token.ScopeEntryInclude {
+		if entry.Kind == ast.ScopeEntryInclude {
 			hasInclude = true
 		}
 
