@@ -9,13 +9,13 @@ package validator
 import "github.com/kdeconinck/spot/dsl/ast"
 
 // Validate validates parsed DSL syntax and returns semantic diagnostics.
-func Validate(document ast.Document) []Diagnostic {
+func Validate(source string, document ast.Document) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	diagnostics = validateScope(document.Scope, diagnostics)
-	diagnostics = validateDefinitions(document.Definitions, diagnostics)
-	diagnostics = validateTokens(document.Tokens, document.Definitions, diagnostics)
-	diagnostics = validateRules(document.Rules, document.Tokens, diagnostics)
+	diagnostics = validateScope(source, document.Scope, diagnostics)
+	diagnostics = validateDefinitions(source, document.Definitions, diagnostics)
+	diagnostics = validateTokens(source, document.Tokens, document.Definitions, diagnostics)
+	diagnostics = validateRules(source, document.Rules, document.Tokens, diagnostics)
 
 	return diagnostics
 }

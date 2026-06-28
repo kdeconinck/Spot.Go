@@ -260,7 +260,7 @@ func Test_Parse_Definitions(t *testing.T) {
 			claim.Equal(t, tcName, snapshot(tc.wantDiags), debugDiagnostics(gotDiagnostics), "Diagnostics")
 
 			if tc.wantTree != "" {
-				claim.Equal(t, tcName, tc.wantTree, debugDocument(gotDocument, false), "Document")
+				claim.Equal(t, tcName, tc.wantTree, debugDocument(tc.inSource, gotDocument, false), "Document")
 			}
 		})
 	}

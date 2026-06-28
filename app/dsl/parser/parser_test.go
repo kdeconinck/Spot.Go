@@ -82,7 +82,7 @@ func Test_Parse_DSL(t *testing.T) {
 
 	// Assert.
 	claim.Equal(t, "When parsing a full DSL file, no diagnostics are returned.", "", debugDiagnostics(gotDiagnostics), "Diagnostics")
-	claim.Equal(t, "When parsing a full DSL file, the document structure and spans are returned.", wantTree, debugDocument(gotDocument, true), "Document")
+	claim.Equal(t, "When parsing a full DSL file, the document structure and spans are returned.", wantTree, debugDocument(source, gotDocument, true), "Document")
 }
 
 func benchmark_Parse(b *testing.B, source string) {
@@ -204,10 +204,10 @@ func snapshot(text string) string {
 	return strings.Join(lines, "\n")
 }
 
-func debugDocument(document ast.Document, includeSpans bool) string {
+func debugDocument(source string, document ast.Document, includeSpans bool) string {
 	var builder strings.Builder
 
-	writeDocument(&builder, document, 0, includeSpans)
+	writeDocument(source, &builder, document, 0, includeSpans)
 
 	return strings.TrimSpace(builder.String())
 }
@@ -227,7 +227,7 @@ func debugDiagnostics(diagnostics []parser.Diagnostic) string {
 	return strings.TrimSpace(builder.String())
 }
 
-func writeDocument(builder *strings.Builder, document ast.Document, depth int, includeSpans bool) {
+func writeDocument(source string, builder *strings.Builder, document ast.Document, depth int, includeSpans bool) {
 	writeLine(builder, depth, labelWithSpan("Document", document.Span, includeSpans))
 
 	if document.Scope.Span != (location.Span{}) {
@@ -240,7 +240,7 @@ func writeDocument(builder *strings.Builder, document ast.Document, depth int, i
 				label = "Exclude "
 			}
 
-			writeLine(builder, depth+2, labelWithSpan(label+entry.Pattern.Text, entry.Span, includeSpans))
+			writeLine(builder, depth+2, labelWithSpan(label+entry.Pattern.Value(source), entry.Span, includeSpans))
 		}
 	}
 
@@ -249,8 +249,8 @@ func writeDocument(builder *strings.Builder, document ast.Document, depth int, i
 
 		for idx := range document.Definitions.Definitions {
 			definition := document.Definitions.Definitions[idx]
-			writeLine(builder, depth+2, labelWithSpan("Definition "+definition.Name.Text, definition.Span, includeSpans))
-			writeExpression(builder, definition.Expression, depth+3, includeSpans)
+			writeLine(builder, depth+2, labelWithSpan("Definition "+definition.Name.Value(source), definition.Span, includeSpans))
+			writeExpression(source, builder, definition.Expression, depth+3, includeSpans)
 		}
 	}
 
@@ -259,8 +259,8 @@ func writeDocument(builder *strings.Builder, document ast.Document, depth int, i
 
 		for idx := range document.Tokens.Tokens {
 			definition := document.Tokens.Tokens[idx]
-			writeLine(builder, depth+2, labelWithSpan("Token "+definition.Name.Text, definition.Span, includeSpans))
-			writeExpression(builder, definition.Expression, depth+3, includeSpans)
+			writeLine(builder, depth+2, labelWithSpan("Token "+definition.Name.Value(source), definition.Span, includeSpans))
+			writeExpression(source, builder, definition.Expression, depth+3, includeSpans)
 
 			if definition.Skip.Kind == token.TokenSkip {
 				writeLine(builder, depth+3, labelWithSpan("Skip", definition.Skip.Span, includeSpans))
@@ -273,60 +273,60 @@ func writeDocument(builder *strings.Builder, document ast.Document, depth int, i
 
 		for idx := range document.Rules.Rules {
 			rule := document.Rules.Rules[idx]
-			writeLine(builder, depth+2, labelWithSpan("Rule "+rule.Name.Text, rule.Span, includeSpans))
-			writeLine(builder, depth+3, labelWithSpan("Match "+rule.Match.Token.Text, rule.Match.Span, includeSpans))
+			writeLine(builder, depth+2, labelWithSpan("Rule "+rule.Name.Value(source), rule.Span, includeSpans))
+			writeLine(builder, depth+3, labelWithSpan("Match "+rule.Match.Token.Value(source), rule.Match.Span, includeSpans))
 
 			if rule.Where.Span != (location.Span{}) {
 				writeLine(builder, depth+3, labelWithSpan("Where", rule.Where.Span, includeSpans))
-				writeLine(builder, depth+4, labelWithSpan("Subject "+rule.Where.Subject.Text, rule.Where.Subject.Span, includeSpans))
-				writeLine(builder, depth+4, labelWithSpan("Property "+rule.Where.Property.Text, rule.Where.Property.Span, includeSpans))
-				writeLine(builder, depth+4, labelWithSpan("Operator "+rule.Where.Operator.Text, rule.Where.Operator.Span, includeSpans))
-				writeLine(builder, depth+4, labelWithSpan("Value "+rule.Where.Value.Text, rule.Where.Value.Span, includeSpans))
+				writeLine(builder, depth+4, labelWithSpan("Subject "+rule.Where.Subject.Value(source), rule.Where.Subject.Span, includeSpans))
+				writeLine(builder, depth+4, labelWithSpan("Property "+rule.Where.Property.Value(source), rule.Where.Property.Span, includeSpans))
+				writeLine(builder, depth+4, labelWithSpan("Operator "+rule.Where.Operator.Value(source), rule.Where.Operator.Span, includeSpans))
+				writeLine(builder, depth+4, labelWithSpan("Value "+rule.Where.Value.Value(source), rule.Where.Value.Span, includeSpans))
 			}
 
 			writeLine(builder, depth+3, labelWithSpan("Report", rule.Report.Span, includeSpans))
-			writeLine(builder, depth+4, labelWithSpan("Severity "+rule.Report.Severity.Text, rule.Report.Severity.Span, includeSpans))
-			writeLine(builder, depth+4, labelWithSpan("At "+rule.Report.Target.Text, rule.Report.Target.Span, includeSpans))
-			writeLine(builder, depth+4, labelWithSpan("Message "+rule.Report.Message.Text, rule.Report.Message.Span, includeSpans))
+			writeLine(builder, depth+4, labelWithSpan("Severity "+rule.Report.Severity.Value(source), rule.Report.Severity.Span, includeSpans))
+			writeLine(builder, depth+4, labelWithSpan("At "+rule.Report.Target.Value(source), rule.Report.Target.Span, includeSpans))
+			writeLine(builder, depth+4, labelWithSpan("Message "+rule.Report.Message.Value(source), rule.Report.Message.Span, includeSpans))
 		}
 	}
 }
 
-func writeExpression(builder *strings.Builder, expression ast.DefinitionExpression, depth int, includeSpans bool) {
+func writeExpression(source string, builder *strings.Builder, expression ast.DefinitionExpression, depth int, includeSpans bool) {
 	switch expression.Kind {
 	case ast.DefinitionExpressionReference:
-		writeLine(builder, depth, labelWithSpan("Reference "+expression.Start.Text, expression.Span, includeSpans))
+		writeLine(builder, depth, labelWithSpan("Reference "+expression.Start.Value(source), expression.Span, includeSpans))
 
 	case ast.DefinitionExpressionCharacter:
-		writeLine(builder, depth, labelWithSpan("Character "+expression.Start.Text, expression.Span, includeSpans))
+		writeLine(builder, depth, labelWithSpan("Character "+expression.Start.Value(source), expression.Span, includeSpans))
 
 	case ast.DefinitionExpressionString:
-		writeLine(builder, depth, labelWithSpan("String "+expression.Start.Text, expression.Span, includeSpans))
+		writeLine(builder, depth, labelWithSpan("String "+expression.Start.Value(source), expression.Span, includeSpans))
 
 	case ast.DefinitionExpressionRange:
-		writeLine(builder, depth, labelWithSpan("Range "+expression.Start.Text+" "+expression.End.Text, expression.Span, includeSpans))
+		writeLine(builder, depth, labelWithSpan("Range "+expression.Start.Value(source)+" "+expression.End.Value(source), expression.Span, includeSpans))
 
 	case ast.DefinitionExpressionAlternation:
 		writeLine(builder, depth, labelWithSpan("Alternation", expression.Span, includeSpans))
 
 		for idx := range expression.Terms {
-			writeExpression(builder, expression.Terms[idx], depth+1, includeSpans)
+			writeExpression(source, builder, expression.Terms[idx], depth+1, includeSpans)
 		}
 
 	case ast.DefinitionExpressionConcatenation:
 		writeLine(builder, depth, labelWithSpan("Concatenation", expression.Span, includeSpans))
 
 		for idx := range expression.Terms {
-			writeExpression(builder, expression.Terms[idx], depth+1, includeSpans)
+			writeExpression(source, builder, expression.Terms[idx], depth+1, includeSpans)
 		}
 
 	case ast.DefinitionExpressionRepetition:
-		writeLine(builder, depth, labelWithSpan("Repetition "+expression.Operator.Text, expression.Span, includeSpans))
-		writeExpression(builder, *expression.Inner, depth+1, includeSpans)
+		writeLine(builder, depth, labelWithSpan("Repetition "+expression.Operator.Value(source), expression.Span, includeSpans))
+		writeExpression(source, builder, *expression.Inner, depth+1, includeSpans)
 
 	case ast.DefinitionExpressionGroup:
 		writeLine(builder, depth, labelWithSpan("Group", expression.Span, includeSpans))
-		writeExpression(builder, *expression.Inner, depth+1, includeSpans)
+		writeExpression(source, builder, *expression.Inner, depth+1, includeSpans)
 	}
 }
 

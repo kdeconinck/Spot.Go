@@ -8,7 +8,7 @@ package validator
 
 import "github.com/kdeconinck/spot/dsl/ast"
 
-func validateScope(scope ast.ScopeSection, diagnostics []Diagnostic) []Diagnostic {
+func validateScope(source string, scope ast.ScopeSection, diagnostics []Diagnostic) []Diagnostic {
 	hasInclude := false
 
 	for idx := range scope.Entries {
@@ -18,7 +18,7 @@ func validateScope(scope ast.ScopeSection, diagnostics []Diagnostic) []Diagnosti
 			hasInclude = true
 		}
 
-		if entry.Pattern.Text == `""` {
+		if entry.Pattern.Value(source) == `""` {
 			diagnostics = append(diagnostics, Diagnostic{
 				Message: "Scope pattern must not be empty.",
 				Span:    entry.Pattern.Span,

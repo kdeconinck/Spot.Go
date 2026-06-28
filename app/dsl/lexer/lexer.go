@@ -186,7 +186,6 @@ func (lexer Lexer) hasValidStringEscape() bool {
 func (lexer Lexer) makeToken(kind token.TokenKind, start, end int) token.Token {
 	return token.Token{
 		Kind: kind,
-		Text: lexer.src[start:end],
 		Span: location.Span{
 			Start: location.Position(start),
 			End:   location.Position(end),

@@ -11,7 +11,7 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func validateTokens(tokens ast.TokensSection, definitions ast.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
+func validateTokens(source string, tokens ast.TokensSection, definitions ast.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
 	if len(tokens.Tokens) == 0 {
 		diagnostics = append(diagnostics, Diagnostic{
 			Message: "Tokens must contain at least one token.",
@@ -26,8 +26,8 @@ func validateTokens(tokens ast.TokensSection, definitions ast.DefinitionsSection
 	for idx := range definitions.Definitions {
 		definition := definitions.Definitions[idx]
 
-		if _, ok := definitionsByName[definition.Name.Text]; !ok {
-			definitionsByName[definition.Name.Text] = definition
+		if _, ok := definitionsByName[definition.Name.Value(source)]; !ok {
+			definitionsByName[definition.Name.Value(source)] = definition
 		}
 	}
 
@@ -36,31 +36,31 @@ func validateTokens(tokens ast.TokensSection, definitions ast.DefinitionsSection
 	for idx := range tokens.Tokens {
 		name := tokens.Tokens[idx].Name
 
-		if _, ok := definitionsByName[name.Text]; ok {
+		if _, ok := definitionsByName[name.Value(source)]; ok {
 			diagnostics = append(diagnostics, Diagnostic{
-				Message: `Token "` + name.Text + `" conflicts with a definition of the same name.`,
+				Message: `Token "` + name.Value(source) + `" conflicts with a definition of the same name.`,
 				Span:    name.Span,
 			})
 		}
 
-		if _, ok := names[name.Text]; ok {
+		if _, ok := names[name.Value(source)]; ok {
 			diagnostics = append(diagnostics, Diagnostic{
-				Message: `Token "` + name.Text + `" is already declared.`,
+				Message: `Token "` + name.Value(source) + `" is already declared.`,
 				Span:    name.Span,
 			})
 
 			continue
 		}
 
-		names[name.Text] = struct{}{}
+		names[name.Value(source)] = struct{}{}
 	}
 
 	for idx := range tokens.Tokens {
 		expression := tokens.Tokens[idx].Expression
 
-		diagnostics = validateTokenExpression(expression, definitionsByName, diagnostics)
+		diagnostics = validateTokenExpression(source, expression, definitionsByName, diagnostics)
 
-		if tokenExpressionMatchesEmpty(expression, definitionsByName, 0) {
+		if tokenExpressionMatchesEmpty(source, expression, definitionsByName, 0) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Message: "Token expression must not match empty input.",
 				Span:    expression.Span,
@@ -71,29 +71,29 @@ func validateTokens(tokens ast.TokensSection, definitions ast.DefinitionsSection
 	return diagnostics
 }
 
-func validateTokenExpression(expression ast.DefinitionExpression, definitions map[string]ast.Definition, diagnostics []Diagnostic) []Diagnostic {
+func validateTokenExpression(source string, expression ast.DefinitionExpression, definitions map[string]ast.Definition, diagnostics []Diagnostic) []Diagnostic {
 	switch expression.Kind {
 	case ast.DefinitionExpressionReference:
-		if _, ok := definitions[expression.Start.Text]; !ok {
+		if _, ok := definitions[expression.Start.Value(source)]; !ok {
 			diagnostics = append(diagnostics, Diagnostic{
-				Message: `Definition "` + expression.Start.Text + `" is not declared.`,
+				Message: `Definition "` + expression.Start.Value(source) + `" is not declared.`,
 				Span:    expression.Start.Span,
 			})
 		}
 
 	case ast.DefinitionExpressionAlternation, ast.DefinitionExpressionConcatenation:
 		for idx := range expression.Terms {
-			diagnostics = validateTokenExpression(expression.Terms[idx], definitions, diagnostics)
+			diagnostics = validateTokenExpression(source, expression.Terms[idx], definitions, diagnostics)
 		}
 
 	case ast.DefinitionExpressionGroup, ast.DefinitionExpressionRepetition:
-		diagnostics = validateTokenExpression(*expression.Inner, definitions, diagnostics)
+		diagnostics = validateTokenExpression(source, *expression.Inner, definitions, diagnostics)
 	}
 
 	return diagnostics
 }
 
-func tokenExpressionMatchesEmpty(expression ast.DefinitionExpression, definitions map[string]ast.Definition, depth int) bool {
+func tokenExpressionMatchesEmpty(source string, expression ast.DefinitionExpression, definitions map[string]ast.Definition, depth int) bool {
 	matchesEmpty := false
 
 	switch expression.Kind {
@@ -101,25 +101,25 @@ func tokenExpressionMatchesEmpty(expression ast.DefinitionExpression, definition
 		matchesEmpty = false
 
 	case ast.DefinitionExpressionString:
-		matchesEmpty = expression.Start.Text == `""`
+		matchesEmpty = expression.Start.Value(source) == `""`
 
 	case ast.DefinitionExpressionReference:
 		if depth >= len(definitions) {
 			break
 		}
 
-		definition, ok := definitions[expression.Start.Text]
+		definition, ok := definitions[expression.Start.Value(source)]
 		if !ok {
 			break
 		}
 
-		matchesEmpty = tokenExpressionMatchesEmpty(definition.Expression, definitions, depth+1)
+		matchesEmpty = tokenExpressionMatchesEmpty(source, definition.Expression, definitions, depth+1)
 
 	case ast.DefinitionExpressionConcatenation:
 		matchesEmpty = true
 
 		for idx := range expression.Terms {
-			if !tokenExpressionMatchesEmpty(expression.Terms[idx], definitions, depth) {
+			if !tokenExpressionMatchesEmpty(source, expression.Terms[idx], definitions, depth) {
 				matchesEmpty = false
 
 				break
@@ -128,7 +128,7 @@ func tokenExpressionMatchesEmpty(expression ast.DefinitionExpression, definition
 
 	case ast.DefinitionExpressionAlternation:
 		for idx := range expression.Terms {
-			if tokenExpressionMatchesEmpty(expression.Terms[idx], definitions, depth) {
+			if tokenExpressionMatchesEmpty(source, expression.Terms[idx], definitions, depth) {
 				matchesEmpty = true
 
 				break
@@ -136,11 +136,11 @@ func tokenExpressionMatchesEmpty(expression ast.DefinitionExpression, definition
 		}
 
 	case ast.DefinitionExpressionGroup:
-		matchesEmpty = tokenExpressionMatchesEmpty(*expression.Inner, definitions, depth)
+		matchesEmpty = tokenExpressionMatchesEmpty(source, *expression.Inner, definitions, depth)
 
 	case ast.DefinitionExpressionRepetition:
 		if expression.Operator.Kind == token.TokenPlus {
-			matchesEmpty = tokenExpressionMatchesEmpty(*expression.Inner, definitions, depth)
+			matchesEmpty = tokenExpressionMatchesEmpty(source, *expression.Inner, definitions, depth)
 
 			break
 		}

@@ -60,7 +60,7 @@ func Test_Validate_Scope(t *testing.T) {
 			document, parseDiagnostics := parser.Parse(tc.inSource)
 
 			// Act.
-			gotDiagnostics := validator.Validate(document)
+			gotDiagnostics := validator.Validate(tc.inSource, document)
 
 			// Assert.
 			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")
@@ -78,11 +78,12 @@ func Benchmark_Validate_Scope_1000(b *testing.B) { benchmark_Validate_Scope(b, 1
 func benchmark_Validate_Scope(b *testing.B, size int) {
 	b.Helper()
 
-	document, parseDiagnostics := parser.Parse(scopeDSL(size))
+	source := scopeDSL(size)
+	document, parseDiagnostics := parser.Parse(source)
 	claim.Equal(b, "Scope benchmark.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
 
 	for b.Loop() {
-		_ = validator.Validate(document)
+		_ = validator.Validate(source, document)
 	}
 }
 

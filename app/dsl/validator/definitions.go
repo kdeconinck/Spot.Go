@@ -11,37 +11,37 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func validateDefinitions(definitions ast.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitions(source string, definitions ast.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
 	names := map[string]struct{}{}
 
 	for idx := range definitions.Definitions {
 		name := definitions.Definitions[idx].Name
 
-		if _, ok := names[name.Text]; ok {
+		if _, ok := names[name.Value(source)]; ok {
 			diagnostics = append(diagnostics, Diagnostic{
-				Message: `Definition "` + name.Text + `" is already declared.`,
+				Message: `Definition "` + name.Value(source) + `" is already declared.`,
 				Span:    name.Span,
 			})
 
 			continue
 		}
 
-		names[name.Text] = struct{}{}
+		names[name.Value(source)] = struct{}{}
 	}
 
 	for idx := range definitions.Definitions {
-		diagnostics = validateDefinitionExpression(definitions.Definitions[idx].Expression, names, diagnostics)
+		diagnostics = validateDefinitionExpression(source, definitions.Definitions[idx].Expression, names, diagnostics)
 	}
 
-	diagnostics = validateDefinitionRecursion(definitions, diagnostics)
+	diagnostics = validateDefinitionRecursion(source, definitions, diagnostics)
 
 	return diagnostics
 }
 
-func validateDefinitionExpression(expression ast.DefinitionExpression, names map[string]struct{}, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitionExpression(source string, expression ast.DefinitionExpression, names map[string]struct{}, diagnostics []Diagnostic) []Diagnostic {
 	switch expression.Kind {
 	case ast.DefinitionExpressionRange:
-		if characterValue(expression.Start) > characterValue(expression.End) {
+		if characterValue(source, expression.Start) > characterValue(source, expression.End) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Message: "Character range start must be less than or equal to end.",
 				Span:    expression.Span,
@@ -49,31 +49,31 @@ func validateDefinitionExpression(expression ast.DefinitionExpression, names map
 		}
 
 	case ast.DefinitionExpressionReference:
-		if _, ok := names[expression.Start.Text]; !ok {
+		if _, ok := names[expression.Start.Value(source)]; !ok {
 			diagnostics = append(diagnostics, Diagnostic{
-				Message: `Definition "` + expression.Start.Text + `" is not declared.`,
+				Message: `Definition "` + expression.Start.Value(source) + `" is not declared.`,
 				Span:    expression.Start.Span,
 			})
 		}
 
 	case ast.DefinitionExpressionAlternation, ast.DefinitionExpressionConcatenation:
 		for idx := range expression.Terms {
-			diagnostics = validateDefinitionExpression(expression.Terms[idx], names, diagnostics)
+			diagnostics = validateDefinitionExpression(source, expression.Terms[idx], names, diagnostics)
 		}
 
 	case ast.DefinitionExpressionGroup, ast.DefinitionExpressionRepetition:
-		diagnostics = validateDefinitionExpression(*expression.Inner, names, diagnostics)
+		diagnostics = validateDefinitionExpression(source, *expression.Inner, names, diagnostics)
 	}
 
 	return diagnostics
 }
 
-func characterValue(token token.Token) byte {
-	if token.Text[1] != '\\' {
-		return token.Text[1]
+func characterValue(source string, token token.Token) byte {
+	if token.Value(source)[1] != '\\' {
+		return token.Value(source)[1]
 	}
 
-	switch token.Text[2] {
+	switch token.Value(source)[2] {
 	case '\\':
 		return '\\'
 
@@ -90,7 +90,7 @@ func characterValue(token token.Token) byte {
 	return '\t'
 }
 
-func validateDefinitionRecursion(definitions ast.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitionRecursion(source string, definitions ast.DefinitionsSection, diagnostics []Diagnostic) []Diagnostic {
 	if len(definitions.Definitions) == 0 {
 		return diagnostics
 	}
@@ -100,21 +100,21 @@ func validateDefinitionRecursion(definitions ast.DefinitionsSection, diagnostics
 	for idx := range definitions.Definitions {
 		definition := definitions.Definitions[idx]
 
-		if _, ok := definitionByName[definition.Name.Text]; !ok {
-			definitionByName[definition.Name.Text] = definition
+		if _, ok := definitionByName[definition.Name.Value(source)]; !ok {
+			definitionByName[definition.Name.Value(source)] = definition
 		}
 	}
 
 	states := map[string]uint8{}
 
 	for idx := range definitions.Definitions {
-		diagnostics = validateDefinitionCycle(definitions.Definitions[idx].Name.Text, definitionByName, states, diagnostics)
+		diagnostics = validateDefinitionCycle(source, definitions.Definitions[idx].Name.Value(source), definitionByName, states, diagnostics)
 	}
 
 	return diagnostics
 }
 
-func validateDefinitionCycle(name string, definitions map[string]ast.Definition, states map[string]uint8, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitionCycle(source string, name string, definitions map[string]ast.Definition, states map[string]uint8, diagnostics []Diagnostic) []Diagnostic {
 	switch states[name] {
 	case 1, 2:
 		return diagnostics
@@ -126,33 +126,33 @@ func validateDefinitionCycle(name string, definitions map[string]ast.Definition,
 	}
 
 	states[name] = 1
-	diagnostics = validateDefinitionExpressionCycle(definition.Expression, definitions, states, diagnostics)
+	diagnostics = validateDefinitionExpressionCycle(source, definition.Expression, definitions, states, diagnostics)
 	states[name] = 2
 
 	return diagnostics
 }
 
-func validateDefinitionExpressionCycle(expression ast.DefinitionExpression, definitions map[string]ast.Definition, states map[string]uint8, diagnostics []Diagnostic) []Diagnostic {
+func validateDefinitionExpressionCycle(source string, expression ast.DefinitionExpression, definitions map[string]ast.Definition, states map[string]uint8, diagnostics []Diagnostic) []Diagnostic {
 	switch expression.Kind {
 	case ast.DefinitionExpressionReference:
-		if states[expression.Start.Text] == 1 {
+		if states[expression.Start.Value(source)] == 1 {
 			diagnostics = append(diagnostics, Diagnostic{
-				Message: `Definition "` + expression.Start.Text + `" is recursive.`,
+				Message: `Definition "` + expression.Start.Value(source) + `" is recursive.`,
 				Span:    expression.Start.Span,
 			})
 
 			return diagnostics
 		}
 
-		diagnostics = validateDefinitionCycle(expression.Start.Text, definitions, states, diagnostics)
+		diagnostics = validateDefinitionCycle(source, expression.Start.Value(source), definitions, states, diagnostics)
 
 	case ast.DefinitionExpressionAlternation, ast.DefinitionExpressionConcatenation:
 		for idx := range expression.Terms {
-			diagnostics = validateDefinitionExpressionCycle(expression.Terms[idx], definitions, states, diagnostics)
+			diagnostics = validateDefinitionExpressionCycle(source, expression.Terms[idx], definitions, states, diagnostics)
 		}
 
 	case ast.DefinitionExpressionGroup, ast.DefinitionExpressionRepetition:
-		diagnostics = validateDefinitionExpressionCycle(*expression.Inner, definitions, states, diagnostics)
+		diagnostics = validateDefinitionExpressionCycle(source, *expression.Inner, definitions, states, diagnostics)
 	}
 
 	return diagnostics

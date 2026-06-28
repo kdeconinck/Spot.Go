@@ -54,7 +54,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	validationDiagnostics := validator.Validate(document)
+	validationDiagnostics := validator.Validate(string(source), document)
 
 	if len(validationDiagnostics) != 0 {
 		for idx := range validationDiagnostics {
@@ -64,7 +64,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	scope, err := compileScope(document.Scope)
+	scope, err := compileScope(document.Scope, string(source))
 
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to compile scope patterns: %v\n", err)
@@ -86,7 +86,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	program := compiler.Compile(document)
+	program := compiler.Compile(string(source), document)
 	analysisEngine := engine.New(program)
 	diagnosticCount := 0
 	walkErr := filepath.WalkDir(rootPath, func(path string, entry fs.DirEntry, err error) error {
@@ -150,14 +150,14 @@ type scope struct {
 	excludes []string
 }
 
-func compileScope(section ast.ScopeSection) (scope, error) {
+func compileScope(section ast.ScopeSection, source string) (scope, error) {
 	compiled := scope{
 		includes: make([]string, 0, len(section.Entries)),
 		excludes: make([]string, 0, len(section.Entries)),
 	}
 
 	for idx := range section.Entries {
-		pattern, err := strconv.Unquote(section.Entries[idx].Pattern.Text)
+		pattern, err := strconv.Unquote(section.Entries[idx].Pattern.Value(source))
 
 		if err != nil {
 			return scope{}, err

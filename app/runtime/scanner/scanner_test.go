@@ -362,7 +362,7 @@ func compileProgram(tb testing.TB, source string) ir.Program {
 	tb.Helper()
 
 	document, parseDiagnostics := parser.Parse(source)
-	validationDiagnostics := validator.Validate(document)
+	validationDiagnostics := validator.Validate(source, document)
 
 	if len(parseDiagnostics) != 0 {
 		tb.Fatalf("scanner test parse diagnostics: got %d, want 0", len(parseDiagnostics))
@@ -372,7 +372,7 @@ func compileProgram(tb testing.TB, source string) ir.Program {
 		tb.Fatalf("scanner test validation diagnostics: got %d, want 0", len(validationDiagnostics))
 	}
 
-	return compiler.Compile(document)
+	return compiler.Compile(source, document)
 }
 
 func scannerDSL() string {

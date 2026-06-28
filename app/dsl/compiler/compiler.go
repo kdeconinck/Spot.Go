@@ -15,13 +15,13 @@ import (
 )
 
 // Compile compiles a validated Spot DSL document into a runtime program.
-func Compile(document ast.Document) ir.Program {
+func Compile(source string, document ast.Document) ir.Program {
 	definitions := map[string]ast.Definition{}
 	tokenIndexes := map[string]int{}
 
 	for idx := range document.Definitions.Definitions {
 		definition := document.Definitions.Definitions[idx]
-		definitions[definition.Name.Text] = definition
+		definitions[definition.Name.Value(source)] = definition
 	}
 
 	program := ir.Program{
@@ -31,114 +31,114 @@ func Compile(document ast.Document) ir.Program {
 
 	for idx := range document.Tokens.Tokens {
 		tok := document.Tokens.Tokens[idx]
-		tokenIndexes[tok.Name.Text] = idx
+		tokenIndexes[tok.Name.Value(source)] = idx
 		program.Tokens = append(program.Tokens, ir.Token{
-			Name:       tok.Name.Text,
-			Expression: compileExpression(tok.Expression, definitions),
+			Name:       tok.Name.Value(source),
+			Expression: compileExpression(source, tok.Expression, definitions),
 			Skip:       tok.Skip.Kind == token.TokenSkip,
 		})
 	}
 
 	for idx := range document.Rules.Rules {
-		program.Rules = append(program.Rules, compileRule(document.Rules.Rules[idx], tokenIndexes))
+		program.Rules = append(program.Rules, compileRule(source, document.Rules.Rules[idx], tokenIndexes))
 	}
 
 	return program
 }
 
-func compileRule(rule ast.Rule, tokenIndexes map[string]int) ir.Rule {
+func compileRule(source string, rule ast.Rule, tokenIndexes map[string]int) ir.Rule {
 	return ir.Rule{
-		Name:       rule.Name.Text,
-		MatchToken: tokenIndexes[rule.Match.Token.Text],
-		Where:      compileCondition(rule.Where),
-		Report:     compileReport(rule.Report, tokenIndexes),
+		Name:       rule.Name.Value(source),
+		MatchToken: tokenIndexes[rule.Match.Token.Value(source)],
+		Where:      compileCondition(source, rule.Where),
+		Report:     compileReport(source, rule.Report, tokenIndexes),
 	}
 }
 
-func compileCondition(condition ast.RuleCondition) ir.Condition {
-	if condition.Property.Text == "" {
+func compileCondition(source string, condition ast.RuleCondition) ir.Condition {
+	if condition.Property.Value(source) == "" {
 		return ir.Condition{
 			Property: ir.ConditionPropertyNone,
 		}
 	}
 
 	compiled := ir.Condition{
-		Property: conditionProperty(condition.Property),
+		Property: conditionProperty(source, condition.Property),
 		Operator: conditionOperator(condition.Operator),
 	}
 
 	if compiled.Property == ir.ConditionPropertyText {
-		compiled.String = stringValue(condition.Value)
+		compiled.String = stringValue(source, condition.Value)
 
 		return compiled
 	}
 
-	compiled.Integer = integerValue(condition.Value)
+	compiled.Integer = integerValue(source, condition.Value)
 
 	return compiled
 }
 
-func compileReport(report ast.RuleReport, tokenIndexes map[string]int) ir.Report {
+func compileReport(source string, report ast.RuleReport, tokenIndexes map[string]int) ir.Report {
 	return ir.Report{
 		Severity:    severityValue(report.Severity),
-		TargetToken: tokenIndexes[report.Target.Text],
-		Message:     stringValue(report.Message),
+		TargetToken: tokenIndexes[report.Target.Value(source)],
+		Message:     stringValue(source, report.Message),
 	}
 }
 
-func compileExpression(expression ast.DefinitionExpression, definitions map[string]ast.Definition) ir.Expression {
+func compileExpression(source string, expression ast.DefinitionExpression, definitions map[string]ast.Definition) ir.Expression {
 	switch expression.Kind {
 	case ast.DefinitionExpressionCharacter:
 		return ir.Expression{
 			Kind:      ir.ExpressionCharacter,
-			Character: characterValue(expression.Start),
+			Character: characterValue(source, expression.Start),
 		}
 
 	case ast.DefinitionExpressionString:
 		return ir.Expression{
 			Kind:   ir.ExpressionString,
-			String: stringValue(expression.Start),
+			String: stringValue(source, expression.Start),
 		}
 
 	case ast.DefinitionExpressionRange:
 		return ir.Expression{
 			Kind:       ir.ExpressionRange,
-			RangeStart: characterValue(expression.Start),
-			RangeEnd:   characterValue(expression.End),
+			RangeStart: characterValue(source, expression.Start),
+			RangeEnd:   characterValue(source, expression.End),
 		}
 
 	case ast.DefinitionExpressionReference:
-		return compileExpression(definitions[expression.Start.Text].Expression, definitions)
+		return compileExpression(source, definitions[expression.Start.Value(source)].Expression, definitions)
 
 	case ast.DefinitionExpressionConcatenation:
 		return ir.Expression{
 			Kind:  ir.ExpressionConcatenation,
-			Terms: compileTerms(expression.Terms, definitions),
+			Terms: compileTerms(source, expression.Terms, definitions),
 		}
 
 	case ast.DefinitionExpressionAlternation:
 		return ir.Expression{
 			Kind:  ir.ExpressionAlternation,
-			Terms: compileTerms(expression.Terms, definitions),
+			Terms: compileTerms(source, expression.Terms, definitions),
 		}
 
 	case ast.DefinitionExpressionGroup:
-		return compileExpression(*expression.Inner, definitions)
+		return compileExpression(source, *expression.Inner, definitions)
 
 	default:
 		return ir.Expression{
 			Kind:       ir.ExpressionRepetition,
-			Inner:      pointer(compileExpression(*expression.Inner, definitions)),
+			Inner:      pointer(compileExpression(source, *expression.Inner, definitions)),
 			Repetition: repetitionKind(expression.Operator.Kind),
 		}
 	}
 }
 
-func compileTerms(expressions []ast.DefinitionExpression, definitions map[string]ast.Definition) []ir.Expression {
+func compileTerms(source string, expressions []ast.DefinitionExpression, definitions map[string]ast.Definition) []ir.Expression {
 	terms := make([]ir.Expression, 0, len(expressions))
 
 	for idx := range expressions {
-		terms = append(terms, compileExpression(expressions[idx], definitions))
+		terms = append(terms, compileExpression(source, expressions[idx], definitions))
 	}
 
 	return terms
@@ -157,8 +157,8 @@ func repetitionKind(kind token.TokenKind) ir.RepetitionKind {
 	}
 }
 
-func conditionProperty(token token.Token) ir.ConditionProperty {
-	if token.Text == "text" {
+func conditionProperty(source string, token token.Token) ir.ConditionProperty {
+	if token.Value(source) == "text" {
 		return ir.ConditionPropertyText
 	}
 
@@ -200,12 +200,12 @@ func severityValue(tok token.Token) ir.Severity {
 	}
 }
 
-func characterValue(tok token.Token) byte {
-	if tok.Text[1] != '\\' {
-		return tok.Text[1]
+func characterValue(source string, tok token.Token) byte {
+	if tok.Value(source)[1] != '\\' {
+		return tok.Value(source)[1]
 	}
 
-	switch tok.Text[2] {
+	switch tok.Value(source)[2] {
 	case '\\':
 		return '\\'
 
@@ -223,11 +223,11 @@ func characterValue(tok token.Token) byte {
 	}
 }
 
-func stringValue(token token.Token) string {
-	value := make([]byte, 0, len(token.Text)-2)
+func stringValue(source string, token token.Token) string {
+	value := make([]byte, 0, len(token.Value(source))-2)
 
-	for idx := 1; idx < len(token.Text)-1; idx++ {
-		character := token.Text[idx]
+	for idx := 1; idx < len(token.Value(source))-1; idx++ {
+		character := token.Value(source)[idx]
 
 		if character != '\\' {
 			value = append(value, character)
@@ -236,7 +236,7 @@ func stringValue(token token.Token) string {
 
 		idx++
 
-		switch token.Text[idx] {
+		switch token.Value(source)[idx] {
 		case '\\':
 			value = append(value, '\\')
 
@@ -257,8 +257,8 @@ func stringValue(token token.Token) string {
 	return string(value)
 }
 
-func integerValue(token token.Token) int {
-	value, _ := strconv.Atoi(token.Text)
+func integerValue(source string, token token.Token) int {
+	value, _ := strconv.Atoi(token.Value(source))
 
 	return value
 }

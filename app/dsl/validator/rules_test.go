@@ -132,7 +132,7 @@ func Test_Validate_Rules(t *testing.T) {
 			document, parseDiagnostics := parser.Parse(tc.inSource)
 
 			// Act.
-			gotDiagnostics := validator.Validate(document)
+			gotDiagnostics := validator.Validate(tc.inSource, document)
 
 			// Assert.
 			claim.Equal(t, tc.name, tc.wantParseDiagnosticCount, len(parseDiagnostics), "Parse Diagnostic Count")
@@ -150,11 +150,12 @@ func Benchmark_Validate_Rules_1000(b *testing.B) { benchmark_Validate_Rules(b, 1
 func benchmark_Validate_Rules(b *testing.B, size int) {
 	b.Helper()
 
-	document, parseDiagnostics := parser.Parse(rulesDSL(size))
+	source := rulesDSL(size)
+	document, parseDiagnostics := parser.Parse(source)
 	claim.Equal(b, "Rules benchmark.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
 
 	for b.Loop() {
-		_ = validator.Validate(document)
+		_ = validator.Validate(source, document)
 	}
 }
 

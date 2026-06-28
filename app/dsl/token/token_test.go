@@ -13,10 +13,11 @@ import (
 	"testing"
 
 	"github.com/kdeconinck/spot/dsl/token"
+	"github.com/kdeconinck/spot/location"
 	"github.com/kdeconinck/spot/qa/claim"
 )
 
-func Test_Lookup(t *testing.T) {
+func Test_LookupTokenKind(t *testing.T) {
 	t.Parallel()
 
 	for tcName, tc := range map[string]struct {
@@ -96,6 +97,73 @@ func Test_Lookup(t *testing.T) {
 
 			// Assert.
 			claim.Equal(t, tcName, tc.want, got, "Token Kind")
+		})
+	}
+}
+
+func Test_Token_Value(t *testing.T) {
+	t.Parallel()
+
+	for tcName, tc := range map[string]struct {
+		inToken  token.Token
+		inSource string
+		want     string
+	}{
+		"When the token spans the beginning of the source, the correct text is extracted.": {
+			inToken: token.Token{
+				Span: location.Span{
+					Start: 0, End: 5,
+				},
+			},
+			inSource: "scope { }",
+			want:     "scope",
+		},
+		"When the token spans the middle of the source, the correct text is extracted.": {
+			inToken: token.Token{
+				Span: location.Span{
+					Start: 8,
+					End:   15,
+				},
+			},
+			inSource: "scope { include }",
+			want:     "include",
+		},
+		"When the token is a single character, the correct text is extracted.": {
+			inToken: token.Token{
+				Span: location.Span{
+					Start: 6, End: 7,
+				},
+			},
+			inSource: "scope { }",
+			want:     "{",
+		},
+		"When the token span is empty (start equals end), an empty string is returned.": {
+			inToken: token.Token{
+				Span: location.Span{
+					Start: 5, End: 5,
+				},
+			},
+			inSource: "scope { }",
+			want:     "",
+		},
+		"When the token spans the end of the source, the correct text is extracted.": {
+			inToken: token.Token{
+				Span: location.Span{
+					Start: 16, End: 25,
+				},
+			},
+			inSource: "scope { include \"**/*.cs\" }",
+			want:     "\"**/*.cs\"", // Length is 9 bytes
+		},
+	} {
+		t.Run(tcName, func(t *testing.T) {
+			t.Parallel()
+
+			// Act.
+			got := tc.inToken.Value(tc.inSource)
+
+			// Assert.
+			claim.Equal(t, tcName, tc.want, got, "Token Text")
 		})
 	}
 }

@@ -127,31 +127,57 @@ const (
 	TokenPlus
 )
 
-var keywordMap = map[string]TokenKind{
-	"scope":       TokenScope,
-	"include":     TokenInclude,
-	"exclude":     TokenExclude,
-	"definitions": TokenDefinitions,
-	"tokens":      TokenTokens,
-	"skip":        TokenSkip,
-	"rules":       TokenRules,
-	"rule":        TokenRule,
-	"match":       TokenMatch,
-	"where":       TokenWhere,
-	"report":      TokenReport,
-	"info":        TokenInfo,
-	"warn":        TokenWarn,
-	"err":         TokenErr,
-	"at":          TokenAt,
-}
-
 // LookupTokenKind returns the TokenKind corresponding to value of TokenIdentifier if value doesn't match any TokenKind.
 func LookupTokenKind(value string) TokenKind {
-	if v, ok := keywordMap[value]; ok {
-		return v
-	}
+	switch value {
+	case "scope":
+		return TokenScope
 
-	return TokenIdentifier
+	case "include":
+		return TokenInclude
+
+	case "exclude":
+		return TokenExclude
+
+	case "definitions":
+		return TokenDefinitions
+
+	case "tokens":
+		return TokenTokens
+
+	case "skip":
+		return TokenSkip
+
+	case "rules":
+		return TokenRules
+
+	case "rule":
+		return TokenRule
+
+	case "match":
+		return TokenMatch
+
+	case "where":
+		return TokenWhere
+
+	case "report":
+		return TokenReport
+
+	case "info":
+		return TokenInfo
+
+	case "warn":
+		return TokenWarn
+
+	case "err":
+		return TokenErr
+
+	case "at":
+		return TokenAt
+
+	default:
+		return TokenIdentifier
+	}
 }
 
 // Token is a lexical token from a Spot DSL source file.
@@ -159,11 +185,13 @@ type Token struct {
 	// Kind identifies the syntactic role of the token.
 	Kind TokenKind
 
-	// Text is the exact source text covered by the token.
-	Text string
-
 	// Span is the byte range covered by the token.
 	Span location.Span
+}
+
+// Value returns the slice of the original source code that this token covers.
+func (tok Token) Value(source string) string {
+	return source[tok.Span.Start:tok.Span.End]
 }
 
 // String returns a stable display name for kind.

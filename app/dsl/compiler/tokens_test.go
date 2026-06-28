@@ -27,7 +27,7 @@ func Test_Compile_Tokens_PreservesSourceOrder(t *testing.T) {
 	// Arrange.
 	source := `scope { include "**/*.go" } tokens { First = "a" Second = "b" Third = "c" }`
 	document, parseDiagnostics := parser.Parse(source)
-	validationDiagnostics := validator.Validate(document)
+	validationDiagnostics := validator.Validate(source, document)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
 			{Name: "First", Expression: ir.Expression{Kind: ir.ExpressionString, String: "a"}},
@@ -38,7 +38,7 @@ func Test_Compile_Tokens_PreservesSourceOrder(t *testing.T) {
 	}
 
 	// Act.
-	gotProgram := compiler.Compile(document)
+	gotProgram := compiler.Compile(source, document)
 
 	// Assert.
 	claim.Equal(t, "When compiling tokens, parse diagnostics are not returned.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
@@ -52,7 +52,7 @@ func Test_Compile_Tokens_ResolvesDefinitionReferences(t *testing.T) {
 	// Arrange.
 	source := `scope { include "**/*.go" } definitions { letter = 'a'..'z' identifier = letter (letter | '_')* } tokens { Identifier = identifier }`
 	document, parseDiagnostics := parser.Parse(source)
-	validationDiagnostics := validator.Validate(document)
+	validationDiagnostics := validator.Validate(source, document)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
 			{
@@ -80,7 +80,7 @@ func Test_Compile_Tokens_ResolvesDefinitionReferences(t *testing.T) {
 	}
 
 	// Act.
-	gotProgram := compiler.Compile(document)
+	gotProgram := compiler.Compile(source, document)
 
 	// Assert.
 	claim.Equal(t, "When compiling tokens with definition references, parse diagnostics are not returned.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
@@ -94,7 +94,7 @@ func Test_Compile_Tokens_UnescapesLiterals(t *testing.T) {
 	// Arrange.
 	source := "scope { include \"**/*.go\" } tokens { Newline = '\\n' Text = \"a\\tb\\n\\\"c\\\\\" }"
 	document, parseDiagnostics := parser.Parse(source)
-	validationDiagnostics := validator.Validate(document)
+	validationDiagnostics := validator.Validate(source, document)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
 			{Name: "Newline", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\n'}},
@@ -104,7 +104,7 @@ func Test_Compile_Tokens_UnescapesLiterals(t *testing.T) {
 	}
 
 	// Act.
-	gotProgram := compiler.Compile(document)
+	gotProgram := compiler.Compile(source, document)
 
 	// Assert.
 	claim.Equal(t, "When compiling literal tokens, parse diagnostics are not returned.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
@@ -156,10 +156,10 @@ func Test_Compile_Tokens_UnescapesCharacterEscapes(t *testing.T) {
 
 			// Arrange.
 			document, parseDiagnostics := parser.Parse(tc.inSource)
-			validationDiagnostics := validator.Validate(document)
+			validationDiagnostics := validator.Validate(tc.inSource, document)
 
 			// Act.
-			gotProgram := compiler.Compile(document)
+			gotProgram := compiler.Compile(tc.inSource, document)
 
 			// Assert.
 			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")
@@ -175,7 +175,7 @@ func Test_Compile_Tokens_UnescapesStringEscapes(t *testing.T) {
 	// Arrange.
 	source := `scope { include "**/*.go" } tokens { Escapes = "\\\"\r" }`
 	document, parseDiagnostics := parser.Parse(source)
-	validationDiagnostics := validator.Validate(document)
+	validationDiagnostics := validator.Validate(source, document)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
 			{Name: "Escapes", Expression: ir.Expression{Kind: ir.ExpressionString, String: "\\\"\r"}},
@@ -184,7 +184,7 @@ func Test_Compile_Tokens_UnescapesStringEscapes(t *testing.T) {
 	}
 
 	// Act.
-	gotProgram := compiler.Compile(document)
+	gotProgram := compiler.Compile(source, document)
 
 	// Assert.
 	claim.Equal(t, "When compiling a string literal with backslash, quote, and carriage return escapes, the literal is unescaped.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
@@ -198,7 +198,7 @@ func Test_Compile_Tokens_PreservesSkipFlags(t *testing.T) {
 	// Arrange.
 	source := `scope { include "**/*.go" } definitions { whitespace = ' ' | '\t' } tokens { Whitespace = whitespace+ skip Identifier = "id" }`
 	document, parseDiagnostics := parser.Parse(source)
-	validationDiagnostics := validator.Validate(document)
+	validationDiagnostics := validator.Validate(source, document)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
 			{
@@ -222,7 +222,7 @@ func Test_Compile_Tokens_PreservesSkipFlags(t *testing.T) {
 	}
 
 	// Act.
-	gotProgram := compiler.Compile(document)
+	gotProgram := compiler.Compile(source, document)
 
 	// Assert.
 	claim.Equal(t, "When compiling skipped tokens, parse diagnostics are not returned.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
@@ -236,7 +236,7 @@ func Test_Compile_Tokens_PreservesZeroOrOneRepetition(t *testing.T) {
 	// Arrange.
 	source := `scope { include "**/*.go" } tokens { Optional = "a"? "b" }`
 	document, parseDiagnostics := parser.Parse(source)
-	validationDiagnostics := validator.Validate(document)
+	validationDiagnostics := validator.Validate(source, document)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
 			{
@@ -258,7 +258,7 @@ func Test_Compile_Tokens_PreservesZeroOrOneRepetition(t *testing.T) {
 	}
 
 	// Act.
-	gotProgram := compiler.Compile(document)
+	gotProgram := compiler.Compile(source, document)
 
 	// Assert.
 	claim.Equal(t, "When compiling a token with zero-or-one repetition, parse diagnostics are not returned.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
@@ -275,13 +275,14 @@ func Benchmark_Compile_Tokens_1000(b *testing.B) { benchmark_Compile_Tokens(b, 1
 func benchmark_Compile_Tokens(b *testing.B, size int) {
 	b.Helper()
 
-	document, parseDiagnostics := parser.Parse(tokensDSL(size))
-	validationDiagnostics := validator.Validate(document)
+	source := tokensDSL(size)
+	document, parseDiagnostics := parser.Parse(source)
+	validationDiagnostics := validator.Validate(source, document)
 	claim.Equal(b, "Compile tokens benchmark parse diagnostics.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
 	claim.Equal(b, "Compile tokens benchmark validation diagnostics.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
 
 	for b.Loop() {
-		_ = compiler.Compile(document)
+		_ = compiler.Compile(source, document)
 	}
 }
 

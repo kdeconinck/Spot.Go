@@ -28,7 +28,7 @@ func Test_Compile_Rules_PreservesSourceOrder(t *testing.T) {
 		rule Second { match Number where Number.length >= 2 report err at Number "second" }
 	}`
 	document, parseDiagnostics := parser.Parse(source)
-	validationDiagnostics := validator.Validate(document)
+	validationDiagnostics := validator.Validate(source, document)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
 			{Name: "Identifier", Expression: ir.Expression{Kind: ir.ExpressionString, String: "id"}},
@@ -72,7 +72,7 @@ func Test_Compile_Rules_PreservesSourceOrder(t *testing.T) {
 	}
 
 	// Act.
-	gotProgram := compiler.Compile(document)
+	gotProgram := compiler.Compile(source, document)
 
 	// Assert.
 	claim.Equal(t, "When compiling rules, parse diagnostics are not returned.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
@@ -194,10 +194,10 @@ func Test_Compile_Rules_CompilesConditionOperators(t *testing.T) {
 
 			// Arrange.
 			document, parseDiagnostics := parser.Parse(tc.inSource)
-			validationDiagnostics := validator.Validate(document)
+			validationDiagnostics := validator.Validate(tc.inSource, document)
 
 			// Act.
-			gotProgram := compiler.Compile(document)
+			gotProgram := compiler.Compile(tc.inSource, document)
 
 			// Assert.
 			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")

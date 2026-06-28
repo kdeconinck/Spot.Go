@@ -52,7 +52,7 @@ func Test_Validate_Names(t *testing.T) {
 			document, parseDiagnostics := parser.Parse(tc.inSource)
 
 			// Act.
-			gotDiagnostics := validator.Validate(document)
+			gotDiagnostics := validator.Validate(tc.inSource, document)
 
 			// Assert.
 			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")

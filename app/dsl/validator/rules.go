@@ -11,34 +11,34 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func validateRules(rules ast.RulesSection, tokens ast.TokensSection, diagnostics []Diagnostic) []Diagnostic {
+func validateRules(source string, rules ast.RulesSection, tokens ast.TokensSection, diagnostics []Diagnostic) []Diagnostic {
 	if len(rules.Rules) > 1 {
 		names := map[string]struct{}{}
 
 		for idx := range rules.Rules {
 			name := rules.Rules[idx].Name
 
-			if _, ok := names[name.Text]; ok {
+			if _, ok := names[name.Value(source)]; ok {
 				diagnostics = append(diagnostics, Diagnostic{
-					Message: `Rule "` + name.Text + `" is already declared.`,
+					Message: `Rule "` + name.Value(source) + `" is already declared.`,
 					Span:    name.Span,
 				})
 
 				continue
 			}
 
-			names[name.Text] = struct{}{}
+			names[name.Value(source)] = struct{}{}
 		}
 	}
 
 	for idx := range rules.Rules {
-		diagnostics = validateRuleReferences(rules.Rules[idx], tokens, diagnostics)
+		diagnostics = validateRuleReferences(source, rules.Rules[idx], tokens, diagnostics)
 	}
 
 	return diagnostics
 }
 
-func validateRuleReferences(rule ast.Rule, tokens ast.TokensSection, diagnostics []Diagnostic) []Diagnostic {
+func validateRuleReferences(source string, rule ast.Rule, tokens ast.TokensSection, diagnostics []Diagnostic) []Diagnostic {
 	hasMatch := ruleHasMatch(rule)
 	hasReport := ruleHasReport(rule)
 
@@ -62,28 +62,28 @@ func validateRuleReferences(rule ast.Rule, tokens ast.TokensSection, diagnostics
 
 	matchedToken := rule.Match.Token
 
-	if !tokenDeclared(tokens, matchedToken.Text) {
+	if !tokenDeclared(source, tokens, matchedToken.Value(source)) {
 		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Token "` + matchedToken.Text + `" is not declared.`,
+			Message: `Token "` + matchedToken.Value(source) + `" is not declared.`,
 			Span:    matchedToken.Span,
 		})
 	}
 
-	if rule.Where.Subject.Text != "" && rule.Where.Subject.Text != matchedToken.Text {
+	if rule.Where.Subject.Value(source) != "" && rule.Where.Subject.Value(source) != matchedToken.Value(source) {
 		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Where clause must reference matched token "` + matchedToken.Text + `".`,
+			Message: `Where clause must reference matched token "` + matchedToken.Value(source) + `".`,
 			Span:    rule.Where.Subject.Span,
 		})
 	}
 
-	if rule.Where.Property.Text != "" && rule.Where.Property.Text != "text" && rule.Where.Property.Text != "length" {
+	if rule.Where.Property.Value(source) != "" && rule.Where.Property.Value(source) != "text" && rule.Where.Property.Value(source) != "length" {
 		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Token property "` + rule.Where.Property.Text + `" is not declared.`,
+			Message: `Token property "` + rule.Where.Property.Value(source) + `" is not declared.`,
 			Span:    rule.Where.Property.Span,
 		})
 	}
 
-	if rule.Where.Property.Text == "text" &&
+	if rule.Where.Property.Value(source) == "text" &&
 		rule.Where.Operator.Kind != token.TokenEqualEqual &&
 		rule.Where.Operator.Kind != token.TokenBangEqual {
 		diagnostics = append(diagnostics, Diagnostic{
@@ -92,23 +92,23 @@ func validateRuleReferences(rule ast.Rule, tokens ast.TokensSection, diagnostics
 		})
 	}
 
-	if rule.Where.Property.Text == "text" && rule.Where.Value.Kind != token.TokenString {
+	if rule.Where.Property.Value(source) == "text" && rule.Where.Value.Kind != token.TokenString {
 		diagnostics = append(diagnostics, Diagnostic{
 			Message: `Token property "text" must be compared with a string literal.`,
 			Span:    rule.Where.Value.Span,
 		})
 	}
 
-	if rule.Where.Property.Text == "length" && rule.Where.Value.Kind != token.TokenInteger {
+	if rule.Where.Property.Value(source) == "length" && rule.Where.Value.Kind != token.TokenInteger {
 		diagnostics = append(diagnostics, Diagnostic{
 			Message: `Token property "length" must be compared with an integer literal.`,
 			Span:    rule.Where.Value.Span,
 		})
 	}
 
-	if hasReport && rule.Report.Target.Text != "" && rule.Report.Target.Text != matchedToken.Text {
+	if hasReport && rule.Report.Target.Value(source) != "" && rule.Report.Target.Value(source) != matchedToken.Value(source) {
 		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Report target must reference matched token "` + matchedToken.Text + `".`,
+			Message: `Report target must reference matched token "` + matchedToken.Value(source) + `".`,
 			Span:    rule.Report.Target.Span,
 		})
 	}
@@ -124,9 +124,9 @@ func ruleHasReport(rule ast.Rule) bool {
 	return rule.Report.Span.Start != rule.Report.Severity.Span.Start
 }
 
-func tokenDeclared(tokens ast.TokensSection, name string) bool {
+func tokenDeclared(source string, tokens ast.TokensSection, name string) bool {
 	for idx := range tokens.Tokens {
-		if tokens.Tokens[idx].Name.Text == name {
+		if tokens.Tokens[idx].Name.Value(source) == name {
 			return true
 		}
 	}
