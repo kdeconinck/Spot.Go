@@ -35,17 +35,90 @@ func (lexer *Lexer) Next() token.Token {
 	start := lexer.offset
 	character := lexer.src[lexer.offset]
 
+	lexer.offset++
+
 	switch character {
 	case '"':
+		lexer.offset--
+
 		return lexer.scanString(start)
 
 	case '\'':
+		lexer.offset--
+
 		return lexer.scanCharacter(start)
+
+	case '(':
+		return lexer.makeToken(token.TokenLeftParen, start, lexer.offset)
+
+	case ')':
+		return lexer.makeToken(token.TokenRightParen, start, lexer.offset)
+
+	case '{':
+		return lexer.makeToken(token.TokenLeftBrace, start, lexer.offset)
+
+	case '}':
+		return lexer.makeToken(token.TokenRightBrace, start, lexer.offset)
+
+	case '|':
+		return lexer.makeToken(token.TokenPipe, start, lexer.offset)
+
+	case '?':
+		return lexer.makeToken(token.TokenQuestion, start, lexer.offset)
+
+	case '*':
+		return lexer.makeToken(token.TokenStar, start, lexer.offset)
+
+	case '+':
+		return lexer.makeToken(token.TokenPlus, start, lexer.offset)
+
+	case '.':
+		if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '.' {
+			lexer.offset++
+
+			return lexer.makeToken(token.TokenDotDot, start, lexer.offset)
+		}
+
+		return lexer.makeToken(token.TokenDot, start, lexer.offset)
+
+	case '=':
+		if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
+			lexer.offset++
+
+			return lexer.makeToken(token.TokenEqualEqual, start, lexer.offset)
+		}
+
+		return lexer.makeToken(token.TokenEqual, start, lexer.offset)
+
+	case '!':
+		if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
+			lexer.offset++
+
+			return lexer.makeToken(token.TokenBangEqual, start, lexer.offset)
+		}
+
+		return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
+
+	case '<':
+		if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
+			lexer.offset++
+
+			return lexer.makeToken(token.TokenLessEqual, start, lexer.offset)
+		}
+
+		return lexer.makeToken(token.TokenLess, start, lexer.offset)
+
+	case '>':
+		if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
+			lexer.offset++
+
+			return lexer.makeToken(token.TokenGreaterEqual, start, lexer.offset)
+		}
+
+		return lexer.makeToken(token.TokenGreater, start, lexer.offset)
 	}
 
-	if tok, ok := lexer.scanSymbol(start, character); ok {
-		return tok
-	}
+	lexer.offset--
 
 	if isIdentifierStart(character) {
 		return lexer.scanIdentifier(start)
@@ -58,72 +131,6 @@ func (lexer *Lexer) Next() token.Token {
 	lexer.offset++
 
 	return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
-}
-
-func (lexer *Lexer) scanDot(start int) token.Token {
-	lexer.offset++
-
-	if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '.' {
-		lexer.offset++
-
-		return lexer.makeToken(token.TokenDotDot, start, lexer.offset)
-	}
-
-	return lexer.makeToken(token.TokenDot, start, lexer.offset)
-}
-
-func (lexer *Lexer) scanEqual(start int) token.Token {
-	lexer.offset++
-
-	if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
-		lexer.offset++
-
-		return lexer.makeToken(token.TokenEqualEqual, start, lexer.offset)
-	}
-
-	return lexer.makeToken(token.TokenEqual, start, lexer.offset)
-}
-
-func (lexer *Lexer) scanBang(start int) token.Token {
-	lexer.offset++
-
-	if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
-		lexer.offset++
-
-		return lexer.makeToken(token.TokenBangEqual, start, lexer.offset)
-	}
-
-	return lexer.makeToken(token.TokenInvalid, start, lexer.offset)
-}
-
-func (lexer *Lexer) scanLess(start int) token.Token {
-	lexer.offset++
-
-	if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
-		lexer.offset++
-
-		return lexer.makeToken(token.TokenLessEqual, start, lexer.offset)
-	}
-
-	return lexer.makeToken(token.TokenLess, start, lexer.offset)
-}
-
-func (lexer *Lexer) scanGreater(start int) token.Token {
-	lexer.offset++
-
-	if lexer.offset < len(lexer.src) && lexer.src[lexer.offset] == '=' {
-		lexer.offset++
-
-		return lexer.makeToken(token.TokenGreaterEqual, start, lexer.offset)
-	}
-
-	return lexer.makeToken(token.TokenGreater, start, lexer.offset)
-}
-
-func (lexer *Lexer) scanSingleCharacter(start int, kind token.TokenKind) token.Token {
-	lexer.offset++
-
-	return lexer.makeToken(kind, start, lexer.offset)
 }
 
 func (lexer *Lexer) skipTrivia() {
