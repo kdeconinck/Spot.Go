@@ -3,7 +3,7 @@
 // == SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // =====================================================================================================================
 
-// Package validator validates parsed Spot DSL token.
+// Package validator validates parsed Spot DSL syntax.
 package validator
 
 import (
@@ -21,10 +21,27 @@ func validateTokens(tokens ast.TokensSection, definitions ast.DefinitionsSection
 		return diagnostics
 	}
 
+	definitionsByName := map[string]ast.Definition{}
+
+	for idx := range definitions.Definitions {
+		definition := definitions.Definitions[idx]
+
+		if _, ok := definitionsByName[definition.Name.Text]; !ok {
+			definitionsByName[definition.Name.Text] = definition
+		}
+	}
+
 	names := map[string]struct{}{}
 
 	for idx := range tokens.Tokens {
 		name := tokens.Tokens[idx].Name
+
+		if _, ok := definitionsByName[name.Text]; ok {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: `Token "` + name.Text + `" conflicts with a definition of the same name.`,
+				Span:    name.Span,
+			})
+		}
 
 		if _, ok := names[name.Text]; ok {
 			diagnostics = append(diagnostics, Diagnostic{
@@ -36,16 +53,6 @@ func validateTokens(tokens ast.TokensSection, definitions ast.DefinitionsSection
 		}
 
 		names[name.Text] = struct{}{}
-	}
-
-	definitionsByName := map[string]ast.Definition{}
-
-	for idx := range definitions.Definitions {
-		definition := definitions.Definitions[idx]
-
-		if _, ok := definitionsByName[definition.Name.Text]; !ok {
-			definitionsByName[definition.Name.Text] = definition
-		}
 	}
 
 	for idx := range tokens.Tokens {

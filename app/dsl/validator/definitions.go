@@ -95,12 +95,6 @@ func validateDefinitionRecursion(definitions ast.DefinitionsSection, diagnostics
 		return diagnostics
 	}
 
-	if len(definitions.Definitions) == 1 {
-		definition := definitions.Definitions[0]
-
-		return validateDefinitionSelfReference(definition.Name.Text, definition.Expression, diagnostics)
-	}
-
 	definitionByName := map[string]ast.Definition{}
 
 	for idx := range definitions.Definitions {
@@ -115,28 +109,6 @@ func validateDefinitionRecursion(definitions ast.DefinitionsSection, diagnostics
 
 	for idx := range definitions.Definitions {
 		diagnostics = validateDefinitionCycle(definitions.Definitions[idx].Name.Text, definitionByName, states, diagnostics)
-	}
-
-	return diagnostics
-}
-
-func validateDefinitionSelfReference(name string, expression ast.DefinitionExpression, diagnostics []Diagnostic) []Diagnostic {
-	switch expression.Kind {
-	case ast.DefinitionExpressionReference:
-		if expression.Start.Text == name {
-			diagnostics = append(diagnostics, Diagnostic{
-				Message: `Definition "` + expression.Start.Text + `" is recursive.`,
-				Span:    expression.Start.Span,
-			})
-		}
-
-	case ast.DefinitionExpressionAlternation, ast.DefinitionExpressionConcatenation:
-		for idx := range expression.Terms {
-			diagnostics = validateDefinitionSelfReference(name, expression.Terms[idx], diagnostics)
-		}
-
-	case ast.DefinitionExpressionGroup, ast.DefinitionExpressionRepetition:
-		diagnostics = validateDefinitionSelfReference(name, *expression.Inner, diagnostics)
 	}
 
 	return diagnostics

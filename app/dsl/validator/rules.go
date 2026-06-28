@@ -3,7 +3,7 @@
 // == SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // =====================================================================================================================
 
-// Package validator validates parsed Spot DSL token.
+// Package validator validates parsed Spot DSL syntax.
 package validator
 
 import (
@@ -117,7 +117,7 @@ func validateRuleReferences(rule ast.Rule, tokens ast.TokensSection, diagnostics
 }
 
 func ruleHasMatch(rule ast.Rule) bool {
-	return rule.Match.Span.Start != rule.Match.Token.Span.Start
+	return rule.Match.Token.Kind == token.TokenIdentifier
 }
 
 func ruleHasReport(rule ast.Rule) bool {
