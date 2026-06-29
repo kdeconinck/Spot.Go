@@ -109,7 +109,7 @@ func Test_Token_Value(t *testing.T) {
 		inSource string
 		want     string
 	}{
-		"When the token spans the beginning of the source, the correct text is extracted.": {
+		"When the token spans the beginning of the source, the returned value is correct.": {
 			inToken: token.Token{
 				Span: location.Span{
 					Start: 0, End: 5,
@@ -118,7 +118,7 @@ func Test_Token_Value(t *testing.T) {
 			inSource: "scope { }",
 			want:     "scope",
 		},
-		"When the token spans the middle of the source, the correct text is extracted.": {
+		"When the token spans the middle of the source, the returned value is correct.": {
 			inToken: token.Token{
 				Span: location.Span{
 					Start: 8,
@@ -128,7 +128,7 @@ func Test_Token_Value(t *testing.T) {
 			inSource: "scope { include }",
 			want:     "include",
 		},
-		"When the token is a single character, the correct text is extracted.": {
+		"When the token is a single character, the returned value is correct.": {
 			inToken: token.Token{
 				Span: location.Span{
 					Start: 6, End: 7,
@@ -137,7 +137,7 @@ func Test_Token_Value(t *testing.T) {
 			inSource: "scope { }",
 			want:     "{",
 		},
-		"When the token span is empty (start equals end), an empty string is returned.": {
+		"When the token span is empty (start equals end), the returned value is correct.": {
 			inToken: token.Token{
 				Span: location.Span{
 					Start: 5, End: 5,
@@ -146,7 +146,7 @@ func Test_Token_Value(t *testing.T) {
 			inSource: "scope { }",
 			want:     "",
 		},
-		"When the token spans the end of the source, the correct text is extracted.": {
+		"When the token spans the end of the source, the returned value is correct.": {
 			inToken: token.Token{
 				Span: location.Span{
 					Start: 16, End: 25,
@@ -187,6 +187,14 @@ func Test_TokenKind_String(t *testing.T) {
 			inKind: token.TokenScope,
 			want:   "scope",
 		},
+		"When using an include token kind, the returned value is correct.": {
+			inKind: token.TokenInclude,
+			want:   "include",
+		},
+		"When using an exclude token kind, the returned value is correct.": {
+			inKind: token.TokenExclude,
+			want:   "exclude",
+		},
 		"When using a definitions token kind, the returned value is correct.": {
 			inKind: token.TokenDefinitions,
 			want:   "definitions",
@@ -195,13 +203,13 @@ func Test_TokenKind_String(t *testing.T) {
 			inKind: token.TokenTokens,
 			want:   "tokens",
 		},
-		"When using a rules token kind, the returned value is correct.": {
-			inKind: token.TokenRules,
-			want:   "rules",
-		},
 		"When using a skip token kind, the returned value is correct.": {
 			inKind: token.TokenSkip,
 			want:   "skip",
+		},
+		"When using a rules token kind, the returned value is correct.": {
+			inKind: token.TokenRules,
+			want:   "rules",
 		},
 		"When using a rule token kind, the returned value is correct.": {
 			inKind: token.TokenRule,
@@ -219,10 +227,6 @@ func Test_TokenKind_String(t *testing.T) {
 			inKind: token.TokenReport,
 			want:   "report",
 		},
-		"When using an at token kind, the returned value is correct.": {
-			inKind: token.TokenAt,
-			want:   "at",
-		},
 		"When using an info token kind, the returned value is correct.": {
 			inKind: token.TokenInfo,
 			want:   "info",
@@ -235,13 +239,25 @@ func Test_TokenKind_String(t *testing.T) {
 			inKind: token.TokenErr,
 			want:   "err",
 		},
-		"When using an include token kind, the returned value is correct.": {
-			inKind: token.TokenInclude,
-			want:   "include",
+		"When using an at token kind, the returned value is correct.": {
+			inKind: token.TokenAt,
+			want:   "at",
 		},
-		"When using an exclude token kind, the returned value is correct.": {
-			inKind: token.TokenExclude,
-			want:   "exclude",
+		"When using a string token kind, the returned value is correct.": {
+			inKind: token.TokenString,
+			want:   "string",
+		},
+		"When using an integer token kind, the returned value is correct.": {
+			inKind: token.TokenInteger,
+			want:   "integer",
+		},
+		"When using an identifier token kind, the returned value is correct.": {
+			inKind: token.TokenIdentifier,
+			want:   "identifier",
+		},
+		"When using a character token kind, the returned value is correct.": {
+			inKind: token.TokenCharacter,
+			want:   "character",
 		},
 		"When using a left-brace token kind, the returned value is correct.": {
 			inKind: token.TokenLeftBrace,
@@ -258,18 +274,6 @@ func Test_TokenKind_String(t *testing.T) {
 		"When using a right-parenthesis token kind, the returned value is correct.": {
 			inKind: token.TokenRightParen,
 			want:   ")",
-		},
-		"When using a string token kind, the returned value is correct.": {
-			inKind: token.TokenString,
-			want:   "string",
-		},
-		"When using an integer token kind, the returned value is correct.": {
-			inKind: token.TokenInteger,
-			want:   "integer",
-		},
-		"When using an identifier token kind, the returned value is correct.": {
-			inKind: token.TokenIdentifier,
-			want:   "identifier",
 		},
 		"When using an equal token kind, the returned value is correct.": {
 			inKind: token.TokenEqual,
@@ -323,10 +327,7 @@ func Test_TokenKind_String(t *testing.T) {
 			inKind: token.TokenPlus,
 			want:   "+",
 		},
-		"When using a character token kind, the returned value is correct.": {
-			inKind: token.TokenCharacter,
-			want:   "character",
-		},
+
 		"When using an unknown token kind, the returned value is correct.": {
 			inKind: token.TokenKind(255),
 			want:   "unknown",
