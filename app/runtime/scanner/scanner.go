@@ -50,6 +50,7 @@ type Diagnostic struct {
 func New(program ir.Program, src string) Scanner {
 	builder := machineBuilder{
 		tokens: make([]tokenDefinition, 0, len(program.Tokens)),
+		arena:  program.Expressions,
 	}
 
 	tokenStarts := make([]int, 0, len(program.Tokens))

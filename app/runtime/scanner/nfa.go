@@ -50,27 +50,36 @@ type fragment struct {
 type machineBuilder struct {
 	tokens []tokenDefinition
 	states []state
+	arena  ir.ExpressionArena
 }
 
-func (builder *machineBuilder) buildExpression(expression ir.Expression) fragment {
+func (builder *machineBuilder) buildExpression(expressionID ir.ExpressionID) fragment {
+	expression := builder.arena.Node(expressionID)
+
 	switch expression.Kind {
 	case ir.ExpressionCharacter:
 		return builder.buildByte(expression.Character)
 
 	case ir.ExpressionString:
-		return builder.buildString(expression.String)
+		return builder.buildString(builder.arena.String(expression.StringID))
 
 	case ir.ExpressionRange:
 		return builder.buildRange(expression.RangeStart, expression.RangeEnd)
 
+	case ir.ExpressionReference:
+		return builder.buildExpression(expression.Reference)
+
 	case ir.ExpressionConcatenation:
-		return builder.buildConcatenation(expression.Terms)
+		return builder.buildConcatenation(builder.arena.Children(expression))
 
 	case ir.ExpressionAlternation:
-		return builder.buildAlternation(expression.Terms)
+		return builder.buildAlternation(builder.arena.Children(expression))
+
+	case ir.ExpressionGroup:
+		return builder.buildExpression(builder.arena.Children(expression)[0])
 
 	default:
-		return builder.buildRepetition(*expression.Inner, expression.Repetition)
+		return builder.buildRepetition(builder.arena.Children(expression)[0], expression.Repetition)
 	}
 }
 
@@ -117,7 +126,7 @@ func (builder *machineBuilder) buildRange(start, end byte) fragment {
 	return fragment{start: initial, end: terminal}
 }
 
-func (builder *machineBuilder) buildConcatenation(terms []ir.Expression) fragment {
+func (builder *machineBuilder) buildConcatenation(terms []ir.ExpressionID) fragment {
 	combined := builder.buildExpression(terms[0])
 
 	for idx := 1; idx < len(terms); idx++ {
@@ -138,7 +147,7 @@ func (builder *machineBuilder) concatenate(left, right fragment) fragment {
 	}
 }
 
-func (builder *machineBuilder) buildAlternation(terms []ir.Expression) fragment {
+func (builder *machineBuilder) buildAlternation(terms []ir.ExpressionID) fragment {
 	combined := builder.buildExpression(terms[0])
 
 	for idx := 1; idx < len(terms); idx++ {
@@ -168,7 +177,7 @@ func (builder *machineBuilder) alternate(left, right fragment) fragment {
 	return fragment{start: start, end: end}
 }
 
-func (builder *machineBuilder) buildRepetition(inner ir.Expression, repetition ir.RepetitionKind) fragment {
+func (builder *machineBuilder) buildRepetition(inner ir.ExpressionID, repetition ir.RepetitionKind) fragment {
 	switch repetition {
 	case ir.RepetitionZeroOrOne:
 		return builder.buildZeroOrOne(inner)
@@ -181,7 +190,7 @@ func (builder *machineBuilder) buildRepetition(inner ir.Expression, repetition i
 	}
 }
 
-func (builder *machineBuilder) buildZeroOrOne(inner ir.Expression) fragment {
+func (builder *machineBuilder) buildZeroOrOne(inner ir.ExpressionID) fragment {
 	innerFragment := builder.buildExpression(inner)
 	end := builder.newState(state{
 		kind: stateEpsilon,
@@ -199,7 +208,7 @@ func (builder *machineBuilder) buildZeroOrOne(inner ir.Expression) fragment {
 	return fragment{start: start, end: end}
 }
 
-func (builder *machineBuilder) buildZeroOrMore(inner ir.Expression) fragment {
+func (builder *machineBuilder) buildZeroOrMore(inner ir.ExpressionID) fragment {
 	innerFragment := builder.buildExpression(inner)
 	end := builder.newState(state{
 		kind: stateEpsilon,
@@ -222,7 +231,7 @@ func (builder *machineBuilder) buildZeroOrMore(inner ir.Expression) fragment {
 	return fragment{start: start, end: end}
 }
 
-func (builder *machineBuilder) buildOneOrMore(inner ir.Expression) fragment {
+func (builder *machineBuilder) buildOneOrMore(inner ir.ExpressionID) fragment {
 	innerFragment := builder.buildExpression(inner)
 	end := builder.newState(state{
 		kind: stateEpsilon,

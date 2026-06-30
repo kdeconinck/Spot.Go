@@ -11,6 +11,9 @@ type Program struct {
 	// Tokens are the compiled token definitions in source order.
 	Tokens []Token
 
+	// Expressions stores compiled token and definition expressions in flat slices.
+	Expressions ExpressionArena
+
 	// Rules are the compiled rule definitions in source order.
 	Rules []Rule
 }
@@ -20,8 +23,8 @@ type Token struct {
 	// Name is the emitted token name.
 	Name string
 
-	// Expression is the compiled token expression.
-	Expression Expression
+	// Expression is the root compiled token expression.
+	Expression ExpressionID
 
 	// Skip reports whether matches for this token should be emitted.
 	Skip bool
@@ -40,11 +43,17 @@ const (
 	// ExpressionRange is a single character range match.
 	ExpressionRange
 
+	// ExpressionReference is a reference to a compiled definition expression.
+	ExpressionReference
+
 	// ExpressionConcatenation is a sequence of expressions.
 	ExpressionConcatenation
 
 	// ExpressionAlternation is a list of alternative expressions.
 	ExpressionAlternation
+
+	// ExpressionGroup is a parenthesized expression.
+	ExpressionGroup
 
 	// ExpressionRepetition is a repeated expression.
 	ExpressionRepetition
@@ -64,16 +73,47 @@ const (
 	RepetitionOneOrMore
 )
 
-// Expression is a compiled token expression.
-type Expression struct {
+// ExpressionID identifies a node in an ExpressionArena.
+type ExpressionID uint32
+
+// ExpressionArena stores compiled token expressions in flat slices.
+//
+// Nodes contains the actual expression records. ChildIDs stores the adjacency data for nodes that have children,
+// such as alternations, concatenations, and repetitions. A node's FirstElementIdx and AmountOfElements describe which
+// segment of ChildIDs belongs to that node.
+type ExpressionArena struct {
+	// Nodes contains every compiled expression node referenced by the program.
+	Nodes []ExpressionNode
+
+	// ChildIDs stores child node identifiers for branch nodes.
+	ChildIDs []ExpressionID
+
+	// Strings stores exact string literals used by compiled string expressions.
+	Strings []string
+}
+
+// Node returns the expression node identified by id.
+func (arena ExpressionArena) Node(id ExpressionID) ExpressionNode {
+	return arena.Nodes[id]
+}
+
+// Children returns the child expression identifiers for node.
+func (arena ExpressionArena) Children(node ExpressionNode) []ExpressionID {
+	return arena.ChildIDs[node.FirstElementIdx : node.FirstElementIdx+node.AmountOfElements]
+}
+
+// String returns the string literal identified by id.
+func (arena ExpressionArena) String(id uint32) string {
+	return arena.Strings[id]
+}
+
+// ExpressionNode is one compiled token expression node.
+type ExpressionNode struct {
 	// Kind identifies the form of expression.
 	Kind ExpressionKind
 
 	// Character is the matched byte in a character expression.
 	Character byte
-
-	// String is the matched text in a string expression.
-	String string
 
 	// RangeStart is the inclusive start of a range expression.
 	RangeStart byte
@@ -81,11 +121,17 @@ type Expression struct {
 	// RangeEnd is the inclusive end of a range expression.
 	RangeEnd byte
 
-	// Terms are the child expressions in a concatenation or alternation expression.
-	Terms []Expression
+	// Reference identifies the target definition root in a reference expression.
+	Reference ExpressionID
 
-	// Inner is the repeated expression in a repetition expression.
-	Inner *Expression
+	// StringID identifies the exact string literal in a string expression.
+	StringID uint32
+
+	// FirstElementIdx is the start offset of this node's children in ChildIDs.
+	FirstElementIdx uint32
+
+	// AmountOfElements is the number of children stored for this node.
+	AmountOfElements uint32
 
 	// Repetition identifies the repetition operator.
 	Repetition RepetitionKind

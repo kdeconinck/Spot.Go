@@ -19,143 +19,127 @@ import (
 	"github.com/kdeconinck/spot/dsl/resolver"
 	"github.com/kdeconinck/spot/dsl/validator"
 	"github.com/kdeconinck/spot/qa/claim"
-	"github.com/kdeconinck/spot/runtime/ir"
 )
 
-func Test_Compile_Tokens_PreservesSourceOrder(t *testing.T) {
+func Test_Compile_Tokens(t *testing.T) {
 	t.Parallel()
 
-	// Arrange.
-	source := `scope { include "**/*.go" } tokens { First = "a" Second = "b" Third = "c" }`
-	document, parseErr := parser.Parse(source)
-	resolution := resolver.Resolve(source, document)
-	validationDiagnostics := validator.Validate(source, resolution)
-	wantProgram := ir.Program{
-		Tokens: []ir.Token{
-			{Name: "First", Expression: ir.Expression{Kind: ir.ExpressionString, String: "a"}},
-			{Name: "Second", Expression: ir.Expression{Kind: ir.ExpressionString, String: "b"}},
-			{Name: "Third", Expression: ir.Expression{Kind: ir.ExpressionString, String: "c"}},
-		},
-		Rules: []ir.Rule{},
-	}
-
-	// Act.
-	gotProgram := compiler.Compile(source, resolution)
-
-	// Assert.
-	claim.Equal(t, "When compiling tokens, no parse error is returned.", error(nil), parseErr, "Parse Error")
-	claim.Equal(t, "When compiling tokens, validation diagnostics are not returned.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
-	claim.DeepEqual(t, "When compiling tokens, source order is preserved.", wantProgram, gotProgram, "Program")
-}
-
-func Test_Compile_Tokens_ResolvesDefinitionReferences(t *testing.T) {
-	t.Parallel()
-
-	// Arrange.
-	source := `scope { include "**/*.go" } definitions { letter = 'a'..'z' identifier = letter (letter | '_')* } tokens { Identifier = identifier }`
-	document, parseErr := parser.Parse(source)
-	resolution := resolver.Resolve(source, document)
-	validationDiagnostics := validator.Validate(source, resolution)
-	wantProgram := ir.Program{
-		Tokens: []ir.Token{
-			{
-				Name: "Identifier",
-				Expression: ir.Expression{
-					Kind: ir.ExpressionConcatenation,
-					Terms: []ir.Expression{
-						{Kind: ir.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
-						{
-							Kind: ir.ExpressionRepetition,
-							Inner: pointer(ir.Expression{
-								Kind: ir.ExpressionAlternation,
-								Terms: []ir.Expression{
-									{Kind: ir.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
-									{Kind: ir.ExpressionCharacter, Character: '_'},
-								},
-							}),
-							Repetition: ir.RepetitionZeroOrMore,
-						},
-					},
-				},
-			},
-		},
-		Rules: []ir.Rule{},
-	}
-
-	// Act.
-	gotProgram := compiler.Compile(source, resolution)
-
-	// Assert.
-	claim.Equal(t, "When compiling tokens with definition references, no parse error is returned.", error(nil), parseErr, "Parse Error")
-	claim.Equal(t, "When compiling tokens with definition references, validation diagnostics are not returned.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
-	claim.DeepEqual(t, "When compiling tokens with definition references, expressions are resolved.", wantProgram, gotProgram, "Program")
-}
-
-func Test_Compile_Tokens_UnescapesLiterals(t *testing.T) {
-	t.Parallel()
-
-	// Arrange.
-	source := "scope { include \"**/*.go\" } tokens { Newline = '\\n' Text = \"a\\tb\\n\\\"c\\\\\" }"
-	document, parseErr := parser.Parse(source)
-	resolution := resolver.Resolve(source, document)
-	validationDiagnostics := validator.Validate(source, resolution)
-	wantProgram := ir.Program{
-		Tokens: []ir.Token{
-			{Name: "Newline", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\n'}},
-			{Name: "Text", Expression: ir.Expression{Kind: ir.ExpressionString, String: "a\tb\n\"c\\"}},
-		},
-		Rules: []ir.Rule{},
-	}
-
-	// Act.
-	gotProgram := compiler.Compile(source, resolution)
-
-	// Assert.
-	claim.Equal(t, "When compiling literal tokens, no parse error is returned.", error(nil), parseErr, "Parse Error")
-	claim.Equal(t, "When compiling literal tokens, validation diagnostics are not returned.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
-	claim.DeepEqual(t, "When compiling literal tokens, escape sequences are unescaped.", wantProgram, gotProgram, "Program")
-}
-
-func Test_Compile_Tokens_UnescapesCharacterEscapes(t *testing.T) {
-	t.Parallel()
-
-	for _, tc := range []struct {
-		name        string
+	for tcName, tc := range map[string]struct {
 		inSource    string
-		wantProgram ir.Program
+		wantProgram string
 	}{
-		{
-			name:     "When compiling a backslash character literal, the literal is unescaped.",
+		"When compiling tokens, source order is preserved.": {
+			inSource: `scope { include "**/*.go" } tokens { First = "a" Second = "b" Third = "c" }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token First
+				      String "a"
+				    Token Second
+				      String "b"
+				    Token Third
+				      String "c"
+				  Rules
+			`),
+		},
+		"When compiling tokens with definition references, expressions are resolved.": {
+			inSource: `scope { include "**/*.go" } definitions { letter = 'a'..'z' identifier = letter (letter | '_')* } tokens { Identifier = identifier }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      Concatenation
+				        Range 'a' 'z'
+				        Repetition *
+				          Alternation
+				            Range 'a' 'z'
+				            Character '_'
+				  Rules
+			`),
+		},
+		"When compiling literal tokens, escape sequences are unescaped.": {
+			inSource: "scope { include \"**/*.go\" } tokens { Newline = '\\n' Text = \"a\\tb\\n\\\"c\\\\\" }",
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Newline
+				      Character '\n'
+				    Token Text
+				      String "a\tb\n\"c\\"
+				  Rules
+			`),
+		},
+		"When compiling a backslash character literal, the literal is unescaped.": {
 			inSource: `scope { include "**/*.go" } tokens { Backslash = '\\' }`,
-			wantProgram: ir.Program{
-				Tokens: []ir.Token{
-					{Name: "Backslash", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\\'}},
-				},
-				Rules: []ir.Rule{},
-			},
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Backslash
+				      Character '\\'
+				  Rules
+			`),
 		},
-		{
-			name:     "When compiling a single quote character literal, the literal is unescaped.",
+		"When compiling a single quote character literal, the literal is unescaped.": {
 			inSource: `scope { include "**/*.go" } tokens { Quote = '\'' }`,
-			wantProgram: ir.Program{
-				Tokens: []ir.Token{
-					{Name: "Quote", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\''}},
-				},
-				Rules: []ir.Rule{},
-			},
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Quote
+				      Character '\''
+				  Rules
+			`),
 		},
-		{
-			name:     "When compiling a carriage return character literal, the literal is unescaped.",
+		"When compiling a carriage return character literal, the literal is unescaped.": {
 			inSource: `scope { include "**/*.go" } tokens { CarriageReturn = '\r' }`,
-			wantProgram: ir.Program{
-				Tokens: []ir.Token{
-					{Name: "CarriageReturn", Expression: ir.Expression{Kind: ir.ExpressionCharacter, Character: '\r'}},
-				},
-				Rules: []ir.Rule{},
-			},
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token CarriageReturn
+				      Character '\r'
+				  Rules
+			`),
+		},
+		"When compiling a string literal with backslash, quote, and carriage return escapes, the literal is unescaped.": {
+			inSource: `scope { include "**/*.go" } tokens { Escapes = "\\\"\r" }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Escapes
+				      String "\\\"\r"
+				  Rules
+			`),
+		},
+		"When compiling skipped tokens, skip flags are preserved.": {
+			inSource: `scope { include "**/*.go" } definitions { whitespace = ' ' | '\t' } tokens { Whitespace = whitespace+ skip Identifier = "id" }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Whitespace
+				      Repetition +
+				        Alternation
+				          Character ' '
+				          Character '\t'
+				      Skip
+				    Token Identifier
+				      String "id"
+				  Rules
+			`),
+		},
+		"When compiling a token with zero-or-one repetition inside a concatenation, the repetition kind is preserved.": {
+			inSource: `scope { include "**/*.go" } tokens { Optional = "a"? "b" }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Optional
+				      Concatenation
+				        Repetition ?
+				          String "a"
+				        String "b"
+				  Rules
+			`),
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()
 
 			// Arrange.
@@ -167,111 +151,11 @@ func Test_Compile_Tokens_UnescapesCharacterEscapes(t *testing.T) {
 			gotProgram := compiler.Compile(tc.inSource, resolution)
 
 			// Assert.
-			claim.Equal(t, tc.name, error(nil), parseErr, "Parse Error")
-			claim.Equal(t, tc.name, 0, len(validationDiagnostics), "Validation Diagnostic Count")
-			claim.DeepEqual(t, tc.name, tc.wantProgram, gotProgram, "Program")
+			claim.Equal(t, tcName, error(nil), parseErr, "Parse Error")
+			claim.Equal(t, tcName, 0, len(validationDiagnostics), "Validation Diagnostic Count")
+			claim.Equal(t, tcName, tc.wantProgram, renderProgram(gotProgram), "Program")
 		})
 	}
-}
-
-func Test_Compile_Tokens_UnescapesStringEscapes(t *testing.T) {
-	t.Parallel()
-
-	// Arrange.
-	source := `scope { include "**/*.go" } tokens { Escapes = "\\\"\r" }`
-	document, parseErr := parser.Parse(source)
-	resolution := resolver.Resolve(source, document)
-	validationDiagnostics := validator.Validate(source, resolution)
-	wantProgram := ir.Program{
-		Tokens: []ir.Token{
-			{Name: "Escapes", Expression: ir.Expression{Kind: ir.ExpressionString, String: "\\\"\r"}},
-		},
-		Rules: []ir.Rule{},
-	}
-
-	// Act.
-	gotProgram := compiler.Compile(source, resolution)
-
-	// Assert.
-	claim.Equal(t, "When compiling a string literal with backslash, quote, and carriage return escapes, no parse error is returned.", error(nil), parseErr, "Parse Error")
-	claim.Equal(t, "When compiling a string literal with backslash, quote, and carriage return escapes, the literal is unescaped.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
-	claim.DeepEqual(t, "When compiling a string literal with backslash, quote, and carriage return escapes, the literal is unescaped.", wantProgram, gotProgram, "Program")
-}
-
-func Test_Compile_Tokens_PreservesSkipFlags(t *testing.T) {
-	t.Parallel()
-
-	// Arrange.
-	source := `scope { include "**/*.go" } definitions { whitespace = ' ' | '\t' } tokens { Whitespace = whitespace+ skip Identifier = "id" }`
-	document, parseErr := parser.Parse(source)
-	resolution := resolver.Resolve(source, document)
-	validationDiagnostics := validator.Validate(source, resolution)
-	wantProgram := ir.Program{
-		Tokens: []ir.Token{
-			{
-				Name: "Whitespace",
-				Expression: ir.Expression{
-					Kind: ir.ExpressionRepetition,
-					Inner: pointer(ir.Expression{
-						Kind: ir.ExpressionAlternation,
-						Terms: []ir.Expression{
-							{Kind: ir.ExpressionCharacter, Character: ' '},
-							{Kind: ir.ExpressionCharacter, Character: '\t'},
-						},
-					}),
-					Repetition: ir.RepetitionOneOrMore,
-				},
-				Skip: true,
-			},
-			{Name: "Identifier", Expression: ir.Expression{Kind: ir.ExpressionString, String: "id"}},
-		},
-		Rules: []ir.Rule{},
-	}
-
-	// Act.
-	gotProgram := compiler.Compile(source, resolution)
-
-	// Assert.
-	claim.Equal(t, "When compiling skipped tokens, no parse error is returned.", error(nil), parseErr, "Parse Error")
-	claim.Equal(t, "When compiling skipped tokens, validation diagnostics are not returned.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
-	claim.DeepEqual(t, "When compiling skipped tokens, skip flags are preserved.", wantProgram, gotProgram, "Program")
-}
-
-func Test_Compile_Tokens_PreservesZeroOrOneRepetition(t *testing.T) {
-	t.Parallel()
-
-	// Arrange.
-	source := `scope { include "**/*.go" } tokens { Optional = "a"? "b" }`
-	document, parseErr := parser.Parse(source)
-	resolution := resolver.Resolve(source, document)
-	validationDiagnostics := validator.Validate(source, resolution)
-	wantProgram := ir.Program{
-		Tokens: []ir.Token{
-			{
-				Name: "Optional",
-				Expression: ir.Expression{
-					Kind: ir.ExpressionConcatenation,
-					Terms: []ir.Expression{
-						{
-							Kind:       ir.ExpressionRepetition,
-							Inner:      pointer(ir.Expression{Kind: ir.ExpressionString, String: "a"}),
-							Repetition: ir.RepetitionZeroOrOne,
-						},
-						{Kind: ir.ExpressionString, String: "b"},
-					},
-				},
-			},
-		},
-		Rules: []ir.Rule{},
-	}
-
-	// Act.
-	gotProgram := compiler.Compile(source, resolution)
-
-	// Assert.
-	claim.Equal(t, "When compiling a token with zero-or-one repetition, no parse error is returned.", error(nil), parseErr, "Parse Error")
-	claim.Equal(t, "When compiling a token with zero-or-one repetition inside a concatenation, validation diagnostics are not returned.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
-	claim.DeepEqual(t, "When compiling a token with zero-or-one repetition inside a concatenation, the repetition kind is preserved.", wantProgram, gotProgram, "Program")
 }
 
 func Benchmark_Compile_Tokens_0(b *testing.B)    { benchmark_Compile_Tokens(b, 0) }
@@ -324,8 +208,4 @@ func tokensDSL(size int) string {
 	sb.WriteString("}")
 
 	return sb.String()
-}
-
-func pointer(expression ir.Expression) *ir.Expression {
-	return &expression
 }

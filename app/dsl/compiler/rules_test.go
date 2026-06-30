@@ -17,181 +17,97 @@ import (
 	"github.com/kdeconinck/spot/dsl/resolver"
 	"github.com/kdeconinck/spot/dsl/validator"
 	"github.com/kdeconinck/spot/qa/claim"
-	"github.com/kdeconinck/spot/runtime/ir"
 )
 
-func Test_Compile_Rules_PreservesSourceOrder(t *testing.T) {
+func Test_Compile_Rules(t *testing.T) {
 	t.Parallel()
 
-	// Arrange.
-	source := `scope { include "**/*.go" } tokens { Identifier = "id" Number = ('0'..'9')+ } rules {
+	for tcName, tc := range map[string]struct {
+		inSource    string
+		wantProgram string
+	}{
+		"When compiling rules, source order is preserved.": {
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" Number = ('0'..'9')+ } rules {
 		rule First { match Identifier report info at Identifier "first" }
 		rule Second { match Number where Number.length >= 2 report err at Number "second" }
-	}`
-	document, parseErr := parser.Parse(source)
-	resolution := resolver.Resolve(source, document)
-	validationDiagnostics := validator.Validate(source, resolution)
-	wantProgram := ir.Program{
-		Tokens: []ir.Token{
-			{Name: "Identifier", Expression: ir.Expression{Kind: ir.ExpressionString, String: "id"}},
-			{
-				Name: "Number",
-				Expression: ir.Expression{
-					Kind:       ir.ExpressionRepetition,
-					Inner:      pointer(ir.Expression{Kind: ir.ExpressionRange, RangeStart: '0', RangeEnd: '9'}),
-					Repetition: ir.RepetitionOneOrMore,
-				},
-			},
+	}`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				    Token Number
+				      Repetition +
+				        Range '0' '9'
+				  Rules
+				    Rule First
+				      MatchToken 0
+				      Where none
+				      Report info at 0 "first"
+				    Rule Second
+				      MatchToken 1
+				      Where length >= 2
+				      Report err at 1 "second"
+			`),
 		},
-		Rules: []ir.Rule{
-			{
-				Name:       "First",
-				MatchToken: 0,
-				Where: ir.Condition{
-					Property: ir.ConditionPropertyNone,
-				},
-				Report: ir.Report{
-					Severity:    ir.SeverityInfo,
-					TargetToken: 0,
-					Message:     "first",
-				},
-			},
-			{
-				Name:       "Second",
-				MatchToken: 1,
-				Where: ir.Condition{
-					Property: ir.ConditionPropertyLength,
-					Operator: ir.ConditionOperatorGreaterEqual,
-					Integer:  2,
-				},
-				Report: ir.Report{
-					Severity:    ir.SeverityErr,
-					TargetToken: 1,
-					Message:     "second",
-				},
-			},
-		},
-	}
-
-	// Act.
-	gotProgram := compiler.Compile(source, resolution)
-
-	// Assert.
-	claim.Equal(t, "When compiling rules, no parse error is returned.", error(nil), parseErr, "Parse Error")
-	claim.Equal(t, "When compiling rules, validation diagnostics are not returned.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
-	claim.DeepEqual(t, "When compiling rules, source order is preserved.", wantProgram, gotProgram, "Program")
-}
-
-func Test_Compile_Rules_CompilesConditionOperators(t *testing.T) {
-	t.Parallel()
-
-	for _, tc := range []struct {
-		name        string
-		inSource    string
-		wantProgram ir.Program
-	}{
-		{
-			name:     "When compiling a text inequality rule, the text condition is compiled.",
+		"When compiling a text inequality rule, the text condition is compiled.": {
 			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule NotPublic { match Identifier where Identifier.text != "public" report warn at Identifier "message" } }`,
-			wantProgram: ir.Program{
-				Tokens: []ir.Token{
-					{Name: "Identifier", Expression: ir.Expression{Kind: ir.ExpressionString, String: "id"}},
-				},
-				Rules: []ir.Rule{
-					{
-						Name:       "NotPublic",
-						MatchToken: 0,
-						Where: ir.Condition{
-							Property: ir.ConditionPropertyText,
-							Operator: ir.ConditionOperatorNotEqual,
-							String:   "public",
-						},
-						Report: ir.Report{
-							Severity:    ir.SeverityWarn,
-							TargetToken: 0,
-							Message:     "message",
-						},
-					},
-				},
-			},
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				  Rules
+				    Rule NotPublic
+				      MatchToken 0
+				      Where text != "public"
+				      Report warn at 0 "message"
+			`),
 		},
-		{
-			name:     "When compiling a length less-than rule, the numeric condition is compiled.",
+		"When compiling a length less-than rule, the numeric condition is compiled.": {
 			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule Short { match Identifier where Identifier.length < 10 report warn at Identifier "message" } }`,
-			wantProgram: ir.Program{
-				Tokens: []ir.Token{
-					{Name: "Identifier", Expression: ir.Expression{Kind: ir.ExpressionString, String: "id"}},
-				},
-				Rules: []ir.Rule{
-					{
-						Name:       "Short",
-						MatchToken: 0,
-						Where: ir.Condition{
-							Property: ir.ConditionPropertyLength,
-							Operator: ir.ConditionOperatorLess,
-							Integer:  10,
-						},
-						Report: ir.Report{
-							Severity:    ir.SeverityWarn,
-							TargetToken: 0,
-							Message:     "message",
-						},
-					},
-				},
-			},
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				  Rules
+				    Rule Short
+				      MatchToken 0
+				      Where length < 10
+				      Report warn at 0 "message"
+			`),
 		},
-		{
-			name:     "When compiling a length less-than-or-equal rule, the numeric condition is compiled.",
+		"When compiling a length less-than-or-equal rule, the numeric condition is compiled.": {
 			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule ShortOrEqual { match Identifier where Identifier.length <= 10 report warn at Identifier "message" } }`,
-			wantProgram: ir.Program{
-				Tokens: []ir.Token{
-					{Name: "Identifier", Expression: ir.Expression{Kind: ir.ExpressionString, String: "id"}},
-				},
-				Rules: []ir.Rule{
-					{
-						Name:       "ShortOrEqual",
-						MatchToken: 0,
-						Where: ir.Condition{
-							Property: ir.ConditionPropertyLength,
-							Operator: ir.ConditionOperatorLessEqual,
-							Integer:  10,
-						},
-						Report: ir.Report{
-							Severity:    ir.SeverityWarn,
-							TargetToken: 0,
-							Message:     "message",
-						},
-					},
-				},
-			},
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				  Rules
+				    Rule ShortOrEqual
+				      MatchToken 0
+				      Where length <= 10
+				      Report warn at 0 "message"
+			`),
 		},
-		{
-			name:     "When compiling a length greater-than rule, the numeric condition is compiled.",
+		"When compiling a length greater-than rule, the numeric condition is compiled.": {
 			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule Long { match Identifier where Identifier.length > 10 report warn at Identifier "message" } }`,
-			wantProgram: ir.Program{
-				Tokens: []ir.Token{
-					{Name: "Identifier", Expression: ir.Expression{Kind: ir.ExpressionString, String: "id"}},
-				},
-				Rules: []ir.Rule{
-					{
-						Name:       "Long",
-						MatchToken: 0,
-						Where: ir.Condition{
-							Property: ir.ConditionPropertyLength,
-							Operator: ir.ConditionOperatorGreater,
-							Integer:  10,
-						},
-						Report: ir.Report{
-							Severity:    ir.SeverityWarn,
-							TargetToken: 0,
-							Message:     "message",
-						},
-					},
-				},
-			},
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				  Rules
+				    Rule Long
+				      MatchToken 0
+				      Where length > 10
+				      Report warn at 0 "message"
+			`),
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()
 
 			// Arrange.
@@ -203,9 +119,9 @@ func Test_Compile_Rules_CompilesConditionOperators(t *testing.T) {
 			gotProgram := compiler.Compile(tc.inSource, resolution)
 
 			// Assert.
-			claim.Equal(t, tc.name, error(nil), parseErr, "Parse Error")
-			claim.Equal(t, tc.name, 0, len(validationDiagnostics), "Validation Diagnostic Count")
-			claim.DeepEqual(t, tc.name, tc.wantProgram, gotProgram, "Program")
+			claim.Equal(t, tcName, error(nil), parseErr, "Parse Error")
+			claim.Equal(t, tcName, 0, len(validationDiagnostics), "Validation Diagnostic Count")
+			claim.Equal(t, tcName, tc.wantProgram, renderProgram(gotProgram), "Program")
 		})
 	}
 }

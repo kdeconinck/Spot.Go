@@ -17,18 +17,27 @@ import (
 
 // Compile compiles validated resolved Spot DSL syntax into a runtime program.
 func Compile(source string, resolution resolver.Resolution) ir.Program {
+	expressions := resolution.Document.Expressions
 	tokenList := resolution.Tokens
 	ruleList := resolution.Rules
 	program := ir.Program{
 		Tokens: make([]ir.Token, 0, len(tokenList)),
-		Rules:  make([]ir.Rule, 0, len(ruleList)),
+		Expressions: ir.ExpressionArena{
+			Nodes:    make([]ir.ExpressionNode, len(expressions.Nodes)),
+			ChildIDs: make([]ir.ExpressionID, len(expressions.ChildIDs)),
+			Strings:  make([]string, 0, countStringExpressions(expressions)),
+		},
+		Rules: make([]ir.Rule, 0, len(ruleList)),
 	}
+
+	copy(program.Expressions.ChildIDs, reinterpretExpressionChildren(expressions.ChildIDs))
+	compileExpressionArena(source, resolution, &program.Expressions)
 
 	for idx := range tokenList {
 		tok := tokenList[idx]
 		program.Tokens = append(program.Tokens, ir.Token{
 			Name:       tok.Name.Value(source),
-			Expression: compileExpression(source, tok.Expression, resolution),
+			Expression: ir.ExpressionID(tok.Expression),
 			Skip:       tok.Skip.Kind == token.TokenSkip,
 		})
 	}
@@ -84,67 +93,74 @@ func compileReport(source string, report ast.RuleReport, resolution resolver.Res
 	}
 }
 
-func compileExpression(source string, expressionID ast.DefinitionExpressionID, resolution resolver.Resolution) ir.Expression {
+func compileExpressionArena(source string, resolution resolver.Resolution, arena *ir.ExpressionArena) {
 	expressions := resolution.Document.Expressions
-	expression := expressions.Node(expressionID)
 
-	switch expression.Kind {
-	case ast.DefinitionExpressionCharacter:
-		return ir.Expression{
-			Kind:      ir.ExpressionCharacter,
-			Character: characterValue(source, expression.Start),
+	for idx := range expressions.Nodes {
+		expression := expressions.Nodes[idx]
+		node := ir.ExpressionNode{
+			FirstElementIdx:  expression.FirstElementIdx,
+			AmountOfElements: expression.AmountOfElements,
 		}
 
-	case ast.DefinitionExpressionString:
-		return ir.Expression{
-			Kind:   ir.ExpressionString,
-			String: stringValue(source, expression.Start),
+		switch expression.Kind {
+		case ast.DefinitionExpressionCharacter:
+			node.Kind = ir.ExpressionCharacter
+			node.Character = characterValue(source, expression.Start)
+
+		case ast.DefinitionExpressionString:
+			node.Kind = ir.ExpressionString
+			node.StringID = uint32(len(arena.Strings))
+			arena.Strings = append(arena.Strings, stringValue(source, expression.Start))
+
+		case ast.DefinitionExpressionRange:
+			node.Kind = ir.ExpressionRange
+			node.RangeStart = characterValue(source, expression.Start)
+			node.RangeEnd = characterValue(source, expression.End)
+
+		case ast.DefinitionExpressionReference:
+			definitionIndex, _ := resolution.DefinitionIndex(expression.Start.Value(source))
+			node.Kind = ir.ExpressionReference
+			node.Reference = ir.ExpressionID(resolution.Definitions[definitionIndex].Expression)
+
+		case ast.DefinitionExpressionConcatenation:
+			node.Kind = ir.ExpressionConcatenation
+
+		case ast.DefinitionExpressionAlternation:
+			node.Kind = ir.ExpressionAlternation
+
+		case ast.DefinitionExpressionGroup:
+			node.Kind = ir.ExpressionGroup
+
+		default:
+			node.Kind = ir.ExpressionRepetition
+			node.Repetition = repetitionKind(expression.Operator.Kind)
 		}
 
-	case ast.DefinitionExpressionRange:
-		return ir.Expression{
-			Kind:       ir.ExpressionRange,
-			RangeStart: characterValue(source, expression.Start),
-			RangeEnd:   characterValue(source, expression.End),
-		}
-
-	case ast.DefinitionExpressionReference:
-		definitionIndex, _ := resolution.DefinitionIndex(expression.Start.Value(source))
-
-		return compileExpression(source, resolution.Definitions[definitionIndex].Expression, resolution)
-
-	case ast.DefinitionExpressionConcatenation:
-		return ir.Expression{
-			Kind:  ir.ExpressionConcatenation,
-			Terms: compileTerms(source, expressions.Children(expression), resolution),
-		}
-
-	case ast.DefinitionExpressionAlternation:
-		return ir.Expression{
-			Kind:  ir.ExpressionAlternation,
-			Terms: compileTerms(source, expressions.Children(expression), resolution),
-		}
-
-	case ast.DefinitionExpressionGroup:
-		return compileExpression(source, expressions.Children(expression)[0], resolution)
-
-	default:
-		return ir.Expression{
-			Kind:       ir.ExpressionRepetition,
-			Inner:      pointer(compileExpression(source, expressions.Children(expression)[0], resolution)),
-			Repetition: repetitionKind(expression.Operator.Kind),
-		}
+		arena.Nodes[idx] = node
 	}
 }
 
-func compileTerms(source string, expressionIDs []ast.DefinitionExpressionID, resolution resolver.Resolution) []ir.Expression {
-	terms := make([]ir.Expression, 0, len(expressionIDs))
+func reinterpretExpressionChildren(children []ast.DefinitionExpressionID) []ir.ExpressionID {
+	compiled := make([]ir.ExpressionID, len(children))
 
-	for idx := range expressionIDs {
-		terms = append(terms, compileExpression(source, expressionIDs[idx], resolution))
+	for idx := range children {
+		compiled[idx] = ir.ExpressionID(children[idx])
 	}
 
-	return terms
+	return compiled
+}
+
+func countStringExpressions(expressions ast.DefinitionExpressionArena) int {
+	count := 0
+
+	for idx := range expressions.Nodes {
+		if expressions.Nodes[idx].Kind == ast.DefinitionExpressionString {
+			count++
+		}
+	}
+
+	return count
 }
 
 func repetitionKind(kind token.TokenKind) ir.RepetitionKind {
@@ -264,8 +280,4 @@ func integerValue(source string, token token.Token) int {
 	value, _ := strconv.Atoi(token.Value(source))
 
 	return value
-}
-
-func pointer(expression ir.Expression) *ir.Expression {
-	return &expression
 }

@@ -25,91 +25,60 @@ import (
 func Test_Compile_DSL(t *testing.T) {
 	t.Parallel()
 
-	// Arrange.
-	source := dsl(0)
-	document, parseErr := parser.Parse(source)
-	resolution := resolver.Resolve(source, document)
-	validationDiagnostics := validator.Validate(source, resolution)
-	wantProgram := ir.Program{
-		Tokens: []ir.Token{
-			{
-				Name: "Identifier",
-				Expression: ir.Expression{
-					Kind: ir.ExpressionConcatenation,
-					Terms: []ir.Expression{
-						{
-							Kind: ir.ExpressionAlternation,
-							Terms: []ir.Expression{
-								{Kind: ir.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
-								{Kind: ir.ExpressionRange, RangeStart: 'A', RangeEnd: 'Z'},
-							},
-						},
-						{
-							Kind: ir.ExpressionRepetition,
-							Inner: pointer(ir.Expression{
-								Kind: ir.ExpressionAlternation,
-								Terms: []ir.Expression{
-									{
-										Kind: ir.ExpressionAlternation,
-										Terms: []ir.Expression{
-											{Kind: ir.ExpressionRange, RangeStart: 'a', RangeEnd: 'z'},
-											{Kind: ir.ExpressionRange, RangeStart: 'A', RangeEnd: 'Z'},
-										},
-									},
-									{Kind: ir.ExpressionRange, RangeStart: '0', RangeEnd: '9'},
-									{Kind: ir.ExpressionCharacter, Character: '_'},
-								},
-							}),
-							Repetition: ir.RepetitionZeroOrMore,
-						},
-					},
-				},
-			},
-			{
-				Name:       "KeywordPublic",
-				Expression: ir.Expression{Kind: ir.ExpressionString, String: "public"},
-			},
-			{
-				Name: "Whitespace",
-				Expression: ir.Expression{
-					Kind: ir.ExpressionRepetition,
-					Inner: pointer(ir.Expression{
-						Kind: ir.ExpressionAlternation,
-						Terms: []ir.Expression{
-							{Kind: ir.ExpressionCharacter, Character: ' '},
-							{Kind: ir.ExpressionCharacter, Character: '\t'},
-						},
-					}),
-					Repetition: ir.RepetitionOneOrMore,
-				},
-				Skip: true,
-			},
+	for tcName, tc := range map[string]struct {
+		inSource    string
+		wantProgram string
+	}{
+		"When compiling a full DSL file, a program is returned.": {
+			inSource: dsl(0),
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      Concatenation
+				        Alternation
+				          Range 'a' 'z'
+				          Range 'A' 'Z'
+				        Repetition *
+				          Alternation
+				            Alternation
+				              Range 'a' 'z'
+				              Range 'A' 'Z'
+				            Range '0' '9'
+				            Character '_'
+				    Token KeywordPublic
+				      String "public"
+				    Token Whitespace
+				      Repetition +
+				        Alternation
+				          Character ' '
+				          Character '\t'
+				      Skip
+				  Rules
+				    Rule PublicIdentifier
+				      MatchToken 0
+				      Where text == "public"
+				      Report warn at 0 "Public identifier found"
+			`),
 		},
-		Rules: []ir.Rule{
-			{
-				Name:       "PublicIdentifier",
-				MatchToken: 0,
-				Where: ir.Condition{
-					Property: ir.ConditionPropertyText,
-					Operator: ir.ConditionOperatorEqual,
-					String:   "public",
-				},
-				Report: ir.Report{
-					Severity:    ir.SeverityWarn,
-					TargetToken: 0,
-					Message:     "Public identifier found",
-				},
-			},
-		},
+	} {
+		t.Run(tcName, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange.
+			document, parseErr := parser.Parse(tc.inSource)
+			resolution := resolver.Resolve(tc.inSource, document)
+			validationDiagnostics := validator.Validate(tc.inSource, resolution)
+
+			// Act.
+			gotProgram := compiler.Compile(tc.inSource, resolution)
+
+			// Assert.
+			claim.Equal(t, tcName, error(nil), parseErr, "Parse Error")
+			claim.Equal(t, tcName, 0, len(validationDiagnostics), "Validation Diagnostic Count")
+			claim.Equal(t, tcName, tc.wantProgram, renderProgram(gotProgram), "Program")
+		})
 	}
-
-	// Act.
-	gotProgram := compiler.Compile(source, resolution)
-
-	// Assert.
-	claim.Equal(t, "When compiling a full DSL file, no parse error is returned.", error(nil), parseErr, "Parse Error")
-	claim.Equal(t, "When compiling a full DSL file, validation diagnostics are not returned.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
-	claim.DeepEqual(t, "When compiling a full DSL file, a program is returned.", wantProgram, gotProgram, "Program")
 }
 
 func Benchmark_Compile_DSL_0(b *testing.B)    { benchmark_Compile_DSL(b, 0) }
@@ -222,4 +191,160 @@ func dsl(size int) string {
 	sb.WriteString("}")
 
 	return sb.String()
+}
+
+func normalizeMultilineLiteral(text string) string {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+
+	for idx := range lines {
+		lines[idx] = strings.TrimRight(strings.TrimLeft(lines[idx], "\t"), " ")
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func renderProgram(program ir.Program) string {
+	var builder strings.Builder
+
+	builder.WriteString("Program\n")
+	builder.WriteString("  Tokens\n")
+
+	for idx := range program.Tokens {
+		tok := program.Tokens[idx]
+		builder.WriteString("    Token ")
+		builder.WriteString(tok.Name)
+		builder.WriteByte('\n')
+		appendExpression(&builder, program, tok.Expression, 3)
+
+		if tok.Skip {
+			appendIndentedLine(&builder, 3, "Skip")
+		}
+	}
+
+	builder.WriteString("  Rules\n")
+
+	for idx := range program.Rules {
+		rule := program.Rules[idx]
+		appendIndentedLine(&builder, 2, "Rule "+rule.Name)
+		appendIndentedLine(&builder, 3, "MatchToken "+strconv.Itoa(rule.MatchToken))
+		appendIndentedLine(&builder, 3, "Where "+renderCondition(rule.Where))
+		appendIndentedLine(&builder, 3, "Report "+renderSeverity(rule.Report.Severity)+" at "+strconv.Itoa(rule.Report.TargetToken)+" "+strconv.Quote(rule.Report.Message))
+	}
+
+	return strings.TrimSpace(builder.String())
+}
+
+func appendExpression(builder *strings.Builder, program ir.Program, expressionID ir.ExpressionID, depth int) {
+	expression := program.Expressions.Node(expressionID)
+
+	switch expression.Kind {
+	case ir.ExpressionCharacter:
+		appendIndentedLine(builder, depth, "Character "+strconv.QuoteRuneToASCII(rune(expression.Character)))
+
+	case ir.ExpressionString:
+		appendIndentedLine(builder, depth, "String "+strconv.Quote(program.Expressions.String(expression.StringID)))
+
+	case ir.ExpressionRange:
+		appendIndentedLine(
+			builder,
+			depth,
+			"Range "+strconv.QuoteRuneToASCII(rune(expression.RangeStart))+" "+strconv.QuoteRuneToASCII(rune(expression.RangeEnd)),
+		)
+
+	case ir.ExpressionReference, ir.ExpressionGroup:
+		appendExpression(builder, program, firstExpressionChild(program.Expressions, expression), depth)
+
+	case ir.ExpressionConcatenation:
+		appendIndentedLine(builder, depth, "Concatenation")
+
+		for _, childID := range program.Expressions.Children(expression) {
+			appendExpression(builder, program, childID, depth+1)
+		}
+
+	case ir.ExpressionAlternation:
+		appendIndentedLine(builder, depth, "Alternation")
+
+		for _, childID := range program.Expressions.Children(expression) {
+			appendExpression(builder, program, childID, depth+1)
+		}
+
+	default:
+		appendIndentedLine(builder, depth, "Repetition "+renderRepetition(expression.Repetition))
+		appendExpression(builder, program, firstExpressionChild(program.Expressions, expression), depth+1)
+	}
+}
+
+func firstExpressionChild(arena ir.ExpressionArena, expression ir.ExpressionNode) ir.ExpressionID {
+	if expression.Kind == ir.ExpressionReference {
+		return expression.Reference
+	}
+
+	return arena.Children(expression)[0]
+}
+
+func renderRepetition(repetition ir.RepetitionKind) string {
+	switch repetition {
+	case ir.RepetitionZeroOrOne:
+		return "?"
+
+	case ir.RepetitionZeroOrMore:
+		return "*"
+
+	default:
+		return "+"
+	}
+}
+
+func renderCondition(condition ir.Condition) string {
+	switch condition.Property {
+	case ir.ConditionPropertyNone:
+		return "none"
+
+	case ir.ConditionPropertyText:
+		return "text " + renderOperator(condition.Operator) + " " + strconv.Quote(condition.String)
+
+	default:
+		return "length " + renderOperator(condition.Operator) + " " + strconv.Itoa(condition.Integer)
+	}
+}
+
+func renderOperator(operator ir.ConditionOperator) string {
+	switch operator {
+	case ir.ConditionOperatorEqual:
+		return "=="
+
+	case ir.ConditionOperatorNotEqual:
+		return "!="
+
+	case ir.ConditionOperatorLess:
+		return "<"
+
+	case ir.ConditionOperatorLessEqual:
+		return "<="
+
+	case ir.ConditionOperatorGreater:
+		return ">"
+
+	default:
+		return ">="
+	}
+}
+
+func renderSeverity(severity ir.Severity) string {
+	switch severity {
+	case ir.SeverityInfo:
+		return "info"
+
+	case ir.SeverityWarn:
+		return "warn"
+
+	default:
+		return "err"
+	}
+}
+
+func appendIndentedLine(builder *strings.Builder, depth int, text string) {
+	builder.WriteString(strings.Repeat("  ", depth))
+	builder.WriteString(text)
+	builder.WriteByte('\n')
 }
