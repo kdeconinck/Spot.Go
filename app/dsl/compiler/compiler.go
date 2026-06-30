@@ -70,20 +70,36 @@ func Compile(source string, resolution resolver.Resolution) ir.Program {
 func compileRule(source string, rule ast.Rule, resolution resolver.Resolution) ir.Rule {
 	matchKind := ir.RuleMatchToken
 	matchIndex := 0
+	matchScopeKind := ir.RuleMatchScopeNone
+	matchScopeIndex := 0
 
 	if rule.Match.Kind == ast.RuleMatchNode {
 		matchKind = ir.RuleMatchSyntaxNode
 		matchIndex, _ = resolution.SyntaxNodeIndex(rule.Match.Target.Value(source))
+
+		switch rule.Match.ScopeKind {
+		case ast.RuleMatchScopeInside:
+			matchScopeKind = ir.RuleMatchScopeInside
+
+		case ast.RuleMatchScopeOutside:
+			matchScopeKind = ir.RuleMatchScopeOutside
+		}
+
+		if matchScopeKind != ir.RuleMatchScopeNone {
+			matchScopeIndex, _ = resolution.SyntaxNodeIndex(rule.Match.ScopeTarget.Value(source))
+		}
 	} else {
 		matchIndex, _ = resolution.TokenIndex(rule.Match.Target.Value(source))
 	}
 
 	return ir.Rule{
-		Name:       rule.Name.Value(source),
-		MatchKind:  matchKind,
-		MatchIndex: matchIndex,
-		Where:      compileCondition(source, rule.Where),
-		Report:     compileReport(source, rule, resolution),
+		Name:            rule.Name.Value(source),
+		MatchKind:       matchKind,
+		MatchIndex:      matchIndex,
+		MatchScopeKind:  matchScopeKind,
+		MatchScopeIndex: matchScopeIndex,
+		Where:           compileCondition(source, rule.Where),
+		Report:          compileReport(source, rule, resolution),
 	}
 }
 

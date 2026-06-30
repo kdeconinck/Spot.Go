@@ -245,6 +245,20 @@ const (
 	RuleMatchSyntaxNode
 )
 
+// RuleMatchScopeKind identifies whether a syntax-node rule constrains ancestor syntax nodes.
+type RuleMatchScopeKind uint8
+
+const (
+	// RuleMatchScopeNone does not constrain ancestor syntax nodes.
+	RuleMatchScopeNone RuleMatchScopeKind = iota
+
+	// RuleMatchScopeInside requires the matched syntax node to be inside the named ancestor syntax node.
+	RuleMatchScopeInside
+
+	// RuleMatchScopeOutside requires the matched syntax node to be outside the named ancestor syntax node.
+	RuleMatchScopeOutside
+)
+
 // Rule is a compiled diagnostic rule.
 type Rule struct {
 	// Name is the DSL rule name.
@@ -255,6 +269,12 @@ type Rule struct {
 
 	// MatchIndex is the source-order token or syntax node index matched by the rule.
 	MatchIndex int
+
+	// MatchScopeKind identifies whether the syntax-node match constrains ancestor syntax nodes.
+	MatchScopeKind RuleMatchScopeKind
+
+	// MatchScopeIndex is the source-order syntax node index used by the inside/outside constraint.
+	MatchScopeIndex int
 
 	// Where is the optional compiled condition.
 	Where Condition

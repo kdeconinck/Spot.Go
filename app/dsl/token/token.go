@@ -54,6 +54,12 @@ const (
 	// TokenWhere marks a rule condition statement.
 	TokenWhere
 
+	// TokenInside marks a syntax-rule ancestor inclusion constraint.
+	TokenInside
+
+	// TokenOutside marks a syntax-rule ancestor exclusion constraint.
+	TokenOutside
+
 	// TokenReport marks a rule report statement.
 	TokenReport
 
@@ -172,6 +178,12 @@ func LookupTokenKind(value string) TokenKind {
 	case "where":
 		return TokenWhere
 
+	case "inside":
+		return TokenInside
+
+	case "outside":
+		return TokenOutside
+
 	case "report":
 		return TokenReport
 
@@ -250,6 +262,12 @@ func (kind TokenKind) String() string {
 
 	case TokenWhere:
 		return "where"
+
+	case TokenInside:
+		return "inside"
+
+	case TokenOutside:
+		return "outside"
 
 	case TokenReport:
 		return "report"

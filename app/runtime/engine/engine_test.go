@@ -274,6 +274,60 @@ rules {
 				diagnostic(engine.SeverityWarn, "package clause found", 0, 12),
 			},
 		},
+		"When a syntax-node inside constraint matches, a diagnostic is returned.": {
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Whitespace = ' '+ skip
+    KeywordNamespace = "namespace"
+    KeywordUsing = "using"
+    Identifier = "x"
+    LeftBrace = "{"
+    RightBrace = "}"
+}
+syntax {
+    node UsingDirective = KeywordUsing Identifier
+    node NamespaceBody = LeftBrace UsingDirective RightBrace
+    node NamespaceDeclaration = KeywordNamespace Identifier NamespaceBody
+    node Root = NamespaceDeclaration
+}
+rules {
+    rule UsingInsideNamespace {
+        match node UsingDirective inside NamespaceDeclaration
+        report warn at UsingDirective "using inside namespace"
+    }
+}`,
+			inSource: "namespace x { using x }",
+			wantDiagnostics: []engine.Diagnostic{
+				diagnostic(engine.SeverityWarn, "using inside namespace", 14, 21),
+			},
+		},
+		"When a syntax-node outside constraint matches, a diagnostic is returned.": {
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Whitespace = ' '+ skip
+    KeywordNamespace = "namespace"
+    KeywordUsing = "using"
+    Identifier = "x"
+    LeftBrace = "{"
+    RightBrace = "}"
+}
+syntax {
+    node UsingDirective = KeywordUsing Identifier
+    node NamespaceBody = LeftBrace RightBrace
+    node NamespaceDeclaration = KeywordNamespace Identifier NamespaceBody
+    node Root = UsingDirective NamespaceDeclaration
+}
+rules {
+    rule UsingOutsideNamespace {
+        match node UsingDirective outside NamespaceDeclaration
+        report warn at UsingDirective "using outside namespace"
+    }
+}`,
+			inSource: "using x namespace x { }",
+			wantDiagnostics: []engine.Diagnostic{
+				diagnostic(engine.SeverityWarn, "using outside namespace", 0, 7),
+			},
+		},
 	} {
 		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()

@@ -342,11 +342,23 @@ func renderProgram(program ir.Program) string {
 }
 
 func renderRuleMatch(program ir.Program, rule ir.Rule) string {
+	label := ""
+
 	if rule.MatchKind == ir.RuleMatchSyntaxNode {
-		return "MatchNode " + program.SyntaxNodes[rule.MatchIndex].Name
+		label = "MatchNode " + program.SyntaxNodes[rule.MatchIndex].Name
+	} else {
+		label = "MatchToken " + program.Tokens[rule.MatchIndex].Name
 	}
 
-	return "MatchToken " + program.Tokens[rule.MatchIndex].Name
+	switch rule.MatchScopeKind {
+	case ir.RuleMatchScopeInside:
+		label += " inside " + program.SyntaxNodes[rule.MatchScopeIndex].Name
+
+	case ir.RuleMatchScopeOutside:
+		label += " outside " + program.SyntaxNodes[rule.MatchScopeIndex].Name
+	}
+
+	return label
 }
 
 func appendExpression(builder *strings.Builder, program ir.Program, expressionID ir.ExpressionID, depth int) {

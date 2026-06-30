@@ -57,7 +57,17 @@ func (p *sizingParser) measureRuleDeclaration() {
 
 func (p *sizingParser) measureMatchClause() {
 	p.expect(token.TokenMatch)
+
+	if p.isAt(token.TokenNode) {
+		p.advance()
+	}
+
 	p.expect(token.TokenIdentifier)
+
+	if p.isAt(token.TokenInside) || p.isAt(token.TokenOutside) {
+		p.advance()
+		p.expect(token.TokenIdentifier)
+	}
 }
 
 func (p *sizingParser) startsWhereClause() bool {

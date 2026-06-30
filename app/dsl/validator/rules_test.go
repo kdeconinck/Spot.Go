@@ -311,6 +311,73 @@ func Test_Validate_Rules(t *testing.T) {
 			`),
 			wantDiagnostics: nil,
 		},
+		"When a syntax rule uses an inside constraint for a declared ancestor node, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node Using = Identifier
+					node Namespace = Using
+					node Root = Namespace
+				}
+				rules {
+					rule UsingInsideNamespace {
+						match node Using inside Namespace
+						report warn at Using "x"
+					}
+				}
+			`),
+			wantDiagnostics: nil,
+		},
+		"When a token rule uses an inside constraint, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node Namespace = Identifier
+				}
+				rules {
+					rule IdentifierRule {
+						[[match Identifier inside Namespace]]
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic("Only syntax-node rules may use inside/outside constraints.", 0),
+			},
+		},
+		"When a syntax rule references an undeclared ancestor node, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node Using = Identifier
+					node Root = Using
+				}
+				rules {
+					rule UsingOutsideNamespace {
+						match node Using outside [[Namespace]]
+						report warn at Using "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Syntax node "Namespace" is not declared.`, 0),
+			},
+		},
 		"When syntax rules are declared without a unique syntax root, a diagnostic is returned.": {
 			inSource: markedMultilineLiteral(`
 				scope {

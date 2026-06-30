@@ -126,6 +126,27 @@ func Test_Compile_Rules(t *testing.T) {
 				      Report warn at Root "message"
 			`),
 		},
+		"When compiling a syntax-node ancestor constraint, the scope is compiled.": {
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { rule UsingOutsideNamespace { match node Using outside Namespace report warn at Using "message" } }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				  Syntax
+				    Node Using
+				      Token Identifier
+				    Node Namespace
+				      Node Using
+				    Node Root
+				      Node Namespace
+				  Rules
+				    Rule UsingOutsideNamespace
+				      MatchNode Using outside Namespace
+				      Where none
+				      Report warn at Using "message"
+			`),
+		},
 	} {
 		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()

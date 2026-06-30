@@ -107,6 +107,27 @@ func Test_Parse_Rules(t *testing.T) {
 				        Message "File found"
 			`),
 		},
+		"When parsing a rules block with a syntax-node ancestor constraint, a document is returned.": {
+			inSource: `scope {} syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { rule UsingOutsideNamespace { match node Using outside Namespace report warn at Using "Using outside namespace" } }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Syntax
+				    Node Using
+				      Reference Identifier
+				    Node Namespace
+				      Reference Using
+				    Node Root
+				      Reference Namespace
+				  Rules
+				    Rule UsingOutsideNamespace
+				      Match node Using outside Namespace
+				      Report
+				        Severity warn
+				        At Using
+				        Message "Using outside namespace"
+			`),
+		},
 		"When the rules opening brace is missing, a diagnostic is returned.": {
 			inSource:  "scope {} rules }",
 			wantDiags: `Expected '{', found '}'. [15:16]`,
@@ -134,6 +155,10 @@ func Test_Parse_Rules(t *testing.T) {
 		"When a rule match statement is missing its token name, a diagnostic is returned.": {
 			inSource:  `scope {} rules { rule PublicIdentifier { match report warn at Identifier "x" } }`,
 			wantDiags: `Expected 'identifier', found 'report'. [47:53]`,
+		},
+		"When a syntax-node ancestor constraint is missing its target, a diagnostic is returned.": {
+			inSource:  `scope {} rules { rule PublicIdentifier { match node Identifier outside report warn at Identifier "x" } }`,
+			wantDiags: `Expected 'identifier', found 'report'. [71:77]`,
 		},
 		"When a where clause is missing its subject, a diagnostic is returned.": {
 			inSource:  `scope {} rules { rule PublicIdentifier { match Identifier where .text == "public" report warn at Identifier "x" } }`,

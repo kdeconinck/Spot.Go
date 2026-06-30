@@ -121,10 +121,34 @@ func (p *parser) parseRuleMatch() (ast.RuleMatch, error) {
 		return ast.RuleMatch{}, err
 	}
 
+	scopeKind := ast.RuleMatchScopeNone
+	scopeTarget := token.Token{}
+	end := target
+
+	if p.isAt(token.TokenInside) || p.isAt(token.TokenOutside) {
+		if p.isAt(token.TokenInside) {
+			scopeKind = ast.RuleMatchScopeInside
+		} else {
+			scopeKind = ast.RuleMatchScopeOutside
+		}
+
+		p.advance()
+
+		scopeTarget, err = p.expect(token.TokenIdentifier)
+
+		if err != nil {
+			return ast.RuleMatch{}, err
+		}
+
+		end = scopeTarget
+	}
+
 	return ast.RuleMatch{
-		Kind:   matchKind,
-		Target: target,
-		Span:   span(start.Span.Start, target.Span.End),
+		Kind:        matchKind,
+		Target:      target,
+		ScopeKind:   scopeKind,
+		ScopeTarget: scopeTarget,
+		Span:        span(start.Span.Start, end.Span.End),
 	}, nil
 }
 

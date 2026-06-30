@@ -660,6 +660,14 @@ func appendDocument(source string, builder *strings.Builder, document ast.Docume
 				matchLabel = "Match node " + rule.Match.Target.Value(source)
 			}
 
+			switch rule.Match.ScopeKind {
+			case ast.RuleMatchScopeInside:
+				matchLabel += " inside " + rule.Match.ScopeTarget.Value(source)
+
+			case ast.RuleMatchScopeOutside:
+				matchLabel += " outside " + rule.Match.ScopeTarget.Value(source)
+			}
+
 			appendIndentedLine(builder, depth+3, formatLabelWithSpan(matchLabel, rule.Match.Span, includeSpans))
 
 			if rule.Where.Span != (location.Span{}) {

@@ -107,7 +107,23 @@ func validateRuleReferences(source string, rule ast.Rule, resolution resolver.Re
 			})
 		}
 
+		if rule.Match.ScopeKind != ast.RuleMatchScopeNone {
+			if _, ok := resolution.SyntaxNodeIndex(rule.Match.ScopeTarget.Value(source)); !ok {
+				diagnostics = append(diagnostics, Diagnostic{
+					Message: `Syntax node "` + rule.Match.ScopeTarget.Value(source) + `" is not declared.`,
+					Span:    rule.Match.ScopeTarget.Span,
+				})
+			}
+		}
+
 		diagnostics = validateRulePropertyRules(where, "Syntax node", source, diagnostics)
+	}
+
+	if rule.Match.Kind == ast.RuleMatchToken && rule.Match.ScopeKind != ast.RuleMatchScopeNone {
+		diagnostics = append(diagnostics, Diagnostic{
+			Message: "Only syntax-node rules may use inside/outside constraints.",
+			Span:    rule.Match.Span,
+		})
 	}
 
 	return diagnostics

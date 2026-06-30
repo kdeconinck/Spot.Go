@@ -154,18 +154,22 @@ func (engine Engine) Analyze(program ir.Program, src string, options Options) []
 		return diagnostics
 	}
 
-	engine.evaluateSyntaxNode(program, src, tree, tree.Root, &diagnostics, options)
+	engine.evaluateSyntaxNode(program, src, tree, tree.Root, nil, &diagnostics, options)
 
 	return diagnostics
 }
 
-func (engine Engine) evaluateSyntaxNode(program ir.Program, src string, tree syntax.Tree, nodeID syntax.NodeID, diagnostics *[]Diagnostic, options Options) bool {
+func (engine Engine) evaluateSyntaxNode(program ir.Program, src string, tree syntax.Tree, nodeID syntax.NodeID, ancestors []uint32, diagnostics *[]Diagnostic, options Options) bool {
 	node := tree.Node(nodeID)
 	nodeRules := engine.rulesBySyntaxID[node.Kind]
 	nodeText, nodeSpan := syntaxNodeTextAndSpan(src, tree, node)
 
 	for idx := range nodeRules {
 		rule := nodeRules[idx]
+
+		if !matchesSyntaxScope(rule, ancestors) {
+			continue
+		}
 
 		if !matchesCondition(rule.Where, nodeText, len(nodeText)) {
 			continue
@@ -182,13 +186,40 @@ func (engine Engine) evaluateSyntaxNode(program ir.Program, src string, tree syn
 		}
 	}
 
+	ancestors = append(ancestors, node.Kind)
+
 	for _, childID := range tree.Children(node) {
-		if engine.evaluateSyntaxNode(program, src, tree, childID, diagnostics, options) {
+		if engine.evaluateSyntaxNode(program, src, tree, childID, ancestors, diagnostics, options) {
 			return true
 		}
 	}
 
 	return false
+}
+
+func matchesSyntaxScope(rule ir.Rule, ancestors []uint32) bool {
+	switch rule.MatchScopeKind {
+	case ir.RuleMatchScopeInside:
+		for idx := range ancestors {
+			if int(ancestors[idx]) == rule.MatchScopeIndex {
+				return true
+			}
+		}
+
+		return false
+
+	case ir.RuleMatchScopeOutside:
+		for idx := range ancestors {
+			if int(ancestors[idx]) == rule.MatchScopeIndex {
+				return false
+			}
+		}
+
+		return true
+
+	default:
+		return true
+	}
 }
 
 func matchesCondition(condition ir.Condition, text string, length int) bool {
