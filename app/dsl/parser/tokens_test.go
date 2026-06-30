@@ -27,7 +27,7 @@ func Test_Parse_Tokens(t *testing.T) {
 	}{
 		"When parsing an empty tokens block, a document is returned.": {
 			inSource: "scope {} tokens {}",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Tokens
@@ -35,26 +35,16 @@ func Test_Parse_Tokens(t *testing.T) {
 		},
 		"When parsing a definitions block followed by an empty tokens block, a document is returned.": {
 			inSource: "scope {} definitions {} tokens {}",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
 				  Tokens
 			`),
 		},
-		"When parsing a tokens block with a reference token, a document is returned.": {
-			inSource: "scope {} tokens { Identifier = letter }",
-			wantTree: snapshot(`
-				Document
-				  Scope
-				  Tokens
-				    Token Identifier
-				      Reference letter
-			`),
-		},
 		"When parsing a tokens block with a string token, a document is returned.": {
 			inSource: `scope {} tokens { KeywordPublic = "public" }`,
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Tokens
@@ -62,9 +52,77 @@ func Test_Parse_Tokens(t *testing.T) {
 				      String "public"
 			`),
 		},
+		"When parsing a tokens block with a reference token, a document is returned.": {
+			inSource: "scope {} tokens { Identifier = letter }",
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Tokens
+				    Token Identifier
+				      Reference letter
+			`),
+		},
+		"When parsing a tokens block with a character token, a document is returned.": {
+			inSource: "scope {} tokens { Plus = '+' }",
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Tokens
+				    Token Plus
+				      Character '+'
+			`),
+		},
+		"When parsing a tokens block with a range token, a document is returned.": {
+			inSource: "scope {} tokens { Lower = 'a'..'z' }",
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Tokens
+				    Token Lower
+				      Range 'a' 'z'
+			`),
+		},
+		"When parsing a tokens block with string concatenation, a document is returned.": {
+			inSource: `scope {} tokens { Keyword = "public" "static" }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Tokens
+				    Token Keyword
+				      Concatenation
+				        String "public"
+				        String "static"
+			`),
+		},
+		"When parsing a tokens block with alternation, a document is returned.": {
+			inSource: `scope {} tokens { Sign = "+" | "-" }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Tokens
+				    Token Sign
+				      Alternation
+				        String "+"
+				        String "-"
+			`),
+		},
+		"When parsing a tokens block with zero-or-one repetition, a document is returned.": {
+			inSource: `scope {} tokens { OptionalSign = ("+" | "-")? }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Tokens
+				    Token OptionalSign
+				      Repetition ?
+				        Group
+				          Alternation
+				            String "+"
+				            String "-"
+			`),
+		},
 		"When parsing a tokens block with a skipped token, a document is returned.": {
 			inSource: `scope {} tokens { Whitespace = (' ' | '\t')+ skip }`,
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Tokens
@@ -89,22 +147,46 @@ func Test_Parse_Tokens(t *testing.T) {
 			inSource:  "scope {} tokens { 'a' }",
 			wantDiags: `Expected 'identifier', found 'character'. [18:21]`,
 		},
+		"When a token is missing an equal sign, a diagnostic is returned.": {
+			inSource:  `scope {} tokens { Identifier "public" }`,
+			wantDiags: `Expected '=', found 'string'. [29:37]`,
+		},
 		"When a token is missing an expression, a diagnostic is returned.": {
 			inSource:  "scope {} tokens { Identifier = }",
 			wantDiags: `Expected 'character', found '}'. [31:32]`,
+		},
+		"When a token grouped expression is missing its inner expression, a diagnostic is returned.": {
+			inSource:  `scope {} tokens { OptionalSign = ( ) }`,
+			wantDiags: `Expected 'character', found ')'. [35:36]`,
+		},
+		"When a token range is missing an end character, a diagnostic is returned.": {
+			inSource:  "scope {} tokens { Lower = 'a'.. }",
+			wantDiags: `Expected 'character', found '}'. [32:33]`,
+		},
+		"When a token concatenation is missing a valid right expression, a diagnostic is returned.": {
+			inSource:  `scope {} tokens { Pair = "a" ( }`,
+			wantDiags: `Expected 'character', found '}'. [31:32]`,
+		},
+		"When token alternation is missing a right expression, a diagnostic is returned.": {
+			inSource:  `scope {} tokens { Sign = "+" | }`,
+			wantDiags: `Expected 'character', found '}'. [31:32]`,
+		},
+		"When a token grouped expression is missing a closing parenthesis, a diagnostic is returned.": {
+			inSource:  `scope {} tokens { OptionalSign = ("+" | "-"? }`,
+			wantDiags: `Expected ')', found '}'. [45:46]`,
 		},
 	} {
 		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()
 
 			// Act.
-			gotDocument, gotDiagnostics := parser.Parse(tc.inSource)
+			gotDocument, gotErr := parser.Parse(tc.inSource)
 
 			// Assert.
-			claim.Equal(t, tcName, snapshot(tc.wantDiags), debugDiagnostics(gotDiagnostics), "Diagnostics")
+			claim.Equal(t, tcName, normalizeMultilineLiteral(tc.wantDiags), formatParseError(gotErr), "Parse Error")
 
 			if tc.wantTree != "" {
-				claim.Equal(t, tcName, tc.wantTree, debugDocument(tc.inSource, gotDocument, false), "Document")
+				claim.Equal(t, tcName, tc.wantTree, renderDocument(tc.inSource, gotDocument, false), "Document")
 			}
 		})
 	}
@@ -125,10 +207,27 @@ func benchmark_Parse_Tokens(b *testing.B, size int) {
 func tokensDSL(size int) string {
 	return "scope {}\n" +
 		"definitions {\n" +
-		"    identifierStart = 'a'..'z' | '_'\n" +
-		"    value = identifierStart*\n" +
+		"    lower = 'a'..'z'\n" +
+		"    upper = 'A'..'Z'\n" +
+		"    digit = '0'..'9'\n" +
+		"    underscore = '_'\n" +
+		"    letter = lower | upper\n" +
+		"    identifierStart = letter | underscore\n" +
+		"    identifierPart = letter | digit | underscore\n" +
+		"    optionalSign = ('+' | '-')?\n" +
 		"}\n" +
 		"tokens {\n" +
-		strings.Repeat("    Identifier = identifierStart value*\n    KeywordPublic = \"public\"\n    Whitespace = (' ' | '\\t')+ skip\n", size) +
+		strings.Repeat(
+			""+
+				"    Plus = '+'\n"+
+				"    Lower = 'a'..'z'\n"+
+				"    Identifier = identifierStart identifierPart*\n"+
+				"    KeywordPublic = \"public\"\n"+
+				"    Sign = \"+\" | \"-\"\n"+
+				"    OptionalSign = (\"+\" | \"-\")?\n"+
+				"    SignedInteger = optionalSign digit+\n"+
+				"    Whitespace = (' ' | '\\t' | '\\n' | '\\r')+ skip\n",
+			size,
+		) +
 		"}"
 }

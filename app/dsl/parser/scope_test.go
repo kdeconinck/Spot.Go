@@ -27,14 +27,14 @@ func Test_Parse_Scope(t *testing.T) {
 	}{
 		"When parsing an empty scope block, a document is returned.": {
 			inSource: "scope {}",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 			`),
 		},
 		"When parsing a scope block with an include entry, a document is returned.": {
 			inSource: `scope { include "**/*.go" }`,
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				    Include "**/*.go"
@@ -42,7 +42,7 @@ func Test_Parse_Scope(t *testing.T) {
 		},
 		"When parsing a scope block with an exclude entry, a document is returned.": {
 			inSource: `scope { exclude "vendor/**" }`,
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				    Exclude "vendor/**"
@@ -50,7 +50,7 @@ func Test_Parse_Scope(t *testing.T) {
 		},
 		"When parsing a scope block with include and exclude entries, a document is returned.": {
 			inSource: `scope { include "**/*.go" exclude "vendor/**" }`,
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				    Include "**/*.go"
@@ -86,13 +86,13 @@ func Test_Parse_Scope(t *testing.T) {
 			t.Parallel()
 
 			// Act.
-			gotDocument, gotDiagnostics := parser.Parse(tc.inSource)
+			gotDocument, gotErr := parser.Parse(tc.inSource)
 
 			// Assert.
-			claim.Equal(t, tcName, snapshot(tc.wantDiags), debugDiagnostics(gotDiagnostics), "Diagnostics")
+			claim.Equal(t, tcName, normalizeMultilineLiteral(tc.wantDiags), formatParseError(gotErr), "Parse Error")
 
 			if tc.wantTree != "" {
-				claim.Equal(t, tcName, tc.wantTree, debugDocument(tc.inSource, gotDocument, false), "Document")
+				claim.Equal(t, tcName, tc.wantTree, renderDocument(tc.inSource, gotDocument, false), "Document")
 			}
 		})
 	}

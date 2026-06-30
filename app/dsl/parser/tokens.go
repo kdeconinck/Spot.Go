@@ -11,53 +11,79 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func (p *parser) parseOptionalTokensSection() ast.TokensSection {
-	if !p.at(token.TokenTokens) {
-		return ast.TokensSection{}
+func (p *parser) parseOptionalTokensSection() (ast.TokensSection, error) {
+	if !p.isAt(token.TokenTokens) {
+		return ast.TokensSection{}, nil
 	}
 
 	return p.parseTokensSection()
 }
 
-func (p *parser) parseTokensSection() ast.TokensSection {
-	start := p.expect(token.TokenTokens)
+func (p *parser) parseTokensSection() (ast.TokensSection, error) {
+	start := p.current
 
-	if !p.match(token.TokenLeftBrace) {
-		return ast.TokensSection{
-			Span: start.Span,
+	p.advance()
+
+	if err := p.match(token.TokenLeftBrace); err != nil {
+		return ast.TokensSection{}, err
+	}
+
+	firstToken := uint32(len(p.document.TokenList))
+
+	for p.isAt(token.TokenIdentifier) {
+		tokenDefinition, err := p.parseTokenDefinition()
+
+		if err != nil {
+			return ast.TokensSection{}, err
 		}
+
+		p.document.TokenList = append(p.document.TokenList, tokenDefinition)
 	}
 
-	var tokens []ast.TokenDefinition
+	end, err := p.expectSectionEnd(token.TokenIdentifier)
 
-	for p.at(token.TokenIdentifier) {
-		tokens = append(tokens, p.parseTokenDefinition())
+	if err != nil {
+		return ast.TokensSection{}, err
 	}
-
-	end := p.expectSectionEnd(token.TokenIdentifier)
 
 	return ast.TokensSection{
-		Tokens: tokens,
-		Span:   span(start.Span.Start, end.Span.End),
-	}
+		FirstElementIdx:  firstToken,
+		AmountOfElements: uint32(len(p.document.TokenList)) - firstToken,
+		Span:             span(start.Span.Start, end.Span.End),
+	}, nil
 }
 
-func (p *parser) parseTokenDefinition() ast.TokenDefinition {
-	name := p.expect(token.TokenIdentifier)
-	p.expect(token.TokenEqual)
-	expression := p.parseExpression(true)
-	end := expression.Span.End
-	var skip token.Token
+func (p *parser) parseTokenDefinition() (ast.TokenDefinition, error) {
+	name := p.current
 
-	if p.at(token.TokenSkip) {
-		skip = p.expect(token.TokenSkip)
-		end = skip.Span.End
+	p.advance()
+
+	if _, err := p.expect(token.TokenEqual); err != nil {
+		return ast.TokenDefinition{}, err
+	}
+
+	expressionID, err := p.parseExpression(true)
+
+	if err != nil {
+		return ast.TokenDefinition{}, err
+	}
+
+	end := p.expressionNode(expressionID).Span.End
+
+	var skipToken token.Token
+
+	if p.isAt(token.TokenSkip) {
+		skipToken = p.current
+
+		p.advance()
+
+		end = skipToken.Span.End
 	}
 
 	return ast.TokenDefinition{
 		Name:       name,
-		Expression: expression,
-		Skip:       skip,
+		Expression: expressionID,
+		Skip:       skipToken,
 		Span:       span(name.Span.Start, end),
-	}
+	}, nil
 }

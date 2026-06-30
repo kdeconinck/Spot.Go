@@ -27,7 +27,7 @@ func Test_Parse_Definitions(t *testing.T) {
 	}{
 		"When parsing an empty definitions block, a document is returned.": {
 			inSource: "scope {} definitions {}",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -35,7 +35,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with a character definition, a document is returned.": {
 			inSource: "scope {} definitions { letter = 'a' }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -45,7 +45,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with a character range definition, a document is returned.": {
 			inSource: "scope {} definitions { letter = 'a'..'z' }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -55,7 +55,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with a reference definition, a document is returned.": {
 			inSource: "scope {} definitions { identifierStart = letter }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -65,7 +65,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with character concatenation, a document is returned.": {
 			inSource: "scope {} definitions { value = 'a' 'b' }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -77,7 +77,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with repeated reference concatenation, a document is returned.": {
 			inSource: "scope {} definitions { value = letter digit* }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -90,7 +90,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with grouped repetition concatenation, a document is returned.": {
 			inSource: "scope {} definitions { value = letter ('_' | digit)+ }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -106,7 +106,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing multiple definitions after concatenation, a document is returned.": {
 			inSource: "scope {} definitions { letter = 'a' value = letter digit }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -120,7 +120,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with character alternation, a document is returned.": {
 			inSource: "scope {} definitions { value = 'a' | 'b' }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -132,7 +132,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with range alternation, a document is returned.": {
 			inSource: "scope {} definitions { letter = 'a'..'z' | 'A'..'Z' }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -144,7 +144,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with reference alternation, a document is returned.": {
 			inSource: "scope {} definitions { identifierStart = letter | '_' }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -156,7 +156,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with concatenation before alternation, a document is returned.": {
 			inSource: "scope {} definitions { value = letter digit | '_' }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -170,7 +170,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with a grouped expression, a document is returned.": {
 			inSource: "scope {} definitions { value = ('a' | 'b') }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -183,7 +183,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with zero-or-one repetition, a document is returned.": {
 			inSource: "scope {} definitions { value = 'a'? }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -194,7 +194,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with zero-or-more repetition, a document is returned.": {
 			inSource: "scope {} definitions { value = letter* }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -205,7 +205,7 @@ func Test_Parse_Definitions(t *testing.T) {
 		},
 		"When parsing a definitions block with one-or-more repetition, a document is returned.": {
 			inSource: "scope {} definitions { value = ('a' | 'b')+ }",
-			wantTree: snapshot(`
+			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
 				  Definitions
@@ -237,9 +237,17 @@ func Test_Parse_Definitions(t *testing.T) {
 			inSource:  "scope {} definitions { letter = }",
 			wantDiags: `Expected 'character', found '}'. [32:33]`,
 		},
+		"When a grouped expression is missing its inner expression, a diagnostic is returned.": {
+			inSource:  "scope {} definitions { value = ( ) }",
+			wantDiags: `Expected 'character', found ')'. [33:34]`,
+		},
 		"When a character range is missing an end character, a diagnostic is returned.": {
 			inSource:  "scope {} definitions { letter = 'a'.. }",
 			wantDiags: `Expected 'character', found '}'. [38:39]`,
+		},
+		"When concatenation is missing a valid right expression, a diagnostic is returned.": {
+			inSource:  "scope {} definitions { value = 'a' ( }",
+			wantDiags: `Expected 'character', found '}'. [37:38]`,
 		},
 		"When alternation is missing a right expression, a diagnostic is returned.": {
 			inSource:  "scope {} definitions { value = 'a' | }",
@@ -254,13 +262,13 @@ func Test_Parse_Definitions(t *testing.T) {
 			t.Parallel()
 
 			// Act.
-			gotDocument, gotDiagnostics := parser.Parse(tc.inSource)
+			gotDocument, gotErr := parser.Parse(tc.inSource)
 
 			// Assert.
-			claim.Equal(t, tcName, snapshot(tc.wantDiags), debugDiagnostics(gotDiagnostics), "Diagnostics")
+			claim.Equal(t, tcName, normalizeMultilineLiteral(tc.wantDiags), formatParseError(gotErr), "Parse Error")
 
 			if tc.wantTree != "" {
-				claim.Equal(t, tcName, tc.wantTree, debugDocument(tc.inSource, gotDocument, false), "Document")
+				claim.Equal(t, tcName, tc.wantTree, renderDocument(tc.inSource, gotDocument, false), "Document")
 			}
 		})
 	}
@@ -281,6 +289,19 @@ func benchmark_Parse_Definitions(b *testing.B, size int) {
 func definitionsDSL(size int) string {
 	return "scope {}\n" +
 		"definitions {\n" +
-		strings.Repeat("    letter = 'a'..'z' | 'A'..'Z'\n    identifierStart = letter | '_'\n    value = letter ('a' | 'b')+\n", size) +
+		strings.Repeat(
+			""+
+				"    lower = 'a'..'z'\n"+
+				"    upper = 'A'..'Z'\n"+
+				"    digit = '0'..'9'\n"+
+				"    underscore = '_'\n"+
+				"    letter = lower | upper\n"+
+				"    identifierStart = letter | underscore\n"+
+				"    identifierPart = letter | digit | underscore\n"+
+				"    optionalSign = ('+' | '-')?\n"+
+				"    repeatedLetter = letter*\n"+
+				"    value = letter ('a' | 'b')+\n",
+			size,
+		) +
 		"}"
 }

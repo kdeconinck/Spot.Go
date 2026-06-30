@@ -161,13 +161,13 @@ func Test_Validate_Tokens(t *testing.T) {
 			t.Parallel()
 
 			// Arrange.
-			document, parseDiagnostics := parser.Parse(tc.inSource)
+			document, parseErr := parser.Parse(tc.inSource)
 
 			// Act.
 			gotDiagnostics := validator.Validate(tc.inSource, document)
 
 			// Assert.
-			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")
+			claim.Equal(t, tc.name, error(nil), parseErr, "Parse Error")
 			claim.DeepEqual(t, tc.name, tc.wantDiagnostics, gotDiagnostics, "Diagnostic")
 		})
 	}
@@ -183,8 +183,8 @@ func benchmark_Validate_Tokens(b *testing.B, size int) {
 	b.Helper()
 
 	source := tokensDSL(size)
-	document, parseDiagnostics := parser.Parse(source)
-	claim.Equal(b, "Tokens benchmark.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
+	document, parseErr := parser.Parse(source)
+	claim.Equal(b, "Tokens benchmark.", error(nil), parseErr, "Parse Error")
 
 	for b.Loop() {
 		_ = validator.Validate(source, document)

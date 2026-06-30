@@ -13,85 +13,26 @@ import (
 	"github.com/kdeconinck/spot/location"
 )
 
-// Parse parses DSL source text into a syntax document.
-func Parse(src string) (ast.Document, []Diagnostic) {
-	parser := parser{
-		lexer: lexer.New(src),
-	}
-
+// Parse parses DSL source text into a syntax document. It stops at the first syntax error and returns it directly.
+func Parse(src string) (ast.Document, error) {
+	capacity := measureDocumentCapacity(src)
+	parser := newParser(src, capacity)
 	parser.current = parser.lexer.Next()
 	parser.next = parser.lexer.Next()
-	document := parser.parseDocument()
+	document, err := parser.parseDocument()
 
-	return document, parser.diagnostics
+	if err != nil {
+		return ast.Document{}, err
+	}
+
+	return document, nil
 }
 
 type parser struct {
-	lexer       lexer.Lexer
-	current     token.Token
-	next        token.Token
-	diagnostics []Diagnostic
-}
-
-func (p *parser) expectSectionEnd(entryKind token.TokenKind) token.Token {
-	if p.at(token.TokenRightBrace) {
-		return p.expect(token.TokenRightBrace)
-	}
-
-	if p.at(token.TokenEOF) {
-		p.addDiagnostic(token.TokenRightBrace)
-	} else {
-		p.addDiagnostic(entryKind)
-	}
-
-	return p.current
-}
-
-func (p *parser) expect(kind token.TokenKind) token.Token {
-	if p.at(kind) {
-		token := p.current
-		p.advance()
-
-		return token
-	}
-
-	token := p.current
-	p.addDiagnostic(kind)
-
-	return token
-}
-
-func (p *parser) match(kind token.TokenKind) bool {
-	if !p.at(kind) {
-		p.addDiagnostic(kind)
-
-		return false
-	}
-
-	p.advance()
-
-	return true
-}
-
-func (p *parser) consume(kind token.TokenKind) bool {
-	if !p.at(kind) {
-		return false
-	}
-
-	p.advance()
-
-	return true
-}
-
-func (p *parser) at(kind token.TokenKind) bool {
-	return p.current.Kind == kind
-}
-
-func (p *parser) addDiagnostic(kind token.TokenKind) {
-	p.diagnostics = append(p.diagnostics, Diagnostic{
-		Message: "Expected '" + kind.String() + "', found '" + p.current.Kind.String() + "'.",
-		Span:    p.current.Span,
-	})
+	lexer    lexer.Lexer
+	current  token.Token
+	next     token.Token
+	document ast.Document
 }
 
 func (p *parser) advance() {
@@ -99,9 +40,79 @@ func (p *parser) advance() {
 	p.next = p.lexer.Next()
 }
 
+func (p *parser) expectSectionEnd(entryKind token.TokenKind) (token.Token, error) {
+	if p.isAt(token.TokenRightBrace) {
+		return p.expect(token.TokenRightBrace)
+	}
+
+	if p.isAt(token.TokenEOF) {
+		return token.Token{}, p.unexpected(token.TokenRightBrace)
+	} else {
+		return token.Token{}, p.unexpected(entryKind)
+	}
+}
+
+func (p *parser) isAt(kind token.TokenKind) bool {
+	return p.current.Kind == kind
+}
+
+func (p *parser) expect(kind token.TokenKind) (token.Token, error) {
+	if p.isAt(kind) {
+		token := p.current
+		p.advance()
+
+		return token, nil
+	}
+
+	return token.Token{}, p.unexpected(kind)
+}
+
+func (p *parser) consume(kind token.TokenKind) bool {
+	if !p.isAt(kind) {
+		return false
+	}
+
+	p.advance()
+
+	return true
+}
+
+func (p *parser) match(kind token.TokenKind) error {
+	if !p.isAt(kind) {
+		return p.unexpected(kind)
+	}
+
+	p.advance()
+
+	return nil
+}
+
+func (p *parser) unexpected(kind token.TokenKind) Diagnostic {
+	return Diagnostic{
+		Message: "Expected '" + kind.String() + "', found '" + p.current.Kind.String() + "'.",
+		Span:    p.current.Span,
+	}
+}
+
 func span(start, end location.Position) location.Span {
 	return location.Span{
 		Start: start,
 		End:   end,
+	}
+}
+
+func newParser(src string, capacity documentCapacity) parser {
+	return parser{
+		lexer: lexer.New(src),
+		document: ast.Document{
+			Expressions: ast.DefinitionExpressionArena{
+				Nodes:    make([]ast.DefinitionExpressionNode, 0, capacity.amountOfExpressionNodes),
+				ChildIDs: make([]ast.DefinitionExpressionID, 0, capacity.amountOfExpressionChildReferences),
+			},
+			ScopeEntries:   make([]ast.ScopeEntry, 0, capacity.amountOfScopeElements),
+			DefinitionList: make([]ast.Definition, 0, capacity.amountOfDefinitionElements),
+			TokenList:      make([]ast.TokenDefinition, 0, capacity.amountOfTokenElements),
+			RuleList:       make([]ast.Rule, 0, capacity.amountOfRuleElements),
+		},
 	}
 }

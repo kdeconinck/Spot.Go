@@ -11,12 +11,12 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func validateRules(source string, rules ast.RulesSection, tokens ast.TokensSection, diagnostics []Diagnostic) []Diagnostic {
-	if len(rules.Rules) > 1 {
+func validateRules(source string, rules ast.RulesSection, ruleList []ast.Rule, tokens []ast.TokenDefinition, diagnostics []Diagnostic) []Diagnostic {
+	if len(ruleList) > 1 {
 		names := map[string]struct{}{}
 
-		for idx := range rules.Rules {
-			name := rules.Rules[idx].Name
+		for idx := range ruleList {
+			name := ruleList[idx].Name
 
 			if _, ok := names[name.Value(source)]; ok {
 				diagnostics = append(diagnostics, Diagnostic{
@@ -31,35 +31,14 @@ func validateRules(source string, rules ast.RulesSection, tokens ast.TokensSecti
 		}
 	}
 
-	for idx := range rules.Rules {
-		diagnostics = validateRuleReferences(source, rules.Rules[idx], tokens, diagnostics)
+	for idx := range ruleList {
+		diagnostics = validateRuleReferences(source, ruleList[idx], tokens, diagnostics)
 	}
 
 	return diagnostics
 }
 
-func validateRuleReferences(source string, rule ast.Rule, tokens ast.TokensSection, diagnostics []Diagnostic) []Diagnostic {
-	hasMatch := ruleHasMatch(rule)
-	hasReport := ruleHasReport(rule)
-
-	if !hasMatch {
-		diagnostics = append(diagnostics, Diagnostic{
-			Message: "Rule must contain a match statement.",
-			Span:    rule.Match.Span,
-		})
-	}
-
-	if !hasReport {
-		diagnostics = append(diagnostics, Diagnostic{
-			Message: "Rule must contain a report statement.",
-			Span:    rule.Report.Span,
-		})
-	}
-
-	if !hasMatch {
-		return diagnostics
-	}
-
+func validateRuleReferences(source string, rule ast.Rule, tokens []ast.TokenDefinition, diagnostics []Diagnostic) []Diagnostic {
 	matchedToken := rule.Match.Token
 
 	if !tokenDeclared(source, tokens, matchedToken.Value(source)) {
@@ -106,7 +85,7 @@ func validateRuleReferences(source string, rule ast.Rule, tokens ast.TokensSecti
 		})
 	}
 
-	if hasReport && rule.Report.Target.Value(source) != "" && rule.Report.Target.Value(source) != matchedToken.Value(source) {
+	if rule.Report.Target.Value(source) != "" && rule.Report.Target.Value(source) != matchedToken.Value(source) {
 		diagnostics = append(diagnostics, Diagnostic{
 			Message: `Report target must reference matched token "` + matchedToken.Value(source) + `".`,
 			Span:    rule.Report.Target.Span,
@@ -116,17 +95,9 @@ func validateRuleReferences(source string, rule ast.Rule, tokens ast.TokensSecti
 	return diagnostics
 }
 
-func ruleHasMatch(rule ast.Rule) bool {
-	return rule.Match.Token.Kind == token.TokenIdentifier
-}
-
-func ruleHasReport(rule ast.Rule) bool {
-	return rule.Report.Span.Start != rule.Report.Severity.Span.Start
-}
-
-func tokenDeclared(source string, tokens ast.TokensSection, name string) bool {
-	for idx := range tokens.Tokens {
-		if tokens.Tokens[idx].Name.Value(source) == name {
+func tokenDeclared(source string, tokens []ast.TokenDefinition, name string) bool {
+	for idx := range tokens {
+		if tokens[idx].Name.Value(source) == name {
 			return true
 		}
 	}

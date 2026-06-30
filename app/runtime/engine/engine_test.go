@@ -288,11 +288,11 @@ func benchmark_Engine_Analyze(b *testing.B, size int) {
 func compileProgram(tb testing.TB, source string) ir.Program {
 	tb.Helper()
 
-	document, parseDiagnostics := parser.Parse(source)
+	document, parseErr := parser.Parse(source)
 	validationDiagnostics := validator.Validate(source, document)
 
-	if len(parseDiagnostics) != 0 {
-		tb.Fatalf("engine test parse diagnostics: got %d, want 0", len(parseDiagnostics))
+	if parseErr != nil {
+		tb.Fatalf("engine test parse error: got %v, want nil", parseErr)
 	}
 
 	if len(validationDiagnostics) != 0 {

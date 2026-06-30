@@ -11,60 +11,42 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func (p *parser) parseDocument() ast.Document {
-	diagnosticCount := len(p.diagnostics)
-	scope := p.parseScopeSection()
+func (p *parser) parseDocument() (ast.Document, error) {
+	scope, err := p.parseScopeSection()
 
-	if len(p.diagnostics) != diagnosticCount {
-		return ast.Document{
-			Scope: scope,
-			Span:  scope.Span,
-		}
+	if err != nil {
+		return ast.Document{}, err
 	}
 
-	diagnosticCount = len(p.diagnostics)
-	definitions := p.parseOptionalDefinitionsSection()
+	definitions, err := p.parseOptionalDefinitionsSection()
 
-	if len(p.diagnostics) != diagnosticCount {
-		return ast.Document{
-			Scope:       scope,
-			Definitions: definitions,
-			Span:        span(scope.Span.Start, definitions.Span.End),
-		}
+	if err != nil {
+		return ast.Document{}, err
 	}
 
-	diagnosticCount = len(p.diagnostics)
-	tokens := p.parseOptionalTokensSection()
+	tokens, err := p.parseOptionalTokensSection()
 
-	if len(p.diagnostics) != diagnosticCount {
-		return ast.Document{
-			Scope:       scope,
-			Definitions: definitions,
-			Tokens:      tokens,
-			Span:        span(scope.Span.Start, tokens.Span.End),
-		}
+	if err != nil {
+		return ast.Document{}, err
 	}
 
-	diagnosticCount = len(p.diagnostics)
-	rules := p.parseOptionalRulesSection()
+	rules, err := p.parseOptionalRulesSection()
 
-	if len(p.diagnostics) != diagnosticCount {
-		return ast.Document{
-			Scope:       scope,
-			Definitions: definitions,
-			Tokens:      tokens,
-			Rules:       rules,
-			Span:        span(scope.Span.Start, rules.Span.End),
-		}
+	if err != nil {
+		return ast.Document{}, err
 	}
 
-	end := p.expect(token.TokenEOF)
+	end, err := p.expect(token.TokenEOF)
 
-	return ast.Document{
-		Scope:       scope,
-		Definitions: definitions,
-		Tokens:      tokens,
-		Rules:       rules,
-		Span:        span(scope.Span.Start, end.Span.End),
+	if err != nil {
+		return ast.Document{}, err
 	}
+
+	p.document.Scope = scope
+	p.document.Definitions = definitions
+	p.document.Tokens = tokens
+	p.document.Rules = rules
+	p.document.Span = span(scope.Span.Start, end.Span.End)
+
+	return p.document, nil
 }

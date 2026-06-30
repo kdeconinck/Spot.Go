@@ -13,8 +13,11 @@ import (
 
 // ScopeSection is a parsed scope section.
 type ScopeSection struct {
-	// Entries are the include and exclude declarations inside the scope section.
-	Entries []ScopeEntry
+	// FirstElementIdx is the index of the section's first scope entry in Document.ScopeEntries.
+	FirstElementIdx uint32
+
+	// AmountOfElements is the number of scope entries in the section.
+	AmountOfElements uint32
 
 	// Span is the byte range covered by the scope section.
 	Span location.Span

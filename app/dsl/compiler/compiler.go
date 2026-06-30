@@ -18,29 +18,32 @@ import (
 func Compile(source string, document ast.Document) ir.Program {
 	definitions := map[string]ast.Definition{}
 	tokenIndexes := map[string]int{}
+	definitionList := document.SectionDefinitions(document.Definitions)
+	tokenList := document.SectionTokens(document.Tokens)
+	ruleList := document.SectionRules(document.Rules)
 
-	for idx := range document.Definitions.Definitions {
-		definition := document.Definitions.Definitions[idx]
+	for idx := range definitionList {
+		definition := definitionList[idx]
 		definitions[definition.Name.Value(source)] = definition
 	}
 
 	program := ir.Program{
-		Tokens: make([]ir.Token, 0, len(document.Tokens.Tokens)),
-		Rules:  make([]ir.Rule, 0, len(document.Rules.Rules)),
+		Tokens: make([]ir.Token, 0, len(tokenList)),
+		Rules:  make([]ir.Rule, 0, len(ruleList)),
 	}
 
-	for idx := range document.Tokens.Tokens {
-		tok := document.Tokens.Tokens[idx]
+	for idx := range tokenList {
+		tok := tokenList[idx]
 		tokenIndexes[tok.Name.Value(source)] = idx
 		program.Tokens = append(program.Tokens, ir.Token{
 			Name:       tok.Name.Value(source),
-			Expression: compileExpression(source, tok.Expression, definitions),
+			Expression: compileExpression(source, tok.Expression, document.Expressions, definitions),
 			Skip:       tok.Skip.Kind == token.TokenSkip,
 		})
 	}
 
-	for idx := range document.Rules.Rules {
-		program.Rules = append(program.Rules, compileRule(source, document.Rules.Rules[idx], tokenIndexes))
+	for idx := range ruleList {
+		program.Rules = append(program.Rules, compileRule(source, ruleList[idx], tokenIndexes))
 	}
 
 	return program
@@ -86,7 +89,9 @@ func compileReport(source string, report ast.RuleReport, tokenIndexes map[string
 	}
 }
 
-func compileExpression(source string, expression ast.DefinitionExpression, definitions map[string]ast.Definition) ir.Expression {
+func compileExpression(source string, expressionID ast.DefinitionExpressionID, expressions ast.DefinitionExpressionArena, definitions map[string]ast.Definition) ir.Expression {
+	expression := expressions.Node(expressionID)
+
 	switch expression.Kind {
 	case ast.DefinitionExpressionCharacter:
 		return ir.Expression{
@@ -108,37 +113,37 @@ func compileExpression(source string, expression ast.DefinitionExpression, defin
 		}
 
 	case ast.DefinitionExpressionReference:
-		return compileExpression(source, definitions[expression.Start.Value(source)].Expression, definitions)
+		return compileExpression(source, definitions[expression.Start.Value(source)].Expression, expressions, definitions)
 
 	case ast.DefinitionExpressionConcatenation:
 		return ir.Expression{
 			Kind:  ir.ExpressionConcatenation,
-			Terms: compileTerms(source, expression.Terms, definitions),
+			Terms: compileTerms(source, expressions.Children(expression), expressions, definitions),
 		}
 
 	case ast.DefinitionExpressionAlternation:
 		return ir.Expression{
 			Kind:  ir.ExpressionAlternation,
-			Terms: compileTerms(source, expression.Terms, definitions),
+			Terms: compileTerms(source, expressions.Children(expression), expressions, definitions),
 		}
 
 	case ast.DefinitionExpressionGroup:
-		return compileExpression(source, *expression.Inner, definitions)
+		return compileExpression(source, expressions.Children(expression)[0], expressions, definitions)
 
 	default:
 		return ir.Expression{
 			Kind:       ir.ExpressionRepetition,
-			Inner:      pointer(compileExpression(source, *expression.Inner, definitions)),
+			Inner:      pointer(compileExpression(source, expressions.Children(expression)[0], expressions, definitions)),
 			Repetition: repetitionKind(expression.Operator.Kind),
 		}
 	}
 }
 
-func compileTerms(source string, expressions []ast.DefinitionExpression, definitions map[string]ast.Definition) []ir.Expression {
-	terms := make([]ir.Expression, 0, len(expressions))
+func compileTerms(source string, expressionIDs []ast.DefinitionExpressionID, expressions ast.DefinitionExpressionArena, definitions map[string]ast.Definition) []ir.Expression {
+	terms := make([]ir.Expression, 0, len(expressionIDs))
 
-	for idx := range expressions {
-		terms = append(terms, compileExpression(source, expressions[idx], definitions))
+	for idx := range expressionIDs {
+		terms = append(terms, compileExpression(source, expressionIDs[idx], expressions, definitions))
 	}
 
 	return terms

@@ -13,8 +13,11 @@ import (
 
 // DefinitionsSection is a parsed definitions section.
 type DefinitionsSection struct {
-	// Definitions are the declarations inside the definitions section.
-	Definitions []Definition
+	// FirstElementsIdx is the index of the section's first definition in Document.DefinitionList.
+	FirstElementsIdx uint32
+
+	// AmountOfElements is the number of definitions in the section.
+	AmountOfElements uint32
 
 	// Span is the byte range covered by the definitions section.
 	Span location.Span
@@ -25,8 +28,8 @@ type Definition struct {
 	// Name is the identifier token naming the definition.
 	Name token.Token
 
-	// Expression is the character-level expression assigned to the definition.
-	Expression DefinitionExpression
+	// Expression is the root expression node assigned to the definition.
+	Expression DefinitionExpressionID
 
 	// Span is the byte range covered by the definition.
 	Span location.Span
@@ -61,8 +64,34 @@ const (
 	DefinitionExpressionRepetition
 )
 
-// DefinitionExpression is a parsed character-level definition expression.
-type DefinitionExpression struct {
+// DefinitionExpressionID identifies a node in a DefinitionExpressionArena.
+type DefinitionExpressionID uint32
+
+// DefinitionExpressionArena stores parsed definition and token expression nodes in flat slices.
+//
+// Nodes contains the actual expression records. ChildIDs stores the adjacency data for nodes that have children,
+// such as alternations, concatenations, groups, and repetitions. A node's FirstChildIndex and ChildCount describe
+// which segment of ChildIDs belongs to that node.
+type DefinitionExpressionArena struct {
+	// Nodes contains every expression node referenced by the parsed document.
+	Nodes []DefinitionExpressionNode
+
+	// ChildIDs stores child node identifiers for branch nodes.
+	ChildIDs []DefinitionExpressionID
+}
+
+// Node returns the expression node identified by id.
+func (arena DefinitionExpressionArena) Node(id DefinitionExpressionID) DefinitionExpressionNode {
+	return arena.Nodes[id]
+}
+
+// Children returns the child expression identifiers for node.
+func (arena DefinitionExpressionArena) Children(node DefinitionExpressionNode) []DefinitionExpressionID {
+	return arena.ChildIDs[node.FirstElementIdx : node.FirstElementIdx+node.AmountOfElements]
+}
+
+// DefinitionExpressionNode is a parsed character-level definition expression.
+type DefinitionExpressionNode struct {
 	// Kind identifies the form of expression.
 	Kind DefinitionExpressionKind
 
@@ -75,11 +104,11 @@ type DefinitionExpression struct {
 	// Operator is the postfix operator token in a repetition expression.
 	Operator token.Token
 
-	// Terms are the child expressions in an alternation or concatenation expression.
-	Terms []DefinitionExpression
+	// FirstElementIdx is the start offset of this node's children in ChildIDs.
+	FirstElementIdx uint32
 
-	// Inner is the expression contained in a grouped or repetition expression.
-	Inner *DefinitionExpression
+	// AmountOfElements is the number of children stored for this node.
+	AmountOfElements uint32
 
 	// Span is the byte range covered by the expression.
 	Span location.Span

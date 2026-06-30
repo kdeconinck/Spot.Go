@@ -27,7 +27,7 @@ func Test_Compile_Rules_PreservesSourceOrder(t *testing.T) {
 		rule First { match Identifier report info at Identifier "first" }
 		rule Second { match Number where Number.length >= 2 report err at Number "second" }
 	}`
-	document, parseDiagnostics := parser.Parse(source)
+	document, parseErr := parser.Parse(source)
 	validationDiagnostics := validator.Validate(source, document)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
@@ -75,7 +75,7 @@ func Test_Compile_Rules_PreservesSourceOrder(t *testing.T) {
 	gotProgram := compiler.Compile(source, document)
 
 	// Assert.
-	claim.Equal(t, "When compiling rules, parse diagnostics are not returned.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
+	claim.Equal(t, "When compiling rules, no parse error is returned.", error(nil), parseErr, "Parse Error")
 	claim.Equal(t, "When compiling rules, validation diagnostics are not returned.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
 	claim.DeepEqual(t, "When compiling rules, source order is preserved.", wantProgram, gotProgram, "Program")
 }
@@ -193,14 +193,14 @@ func Test_Compile_Rules_CompilesConditionOperators(t *testing.T) {
 			t.Parallel()
 
 			// Arrange.
-			document, parseDiagnostics := parser.Parse(tc.inSource)
+			document, parseErr := parser.Parse(tc.inSource)
 			validationDiagnostics := validator.Validate(tc.inSource, document)
 
 			// Act.
 			gotProgram := compiler.Compile(tc.inSource, document)
 
 			// Assert.
-			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")
+			claim.Equal(t, tc.name, error(nil), parseErr, "Parse Error")
 			claim.Equal(t, tc.name, 0, len(validationDiagnostics), "Validation Diagnostic Count")
 			claim.DeepEqual(t, tc.name, tc.wantProgram, gotProgram, "Program")
 		})

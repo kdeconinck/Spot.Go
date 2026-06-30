@@ -12,10 +12,10 @@ import "github.com/kdeconinck/spot/dsl/ast"
 func Validate(source string, document ast.Document) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	diagnostics = validateScope(source, document.Scope, diagnostics)
-	diagnostics = validateDefinitions(source, document.Definitions, diagnostics)
-	diagnostics = validateTokens(source, document.Tokens, document.Definitions, diagnostics)
-	diagnostics = validateRules(source, document.Rules, document.Tokens, diagnostics)
+	diagnostics = validateScope(source, document.Scope, document.ScopeSectionEntries(document.Scope), diagnostics)
+	diagnostics = validateDefinitions(source, document.Definitions, document.SectionDefinitions(document.Definitions), document.Expressions, diagnostics)
+	diagnostics = validateTokens(source, document.Tokens, document.SectionTokens(document.Tokens), document.SectionDefinitions(document.Definitions), document.Expressions, diagnostics)
+	diagnostics = validateRules(source, document.Rules, document.SectionRules(document.Rules), document.SectionTokens(document.Tokens), diagnostics)
 
 	return diagnostics
 }

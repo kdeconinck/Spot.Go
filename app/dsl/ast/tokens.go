@@ -13,8 +13,11 @@ import (
 
 // TokensSection is a parsed tokens section.
 type TokensSection struct {
-	// Tokens are the declarations inside the tokens section.
-	Tokens []TokenDefinition
+	// FirstElementIdx is the index of the section's first token definition in Document.TokenList.
+	FirstElementIdx uint32
+
+	// AmountOfElements is the number of token definitions in the section.
+	AmountOfElements uint32
 
 	// Span is the byte range covered by the tokens section.
 	Span location.Span
@@ -25,8 +28,8 @@ type TokenDefinition struct {
 	// Name is the identifier token naming the emitted token.
 	Name token.Token
 
-	// Expression is the expression assigned to the token.
-	Expression DefinitionExpression
+	// Expression is the root expression node assigned to the token.
+	Expression DefinitionExpressionID
 
 	// Skip marks a token declaration whose matches are not emitted.
 	Skip token.Token

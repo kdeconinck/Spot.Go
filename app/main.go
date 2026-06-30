@@ -44,12 +44,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	document, parseDiagnostics := parser.Parse(string(source))
+	document, parseErr := parser.Parse(string(source))
 
-	if len(parseDiagnostics) != 0 {
-		for idx := range parseDiagnostics {
-			writeSyntaxDiagnostic(stderr, dslPath, parseDiagnostics[idx].Span.Start, parseDiagnostics[idx].Span.End, parseDiagnostics[idx].Message)
-		}
+	if parseErr != nil {
+		diagnostic := parseErr.(parser.Diagnostic)
+		writeSyntaxDiagnostic(stderr, dslPath, diagnostic.Span.Start, diagnostic.Span.End, diagnostic.Message)
 
 		return 2
 	}
@@ -64,7 +63,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	scope, err := compileScope(document.Scope, string(source))
+	scope, err := compileScope(document.ScopeSectionEntries(document.Scope), string(source))
 
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to compile scope patterns: %v\n", err)
@@ -150,20 +149,20 @@ type scope struct {
 	excludes []string
 }
 
-func compileScope(section ast.ScopeSection, source string) (scope, error) {
+func compileScope(entries []ast.ScopeEntry, source string) (scope, error) {
 	compiled := scope{
-		includes: make([]string, 0, len(section.Entries)),
-		excludes: make([]string, 0, len(section.Entries)),
+		includes: make([]string, 0, len(entries)),
+		excludes: make([]string, 0, len(entries)),
 	}
 
-	for idx := range section.Entries {
-		pattern, err := strconv.Unquote(section.Entries[idx].Pattern.Value(source))
+	for idx := range entries {
+		pattern, err := strconv.Unquote(entries[idx].Pattern.Value(source))
 
 		if err != nil {
 			return scope{}, err
 		}
 
-		if section.Entries[idx].Kind == ast.ScopeEntryInclude {
+		if entries[idx].Kind == ast.ScopeEntryInclude {
 			compiled.includes = append(compiled.includes, pattern)
 			continue
 		}

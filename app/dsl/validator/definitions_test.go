@@ -141,13 +141,13 @@ func Test_Validate_Definitions(t *testing.T) {
 			t.Parallel()
 
 			// Arrange.
-			document, parseDiagnostics := parser.Parse(tc.inSource)
+			document, parseErr := parser.Parse(tc.inSource)
 
 			// Act.
 			gotDiagnostics := validator.Validate(tc.inSource, document)
 
 			// Assert.
-			claim.Equal(t, tc.name, 0, len(parseDiagnostics), "Parse Diagnostic Count")
+			claim.Equal(t, tc.name, error(nil), parseErr, "Parse Error")
 			claim.DeepEqual(t, tc.name, tc.wantDiagnostics, gotDiagnostics, "Diagnostic")
 		})
 	}
@@ -163,8 +163,8 @@ func benchmark_Validate_Definitions(b *testing.B, size int) {
 	b.Helper()
 
 	source := definitionsDSL(size)
-	document, parseDiagnostics := parser.Parse(source)
-	claim.Equal(b, "Definitions benchmark.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
+	document, parseErr := parser.Parse(source)
+	claim.Equal(b, "Definitions benchmark.", error(nil), parseErr, "Parse Error")
 
 	for b.Loop() {
 		_ = validator.Validate(source, document)

@@ -23,10 +23,9 @@ func Test_Validate_Rules(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
-		name                     string
-		inSource                 string
-		wantParseDiagnosticCount int
-		wantDiagnostics          []validator.Diagnostic
+		name            string
+		inSource        string
+		wantDiagnostics []validator.Diagnostic
 	}{
 		{
 			name:     "When rule names are unique, no diagnostic is returned.",
@@ -45,22 +44,6 @@ func Test_Validate_Rules(t *testing.T) {
 			wantDiagnostics: []validator.Diagnostic{
 				diagnostic(`Rule "PublicIdentifier" is already declared.`, 143, 159),
 				diagnostic(`Rule "PublicIdentifier" is already declared.`, 216, 232),
-			},
-		},
-		{
-			name:                     "When a rule is missing a match statement, a diagnostic is returned.",
-			inSource:                 `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { report warn at Identifier "x" } }`,
-			wantParseDiagnosticCount: 2,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic("Rule must contain a match statement.", 89, 95),
-			},
-		},
-		{
-			name:                     "When a rule is missing a report statement, a diagnostic is returned.",
-			inSource:                 `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier } }`,
-			wantParseDiagnosticCount: 5,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic("Rule must contain a report statement.", 106, 107),
 			},
 		},
 		{
@@ -129,13 +112,13 @@ func Test_Validate_Rules(t *testing.T) {
 			t.Parallel()
 
 			// Arrange.
-			document, parseDiagnostics := parser.Parse(tc.inSource)
+			document, parseErr := parser.Parse(tc.inSource)
 
 			// Act.
 			gotDiagnostics := validator.Validate(tc.inSource, document)
 
 			// Assert.
-			claim.Equal(t, tc.name, tc.wantParseDiagnosticCount, len(parseDiagnostics), "Parse Diagnostic Count")
+			claim.Equal(t, tc.name, error(nil), parseErr, "Parse Error")
 			claim.DeepEqual(t, tc.name, tc.wantDiagnostics, gotDiagnostics, "Diagnostic")
 		})
 	}
@@ -151,8 +134,8 @@ func benchmark_Validate_Rules(b *testing.B, size int) {
 	b.Helper()
 
 	source := rulesDSL(size)
-	document, parseDiagnostics := parser.Parse(source)
-	claim.Equal(b, "Rules benchmark.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
+	document, parseErr := parser.Parse(source)
+	claim.Equal(b, "Rules benchmark.", error(nil), parseErr, "Parse Error")
 
 	for b.Loop() {
 		_ = validator.Validate(source, document)

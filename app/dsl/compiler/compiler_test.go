@@ -26,7 +26,7 @@ func Test_Compile_DSL(t *testing.T) {
 
 	// Arrange.
 	source := dsl(0)
-	document, parseDiagnostics := parser.Parse(source)
+	document, parseErr := parser.Parse(source)
 	validationDiagnostics := validator.Validate(source, document)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
@@ -105,7 +105,7 @@ func Test_Compile_DSL(t *testing.T) {
 	gotProgram := compiler.Compile(source, document)
 
 	// Assert.
-	claim.Equal(t, "When compiling a full DSL file, parse diagnostics are not returned.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
+	claim.Equal(t, "When compiling a full DSL file, no parse error is returned.", error(nil), parseErr, "Parse Error")
 	claim.Equal(t, "When compiling a full DSL file, validation diagnostics are not returned.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
 	claim.DeepEqual(t, "When compiling a full DSL file, a program is returned.", wantProgram, gotProgram, "Program")
 }
@@ -120,9 +120,9 @@ func benchmark_Compile_DSL(b *testing.B, size int) {
 	b.Helper()
 
 	source := dsl(size)
-	document, parseDiagnostics := parser.Parse(source)
+	document, parseErr := parser.Parse(source)
 	validationDiagnostics := validator.Validate(source, document)
-	claim.Equal(b, "Compile DSL benchmark parse diagnostics.", 0, len(parseDiagnostics), "Parse Diagnostic Count")
+	claim.Equal(b, "Compile DSL benchmark parse error.", error(nil), parseErr, "Parse Error")
 	claim.Equal(b, "Compile DSL benchmark validation diagnostics.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
 
 	for b.Loop() {

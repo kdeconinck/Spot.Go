@@ -11,51 +11,63 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func (p *parser) parseScopeSection() ast.ScopeSection {
-	if !p.at(token.TokenScope) {
-		p.addDiagnostic(token.TokenScope)
+func (p *parser) parseScopeSection() (ast.ScopeSection, error) {
+	if !p.isAt(token.TokenScope) {
+		return ast.ScopeSection{}, p.unexpected(token.TokenScope)
+	}
 
-		return ast.ScopeSection{
-			Span: p.current.Span,
+	start := p.current
+
+	p.advance()
+
+	if err := p.match(token.TokenLeftBrace); err != nil {
+		return ast.ScopeSection{}, err
+	}
+
+	firstElementIdx := uint32(len(p.document.ScopeEntries))
+
+	for p.isAt(token.TokenInclude) || p.isAt(token.TokenExclude) {
+		entry, err := p.parseScopeEntry()
+
+		if err != nil {
+			return ast.ScopeSection{}, err
 		}
+
+		p.document.ScopeEntries = append(p.document.ScopeEntries, entry)
 	}
 
-	start := p.expect(token.TokenScope)
+	end, err := p.expectSectionEnd(token.TokenInclude)
 
-	if !p.match(token.TokenLeftBrace) {
-		return ast.ScopeSection{
-			Span: start.Span,
-		}
+	if err != nil {
+		return ast.ScopeSection{}, err
 	}
-
-	var entries []ast.ScopeEntry
-
-	for p.at(token.TokenInclude) || p.at(token.TokenExclude) {
-		entries = append(entries, p.parseScopeEntry())
-	}
-
-	end := p.expectSectionEnd(token.TokenInclude)
 
 	return ast.ScopeSection{
-		Entries: entries,
-		Span:    span(start.Span.Start, end.Span.End),
-	}
+		FirstElementIdx:  firstElementIdx,
+		AmountOfElements: uint32(len(p.document.ScopeEntries)) - firstElementIdx,
+		Span:             span(start.Span.Start, end.Span.End),
+	}, nil
 }
 
-func (p *parser) parseScopeEntry() ast.ScopeEntry {
+func (p *parser) parseScopeEntry() (ast.ScopeEntry, error) {
 	start := p.current
 	kind := ast.ScopeEntryInclude
 
-	if p.at(token.TokenExclude) {
+	if p.isAt(token.TokenExclude) {
 		kind = ast.ScopeEntryExclude
 	}
 
 	p.advance()
-	pattern := p.expect(token.TokenString)
+
+	pattern, err := p.expect(token.TokenString)
+
+	if err != nil {
+		return ast.ScopeEntry{}, err
+	}
 
 	return ast.ScopeEntry{
 		Kind:    kind,
 		Pattern: pattern,
 		Span:    span(start.Span.Start, pattern.Span.End),
-	}
+	}, nil
 }

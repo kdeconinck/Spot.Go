@@ -8,11 +8,11 @@ package validator
 
 import "github.com/kdeconinck/spot/dsl/ast"
 
-func validateScope(source string, scope ast.ScopeSection, diagnostics []Diagnostic) []Diagnostic {
+func validateScope(source string, scope ast.ScopeSection, entries []ast.ScopeEntry, diagnostics []Diagnostic) []Diagnostic {
 	hasInclude := false
 
-	for idx := range scope.Entries {
-		entry := scope.Entries[idx]
+	for idx := range entries {
+		entry := entries[idx]
 
 		if entry.Kind == ast.ScopeEntryInclude {
 			hasInclude = true

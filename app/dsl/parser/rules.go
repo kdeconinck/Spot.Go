@@ -11,52 +11,86 @@ import (
 	"github.com/kdeconinck/spot/dsl/token"
 )
 
-func (p *parser) parseOptionalRulesSection() ast.RulesSection {
-	if !p.at(token.TokenRules) {
-		return ast.RulesSection{}
+func (p *parser) parseOptionalRulesSection() (ast.RulesSection, error) {
+	if !p.isAt(token.TokenRules) {
+		return ast.RulesSection{}, nil
 	}
 
 	return p.parseRulesSection()
 }
 
-func (p *parser) parseRulesSection() ast.RulesSection {
-	start := p.expect(token.TokenRules)
+func (p *parser) parseRulesSection() (ast.RulesSection, error) {
+	start := p.current
 
-	if !p.match(token.TokenLeftBrace) {
-		return ast.RulesSection{
-			Span: start.Span,
+	p.advance()
+
+	if err := p.match(token.TokenLeftBrace); err != nil {
+		return ast.RulesSection{}, err
+	}
+
+	firstRule := uint32(len(p.document.RuleList))
+
+	for p.isAt(token.TokenRule) {
+		rule, err := p.parseRule()
+
+		if err != nil {
+			return ast.RulesSection{}, err
 		}
+
+		p.document.RuleList = append(p.document.RuleList, rule)
 	}
 
-	var rules []ast.Rule
+	end, err := p.expectSectionEnd(token.TokenRule)
 
-	for p.at(token.TokenRule) {
-		rules = append(rules, p.parseRule())
+	if err != nil {
+		return ast.RulesSection{}, err
 	}
-
-	end := p.expectSectionEnd(token.TokenRule)
 
 	return ast.RulesSection{
-		Rules: rules,
-		Span:  span(start.Span.Start, end.Span.End),
-	}
+		FirstElementIdx:  firstRule,
+		AmountOfElements: uint32(len(p.document.RuleList)) - firstRule,
+		Span:             span(start.Span.Start, end.Span.End),
+	}, nil
 }
 
-func (p *parser) parseRule() ast.Rule {
-	start := p.expect(token.TokenRule)
-	name := p.expect(token.TokenIdentifier)
+func (p *parser) parseRule() (ast.Rule, error) {
+	start := p.current
 
-	if !p.match(token.TokenLeftBrace) {
-		return ast.Rule{
-			Name: name,
-			Span: span(start.Span.Start, name.Span.End),
-		}
+	p.advance()
+
+	name, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return ast.Rule{}, err
 	}
 
-	match := p.parseRuleMatch()
-	where := p.parseOptionalRuleCondition()
-	report := p.parseRuleReport()
-	end := p.expect(token.TokenRightBrace)
+	if err := p.match(token.TokenLeftBrace); err != nil {
+		return ast.Rule{}, err
+	}
+
+	match, err := p.parseRuleMatch()
+
+	if err != nil {
+		return ast.Rule{}, err
+	}
+
+	where, err := p.parseOptionalRuleCondition()
+
+	if err != nil {
+		return ast.Rule{}, err
+	}
+
+	report, err := p.parseRuleReport()
+
+	if err != nil {
+		return ast.Rule{}, err
+	}
+
+	end, err := p.expect(token.TokenRightBrace)
+
+	if err != nil {
+		return ast.Rule{}, err
+	}
 
 	return ast.Rule{
 		Name:   name,
@@ -64,34 +98,68 @@ func (p *parser) parseRule() ast.Rule {
 		Where:  where,
 		Report: report,
 		Span:   span(start.Span.Start, end.Span.End),
-	}
+	}, nil
 }
 
-func (p *parser) parseRuleMatch() ast.RuleMatch {
-	start := p.expect(token.TokenMatch)
-	tok := p.expect(token.TokenIdentifier)
+func (p *parser) parseRuleMatch() (ast.RuleMatch, error) {
+	start, err := p.expect(token.TokenMatch)
+
+	if err != nil {
+		return ast.RuleMatch{}, err
+	}
+
+	tok, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return ast.RuleMatch{}, err
+	}
 
 	return ast.RuleMatch{
 		Token: tok,
 		Span:  span(start.Span.Start, tok.Span.End),
-	}
+	}, nil
 }
 
-func (p *parser) parseOptionalRuleCondition() ast.RuleCondition {
-	if !p.at(token.TokenWhere) {
-		return ast.RuleCondition{}
+func (p *parser) parseOptionalRuleCondition() (ast.RuleCondition, error) {
+	if !p.isAt(token.TokenWhere) {
+		return ast.RuleCondition{}, nil
 	}
 
 	return p.parseRuleCondition()
 }
 
-func (p *parser) parseRuleCondition() ast.RuleCondition {
-	start := p.expect(token.TokenWhere)
-	subject := p.expect(token.TokenIdentifier)
-	p.expect(token.TokenDot)
-	property := p.expect(token.TokenIdentifier)
-	operator := p.expectComparisonOperator()
-	value := p.expectConditionLiteral()
+func (p *parser) parseRuleCondition() (ast.RuleCondition, error) {
+	start := p.current
+
+	p.advance()
+
+	subject, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return ast.RuleCondition{}, err
+	}
+
+	if _, err := p.expect(token.TokenDot); err != nil {
+		return ast.RuleCondition{}, err
+	}
+
+	property, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return ast.RuleCondition{}, err
+	}
+
+	operator, err := p.expectComparisonOperator()
+
+	if err != nil {
+		return ast.RuleCondition{}, err
+	}
+
+	value, err := p.expectConditionLiteral()
+
+	if err != nil {
+		return ast.RuleCondition{}, err
+	}
 
 	return ast.RuleCondition{
 		Subject:  subject,
@@ -99,67 +167,80 @@ func (p *parser) parseRuleCondition() ast.RuleCondition {
 		Operator: operator,
 		Value:    value,
 		Span:     span(start.Span.Start, value.Span.End),
-	}
+	}, nil
 }
 
-func (p *parser) parseRuleReport() ast.RuleReport {
-	start := p.expect(token.TokenReport)
-	severity := p.expectSeverity()
-	p.expect(token.TokenAt)
-	target := p.expect(token.TokenIdentifier)
-	message := p.expect(token.TokenString)
+func (p *parser) parseRuleReport() (ast.RuleReport, error) {
+	start, err := p.expect(token.TokenReport)
+
+	if err != nil {
+		return ast.RuleReport{}, err
+	}
+
+	severity, err := p.expectSeverity()
+
+	if err != nil {
+		return ast.RuleReport{}, err
+	}
+
+	if _, err := p.expect(token.TokenAt); err != nil {
+		return ast.RuleReport{}, err
+	}
+
+	target, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return ast.RuleReport{}, err
+	}
+
+	message, err := p.expect(token.TokenString)
+
+	if err != nil {
+		return ast.RuleReport{}, err
+	}
 
 	return ast.RuleReport{
 		Severity: severity,
 		Target:   target,
 		Message:  message,
 		Span:     span(start.Span.Start, message.Span.End),
-	}
+	}, nil
 }
 
-func (p *parser) expectComparisonOperator() token.Token {
-	if p.at(token.TokenEqualEqual) ||
-		p.at(token.TokenBangEqual) ||
-		p.at(token.TokenLess) ||
-		p.at(token.TokenLessEqual) ||
-		p.at(token.TokenGreater) ||
-		p.at(token.TokenGreaterEqual) {
+func (p *parser) expectComparisonOperator() (token.Token, error) {
+	if p.isAt(token.TokenEqualEqual) ||
+		p.isAt(token.TokenBangEqual) ||
+		p.isAt(token.TokenLess) ||
+		p.isAt(token.TokenLessEqual) ||
+		p.isAt(token.TokenGreater) ||
+		p.isAt(token.TokenGreaterEqual) {
 		tok := p.current
 		p.advance()
 
-		return tok
+		return tok, nil
 	}
 
-	tok := p.current
-	p.addDiagnostic(token.TokenEqualEqual)
-
-	return tok
+	return token.Token{}, p.unexpected(token.TokenEqualEqual)
 }
 
-func (p *parser) expectConditionLiteral() token.Token {
-	if p.at(token.TokenString) || p.at(token.TokenInteger) {
+func (p *parser) expectConditionLiteral() (token.Token, error) {
+	if p.isAt(token.TokenString) || p.isAt(token.TokenInteger) {
 		token := p.current
 		p.advance()
 
-		return token
+		return token, nil
 	}
 
-	tok := p.current
-	p.addDiagnostic(token.TokenString)
-
-	return tok
+	return token.Token{}, p.unexpected(token.TokenString)
 }
 
-func (p *parser) expectSeverity() token.Token {
-	if p.at(token.TokenInfo) || p.at(token.TokenWarn) || p.at(token.TokenErr) {
+func (p *parser) expectSeverity() (token.Token, error) {
+	if p.isAt(token.TokenInfo) || p.isAt(token.TokenWarn) || p.isAt(token.TokenErr) {
 		token := p.current
 		p.advance()
 
-		return token
+		return token, nil
 	}
 
-	tok := p.current
-	p.addDiagnostic(token.TokenWarn)
-
-	return tok
+	return token.Token{}, p.unexpected(token.TokenWarn)
 }

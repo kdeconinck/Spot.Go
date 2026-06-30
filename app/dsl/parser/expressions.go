@@ -9,132 +9,212 @@ package parser
 import (
 	"github.com/kdeconinck/spot/dsl/ast"
 	"github.com/kdeconinck/spot/dsl/token"
+	"github.com/kdeconinck/spot/location"
 )
 
-func (p *parser) parseExpression(allowString bool) ast.DefinitionExpression {
-	first := p.parseConcatenation(allowString)
+func (p *parser) parseExpression(allowString bool) (ast.DefinitionExpressionID, error) {
+	first, err := p.parseConcatenation(allowString)
 
-	if !p.at(token.TokenPipe) {
-		return first
+	if err != nil {
+		return 0, err
 	}
 
-	terms := make([]ast.DefinitionExpression, 0, 2)
+	if !p.isAt(token.TokenPipe) {
+		return first, nil
+	}
+
+	var buffer [4]ast.DefinitionExpressionID
+	terms := buffer[:0]
 	terms = append(terms, first)
 
 	for p.consume(token.TokenPipe) {
-		terms = append(terms, p.parseConcatenation(allowString))
+		term, err := p.parseConcatenation(allowString)
+
+		if err != nil {
+			return 0, err
+		}
+
+		terms = append(terms, term)
 	}
 
-	return ast.DefinitionExpression{
-		Kind:  ast.DefinitionExpressionAlternation,
-		Terms: terms,
-		Span:  span(first.Span.Start, terms[len(terms)-1].Span.End),
-	}
+	return p.addExpressionBranch(
+		ast.DefinitionExpressionAlternation,
+		terms,
+		span(p.expressionNode(first).Span.Start, p.expressionNode(terms[len(terms)-1]).Span.End),
+	), nil
 }
 
-func (p *parser) parseConcatenation(allowString bool) ast.DefinitionExpression {
-	first := p.parseRepetition(allowString)
+func (p *parser) parseConcatenation(allowString bool) (ast.DefinitionExpressionID, error) {
+	first, err := p.parseRepetition(allowString)
 
-	if !p.atExpressionContinuationStart(allowString) {
-		return first
+	if err != nil {
+		return 0, err
 	}
 
-	terms := make([]ast.DefinitionExpression, 0, 2)
+	if !p.atExpressionContinuationStart(allowString) {
+		return first, nil
+	}
+
+	var buffer [4]ast.DefinitionExpressionID
+	terms := buffer[:0]
 	terms = append(terms, first)
 
 	for p.atExpressionContinuationStart(allowString) {
-		terms = append(terms, p.parseRepetition(allowString))
+		term, err := p.parseRepetition(allowString)
+
+		if err != nil {
+			return 0, err
+		}
+
+		terms = append(terms, term)
 	}
 
-	return ast.DefinitionExpression{
-		Kind:  ast.DefinitionExpressionConcatenation,
-		Terms: terms,
-		Span:  span(first.Span.Start, terms[len(terms)-1].Span.End),
-	}
+	return p.addExpressionBranch(
+		ast.DefinitionExpressionConcatenation,
+		terms,
+		span(p.expressionNode(first).Span.Start, p.expressionNode(terms[len(terms)-1]).Span.End),
+	), nil
 }
 
-func (p *parser) parseRepetition(allowString bool) ast.DefinitionExpression {
-	inner := p.parsePrimary(allowString)
+func (p *parser) parseRepetition(allowString bool) (ast.DefinitionExpressionID, error) {
+	inner, err := p.parsePrimary(allowString)
 
-	if !p.at(token.TokenQuestion) && !p.at(token.TokenStar) && !p.at(token.TokenPlus) {
-		return inner
+	if err != nil {
+		return 0, err
+	}
+
+	if !p.isAt(token.TokenQuestion) && !p.isAt(token.TokenStar) && !p.isAt(token.TokenPlus) {
+		return inner, nil
 	}
 
 	operator := p.current
+
 	p.advance()
 
-	return ast.DefinitionExpression{
-		Kind:     ast.DefinitionExpressionRepetition,
-		Operator: operator,
-		Inner:    &inner,
-		Span:     span(inner.Span.Start, operator.Span.End),
-	}
+	return p.addExpressionNode(ast.DefinitionExpressionNode{
+		Kind:             ast.DefinitionExpressionRepetition,
+		Operator:         operator,
+		FirstElementIdx:  p.appendExpressionChildren(inner),
+		AmountOfElements: 1,
+		Span:             span(p.expressionNode(inner).Span.Start, operator.Span.End),
+	}), nil
 }
 
-func (p *parser) parsePrimary(allowString bool) ast.DefinitionExpression {
-	if p.at(token.TokenLeftParen) {
+func (p *parser) parsePrimary(allowString bool) (ast.DefinitionExpressionID, error) {
+	if p.isAt(token.TokenLeftParen) {
 		return p.parseGroupedExpression(allowString)
 	}
 
-	if allowString && p.at(token.TokenString) {
-		start := p.expect(token.TokenString)
+	if allowString && p.isAt(token.TokenString) {
+		start := p.current
 
-		return ast.DefinitionExpression{
+		p.advance()
+
+		return p.addExpressionNode(ast.DefinitionExpressionNode{
 			Kind:  ast.DefinitionExpressionString,
 			Start: start,
 			Span:  start.Span,
-		}
+		}), nil
 	}
 
-	if p.at(token.TokenIdentifier) {
-		reference := p.expect(token.TokenIdentifier)
+	if p.isAt(token.TokenIdentifier) {
+		reference := p.current
 
-		return ast.DefinitionExpression{
+		p.advance()
+
+		return p.addExpressionNode(ast.DefinitionExpressionNode{
 			Kind:  ast.DefinitionExpressionReference,
 			Start: reference,
 			Span:  reference.Span,
-		}
+		}), nil
 	}
 
-	start := p.expect(token.TokenCharacter)
+	start, err := p.expect(token.TokenCharacter)
+
+	if err != nil {
+		return 0, err
+	}
 
 	if !p.consume(token.TokenDotDot) {
-		return ast.DefinitionExpression{
+		return p.addExpressionNode(ast.DefinitionExpressionNode{
 			Kind:  ast.DefinitionExpressionCharacter,
 			Start: start,
 			Span:  start.Span,
-		}
+		}), nil
 	}
 
-	end := p.expect(token.TokenCharacter)
+	end, err := p.expect(token.TokenCharacter)
 
-	return ast.DefinitionExpression{
+	if err != nil {
+		return 0, err
+	}
+
+	return p.addExpressionNode(ast.DefinitionExpressionNode{
 		Kind:  ast.DefinitionExpressionRange,
 		Start: start,
 		End:   end,
 		Span:  span(start.Span.Start, end.Span.End),
-	}
+	}), nil
 }
 
 func (p *parser) atExpressionContinuationStart(allowString bool) bool {
-	if p.at(token.TokenIdentifier) && p.next.Kind == token.TokenEqual {
+	if p.isAt(token.TokenIdentifier) && p.next.Kind == token.TokenEqual {
 		return false
 	}
 
-	return p.at(token.TokenLeftParen) ||
-		p.at(token.TokenIdentifier) ||
-		p.at(token.TokenCharacter) ||
-		allowString && p.at(token.TokenString)
+	return p.isAt(token.TokenLeftParen) || p.isAt(token.TokenIdentifier) || p.isAt(token.TokenCharacter) || allowString && p.isAt(token.TokenString)
 }
 
-func (p *parser) parseGroupedExpression(allowString bool) ast.DefinitionExpression {
-	start := p.expect(token.TokenLeftParen)
-	inner := p.parseExpression(allowString)
-	end := p.expect(token.TokenRightParen)
+func (p *parser) parseGroupedExpression(allowString bool) (ast.DefinitionExpressionID, error) {
+	start := p.current
 
-	return ast.DefinitionExpression{
-		Kind:  ast.DefinitionExpressionGroup,
-		Inner: &inner,
-		Span:  span(start.Span.Start, end.Span.End),
+	p.advance()
+
+	inner, err := p.parseExpression(allowString)
+
+	if err != nil {
+		return 0, err
 	}
+
+	end, err := p.expect(token.TokenRightParen)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return p.addExpressionNode(ast.DefinitionExpressionNode{
+		Kind:             ast.DefinitionExpressionGroup,
+		FirstElementIdx:  p.appendExpressionChildren(inner),
+		AmountOfElements: 1,
+		Span:             span(start.Span.Start, end.Span.End),
+	}), nil
+}
+
+func (p *parser) addExpressionBranch(kind ast.DefinitionExpressionKind, children []ast.DefinitionExpressionID, exprSpan location.Span) ast.DefinitionExpressionID {
+	firstElementIdx := p.appendExpressionChildren(children...)
+
+	return p.addExpressionNode(ast.DefinitionExpressionNode{
+		Kind:             kind,
+		FirstElementIdx:  firstElementIdx,
+		AmountOfElements: uint32(len(children)),
+		Span:             exprSpan,
+	})
+}
+
+func (p *parser) appendExpressionChildren(children ...ast.DefinitionExpressionID) uint32 {
+	firstElementIdx := uint32(len(p.document.Expressions.ChildIDs))
+	p.document.Expressions.ChildIDs = append(p.document.Expressions.ChildIDs, children...)
+
+	return firstElementIdx
+}
+
+func (p *parser) addExpressionNode(node ast.DefinitionExpressionNode) ast.DefinitionExpressionID {
+	id := ast.DefinitionExpressionID(len(p.document.Expressions.Nodes))
+	p.document.Expressions.Nodes = append(p.document.Expressions.Nodes, node)
+
+	return id
+}
+
+func (p *parser) expressionNode(id ast.DefinitionExpressionID) ast.DefinitionExpressionNode {
+	return p.document.Expressions.Node(id)
 }

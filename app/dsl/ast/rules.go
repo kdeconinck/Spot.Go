@@ -13,8 +13,11 @@ import (
 
 // RulesSection is a parsed rules section.
 type RulesSection struct {
-	// Rules are the declarations inside the rules section.
-	Rules []Rule
+	// FirstElementIdx is the index of the section's first rule in Document.RuleList.
+	FirstElementIdx uint32
+
+	// AmountOfElements is the number of rules in the section.
+	AmountOfElements uint32
 
 	// Span is the byte range covered by the rules section.
 	Span location.Span
