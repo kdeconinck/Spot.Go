@@ -63,9 +63,10 @@ func Test_Validate_Syntax(t *testing.T) {
 				}
 				tokens {
 					Identifier = "id"
+					Name = "name"
 				}
 				syntax {
-					node [[Identifier]] = Identifier
+					node [[Identifier]] = Name
 				}
 			`),
 			wantDiagnostics: []expectedDiagnostic{
@@ -133,6 +134,56 @@ func Test_Validate_Syntax(t *testing.T) {
 			wantDiagnostics: []expectedDiagnostic{
 				expectDiagnostic(`Syntax reference "Missing" is not declared as a token or syntax node.`, 0),
 				expectDiagnostic(`Syntax reference "Other" is not declared as a token or syntax node.`, 1),
+			},
+		},
+		"When a syntax node is recursive, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node Word = [[Word]]
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Syntax node "Word" is recursive.`, 0),
+			},
+		},
+		"When syntax recursion is indirect, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node Word = Pair
+					node Pair = [[Word]]
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Syntax node "Word" is recursive.`, 0),
+			},
+		},
+		"When a syntax repetition can match empty input, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node OptionalWord = Identifier?
+					node WordList = [[OptionalWord*]]
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic("Syntax repetition expression must not match empty input.", 0),
 			},
 		},
 	} {
