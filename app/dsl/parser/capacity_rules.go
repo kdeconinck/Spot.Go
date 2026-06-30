@@ -32,11 +32,17 @@ func (p *sizingParser) measureRulesSection() {
 }
 
 func (p *sizingParser) startsRule() bool {
-	return p.isAt(token.TokenRule)
+	return p.isAt(token.TokenRule) || p.atSeverity()
 }
 
 func (p *sizingParser) measureRuleDeclaration() {
 	p.capacity.amountOfRuleElements++
+
+	if p.atSeverity() {
+		p.measureSelectorRule()
+
+		return
+	}
 
 	p.expect(token.TokenRule)
 	p.expect(token.TokenIdentifier)
@@ -53,6 +59,44 @@ func (p *sizingParser) measureRuleDeclaration() {
 
 	p.measureReportClause()
 	p.expect(token.TokenRightBrace)
+}
+
+func (p *sizingParser) measureSelectorRule() {
+	p.expectSeverityToken()
+	p.expect(token.TokenString)
+	p.expect(token.TokenColon)
+	p.measureSelectorMatch()
+}
+
+func (p *sizingParser) measureSelectorMatch() {
+	p.expect(token.TokenIdentifier)
+
+	if p.isAt(token.TokenColon) {
+		p.expect(token.TokenColon)
+		p.expect(token.TokenNot)
+		p.expect(token.TokenLeftParen)
+		p.expect(token.TokenIdentifier)
+
+		if p.isAt(token.TokenGreater) {
+			p.advance()
+		}
+
+		p.expect(token.TokenStar)
+		p.expect(token.TokenRightParen)
+
+		return
+	}
+
+	if p.isAt(token.TokenGreater) {
+		p.advance()
+		p.expect(token.TokenIdentifier)
+
+		return
+	}
+
+	if p.isAt(token.TokenIdentifier) {
+		p.advance()
+	}
 }
 
 func (p *sizingParser) measureMatchClause() {

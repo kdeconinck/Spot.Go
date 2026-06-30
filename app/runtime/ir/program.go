@@ -258,8 +258,14 @@ const (
 	// RuleMatchScopeNone does not constrain ancestor syntax nodes.
 	RuleMatchScopeNone RuleMatchScopeKind = iota
 
+	// RuleMatchScopeParent requires the matched syntax node to have the named direct parent syntax node.
+	RuleMatchScopeParent
+
 	// RuleMatchScopeInside requires the matched syntax node to be inside the named ancestor syntax node.
 	RuleMatchScopeInside
+
+	// RuleMatchScopeParentOutside requires the matched syntax node to not have the named direct parent syntax node.
+	RuleMatchScopeParentOutside
 
 	// RuleMatchScopeOutside requires the matched syntax node to be outside the named ancestor syntax node.
 	RuleMatchScopeOutside

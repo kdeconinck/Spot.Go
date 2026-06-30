@@ -41,8 +41,14 @@ const (
 	// RuleMatchScopeNone does not constrain ancestor nodes.
 	RuleMatchScopeNone RuleMatchScopeKind = iota
 
+	// RuleMatchScopeParent requires the matched syntax node to have the named direct parent syntax node.
+	RuleMatchScopeParent
+
 	// RuleMatchScopeInside requires the matched syntax node to be inside the named ancestor syntax node.
 	RuleMatchScopeInside
+
+	// RuleMatchScopeParentOutside requires the matched syntax node to not have the named direct parent syntax node.
+	RuleMatchScopeParentOutside
 
 	// RuleMatchScopeOutside requires the matched syntax node to be outside the named ancestor syntax node.
 	RuleMatchScopeOutside
@@ -50,7 +56,7 @@ const (
 
 // Rule is a diagnostic declaration over matched tokens or syntax nodes.
 type Rule struct {
-	// Name is the identifier token naming the rule.
+	// Name is the identifier token naming the rule. It is empty for selector-style rules.
 	Name token.Token
 
 	// Match is the token match statement for the rule.

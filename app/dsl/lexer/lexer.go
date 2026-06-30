@@ -54,6 +54,9 @@ func (lexer *Lexer) Next() token.Token {
 	case ')':
 		return lexer.makeToken(token.TokenRightParen, start, lexer.offset)
 
+	case ':':
+		return lexer.makeToken(token.TokenColon, start, lexer.offset)
+
 	case '{':
 		return lexer.makeToken(token.TokenLeftBrace, start, lexer.offset)
 

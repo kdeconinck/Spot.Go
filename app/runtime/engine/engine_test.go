@@ -328,6 +328,54 @@ rules {
 				diagnostic(engine.SeverityWarn, "using outside namespace", 0, 7),
 			},
 		},
+		"When a selector rule with a direct parent query matches, a diagnostic is returned.": {
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Whitespace = ' '+ skip
+    KeywordNamespace = "namespace"
+    KeywordUsing = "using"
+    Identifier = "x"
+    LeftBrace = "{"
+    RightBrace = "}"
+}
+syntax {
+    node UsingDirective = KeywordUsing Identifier
+    node NamespaceBody = LeftBrace UsingDirective RightBrace
+    node NamespaceDeclaration = KeywordNamespace Identifier NamespaceBody
+    node Root = NamespaceDeclaration
+}
+rules {
+    info "using under namespace body" : NamespaceBody > UsingDirective
+}`,
+			inSource: "namespace x { using x }",
+			wantDiagnostics: []engine.Diagnostic{
+				diagnostic(engine.SeverityInfo, "using under namespace body", 14, 21),
+			},
+		},
+		"When a selector rule with a negated direct parent query matches, a diagnostic is returned.": {
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Whitespace = ' '+ skip
+    KeywordNamespace = "namespace"
+    KeywordUsing = "using"
+    Identifier = "x"
+    LeftBrace = "{"
+    RightBrace = "}"
+}
+syntax {
+    node UsingDirective = KeywordUsing Identifier
+    node NamespaceBody = LeftBrace RightBrace
+    node NamespaceDeclaration = KeywordNamespace Identifier NamespaceBody
+    node Root = UsingDirective NamespaceDeclaration
+}
+rules {
+    warn "using outside namespace body" : UsingDirective:not(NamespaceBody > *)
+}`,
+			inSource: "using x namespace x { }",
+			wantDiagnostics: []engine.Diagnostic{
+				diagnostic(engine.SeverityWarn, "using outside namespace body", 0, 7),
+			},
+		},
 	} {
 		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()

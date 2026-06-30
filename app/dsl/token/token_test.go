@@ -68,6 +68,10 @@ func Test_LookupTokenKind(t *testing.T) {
 			inValue: "any",
 			want:    token.TokenAny,
 		},
+		"When using 'not', the correct value is returned.": {
+			inValue: "not",
+			want:    token.TokenNot,
+		},
 		"When using 'rule', the correct value is returned.": {
 			inValue: "rule",
 			want:    token.TokenRule,
@@ -307,6 +311,10 @@ func Test_TokenKind_String(t *testing.T) {
 			inKind: token.TokenRightParen,
 			want:   ")",
 		},
+		"When using a colon token kind, the returned value is correct.": {
+			inKind: token.TokenColon,
+			want:   ":",
+		},
 		"When using an equal token kind, the returned value is correct.": {
 			inKind: token.TokenEqual,
 			want:   "=",
@@ -358,6 +366,10 @@ func Test_TokenKind_String(t *testing.T) {
 		"When using a plus token kind, the returned value is correct.": {
 			inKind: token.TokenPlus,
 			want:   "+",
+		},
+		"When using a not token kind, the returned value is correct.": {
+			inKind: token.TokenNot,
+			want:   "not",
 		},
 
 		"When using an unknown token kind, the returned value is correct.": {

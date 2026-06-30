@@ -51,6 +51,9 @@ const (
 	// TokenAny marks a syntax expression that matches any emitted token.
 	TokenAny
 
+	// TokenNot marks selector negation.
+	TokenNot
+
 	// TokenRule marks a rule declaration.
 	TokenRule
 
@@ -104,6 +107,9 @@ const (
 
 	// TokenRightParen marks the end of an expression group.
 	TokenRightParen
+
+	// TokenColon marks the start of a selector query.
+	TokenColon
 
 	// TokenEqual marks a definition assignment.
 	TokenEqual
@@ -180,6 +186,9 @@ func LookupTokenKind(value string) TokenKind {
 
 	case "any":
 		return TokenAny
+
+	case "not":
+		return TokenNot
 
 	case "rule":
 		return TokenRule
@@ -272,6 +281,9 @@ func (kind TokenKind) String() string {
 	case TokenAny:
 		return "any"
 
+	case TokenNot:
+		return "not"
+
 	case TokenRule:
 		return "rule"
 
@@ -325,6 +337,9 @@ func (kind TokenKind) String() string {
 
 	case TokenRightParen:
 		return ")"
+
+	case TokenColon:
+		return ":"
 
 	case TokenEqual:
 		return "="

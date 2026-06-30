@@ -30,8 +30,8 @@ func (p *parser) parseRulesSection() (ast.RulesSection, error) {
 
 	firstRule := uint32(len(p.document.RuleList))
 
-	for p.isAt(token.TokenRule) {
-		rule, err := p.parseRule()
+	for p.startsRule() {
+		rule, err := p.parseRuleDeclaration()
 
 		if err != nil {
 			return ast.RulesSection{}, err
@@ -51,6 +51,18 @@ func (p *parser) parseRulesSection() (ast.RulesSection, error) {
 		AmountOfElements: uint32(len(p.document.RuleList)) - firstRule,
 		Span:             span(start.Span.Start, end.Span.End),
 	}, nil
+}
+
+func (p *parser) startsRule() bool {
+	return p.isAt(token.TokenRule) || p.atSeverity()
+}
+
+func (p *parser) parseRuleDeclaration() (ast.Rule, error) {
+	if p.isAt(token.TokenRule) {
+		return p.parseRule()
+	}
+
+	return p.parseSelectorRule()
 }
 
 func (p *parser) parseRule() (ast.Rule, error) {
@@ -98,6 +110,133 @@ func (p *parser) parseRule() (ast.Rule, error) {
 		Where:  where,
 		Report: report,
 		Span:   span(start.Span.Start, end.Span.End),
+	}, nil
+}
+
+func (p *parser) parseSelectorRule() (ast.Rule, error) {
+	severity, err := p.expectSeverity()
+
+	if err != nil {
+		return ast.Rule{}, err
+	}
+
+	message, err := p.expect(token.TokenString)
+
+	if err != nil {
+		return ast.Rule{}, err
+	}
+
+	if _, err := p.expect(token.TokenColon); err != nil {
+		return ast.Rule{}, err
+	}
+
+	match, err := p.parseSelectorRuleMatch()
+
+	if err != nil {
+		return ast.Rule{}, err
+	}
+
+	return ast.Rule{
+		Match: match,
+		Report: ast.RuleReport{
+			Severity: severity,
+			Target:   match.Target,
+			Message:  message,
+			Span:     span(severity.Span.Start, message.Span.End),
+		},
+		Span: span(severity.Span.Start, match.Span.End),
+	}, nil
+}
+
+func (p *parser) parseSelectorRuleMatch() (ast.RuleMatch, error) {
+	first, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return ast.RuleMatch{}, err
+	}
+
+	if p.isAt(token.TokenColon) {
+		return p.parseNegatedSelectorMatch(first)
+	}
+
+	if p.isAt(token.TokenGreater) || p.isAt(token.TokenIdentifier) {
+		return p.parseRelatedSelectorMatch(first)
+	}
+
+	return ast.RuleMatch{
+		Kind:   ast.RuleMatchNode,
+		Target: first,
+		Span:   first.Span,
+	}, nil
+}
+
+func (p *parser) parseRelatedSelectorMatch(scopeTarget token.Token) (ast.RuleMatch, error) {
+	scopeKind := ast.RuleMatchScopeInside
+
+	if p.isAt(token.TokenGreater) {
+		scopeKind = ast.RuleMatchScopeParent
+		p.advance()
+	}
+
+	target, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return ast.RuleMatch{}, err
+	}
+
+	return ast.RuleMatch{
+		Kind:        ast.RuleMatchNode,
+		Target:      target,
+		ScopeKind:   scopeKind,
+		ScopeTarget: scopeTarget,
+		Span:        span(scopeTarget.Span.Start, target.Span.End),
+	}, nil
+}
+
+func (p *parser) parseNegatedSelectorMatch(target token.Token) (ast.RuleMatch, error) {
+	start := target.Span.Start
+
+	if _, err := p.expect(token.TokenColon); err != nil {
+		return ast.RuleMatch{}, err
+	}
+
+	if _, err := p.expect(token.TokenNot); err != nil {
+		return ast.RuleMatch{}, err
+	}
+
+	if _, err := p.expect(token.TokenLeftParen); err != nil {
+		return ast.RuleMatch{}, err
+	}
+
+	scopeTarget, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return ast.RuleMatch{}, err
+	}
+
+	scopeKind := ast.RuleMatchScopeOutside
+
+	if p.isAt(token.TokenGreater) {
+		scopeKind = ast.RuleMatchScopeParentOutside
+		p.advance()
+	}
+
+	end, err := p.expect(token.TokenStar)
+
+	if err != nil {
+		return ast.RuleMatch{}, err
+	}
+
+	if _, err := p.expect(token.TokenRightParen); err != nil {
+		return ast.RuleMatch{}, err
+	}
+
+	return ast.RuleMatch{
+		Kind:        ast.RuleMatchNode,
+		Target:      target,
+		ScopeKind:   scopeKind,
+		ScopeTarget: scopeTarget,
+		Span:        span(start, end.Span.End),
 	}, nil
 }
 
@@ -275,4 +414,8 @@ func (p *parser) expectSeverity() (token.Token, error) {
 	}
 
 	return token.Token{}, p.unexpected(token.TokenWarn)
+}
+
+func (p *parser) atSeverity() bool {
+	return p.isAt(token.TokenInfo) || p.isAt(token.TokenWarn) || p.isAt(token.TokenErr)
 }

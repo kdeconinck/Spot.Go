@@ -147,6 +147,48 @@ func Test_Compile_Rules(t *testing.T) {
 				      Report warn at Using "message"
 			`),
 		},
+		"When compiling a selector rule with a direct parent query, the scope is compiled.": {
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { info "message" : Namespace > Using }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				  Syntax
+				    Node Using
+				      Token Identifier
+				    Node Namespace
+				      Node Using
+				    Node Root
+				      Node Namespace
+				  Rules
+				    Rule
+				      MatchNode Using parent Namespace
+				      Where none
+				      Report info at Using "message"
+			`),
+		},
+		"When compiling a selector rule with a negated direct parent query, the scope is compiled.": {
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { warn "message" : Using:not(Namespace > *) }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				  Syntax
+				    Node Using
+				      Token Identifier
+				    Node Namespace
+				      Node Using
+				    Node Root
+				      Node Namespace
+				  Rules
+				    Rule
+				      MatchNode Using outside parent Namespace
+				      Where none
+				      Report warn at Using "message"
+			`),
+		},
 	} {
 		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()

@@ -21,6 +21,10 @@ func validateRules(source string, resolution resolver.Resolution, diagnostics []
 			name := rules[idx].Name
 			nameValue := name.Value(source)
 
+			if nameValue == "" {
+				continue
+			}
+
 			if firstIndex, ok := resolution.RuleIndex(nameValue); ok && firstIndex != idx {
 				diagnostics = append(diagnostics, Diagnostic{
 					Message: `Rule "` + nameValue + `" is already declared.`,

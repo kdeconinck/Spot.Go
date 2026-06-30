@@ -79,8 +79,14 @@ func compileRule(source string, rule ast.Rule, resolution resolver.Resolution) i
 		matchIndex, _ = resolution.SyntaxNodeIndex(rule.Match.Target.Value(source))
 
 		switch rule.Match.ScopeKind {
+		case ast.RuleMatchScopeParent:
+			matchScopeKind = ir.RuleMatchScopeParent
+
 		case ast.RuleMatchScopeInside:
 			matchScopeKind = ir.RuleMatchScopeInside
+
+		case ast.RuleMatchScopeParentOutside:
+			matchScopeKind = ir.RuleMatchScopeParentOutside
 
 		case ast.RuleMatchScopeOutside:
 			matchScopeKind = ir.RuleMatchScopeOutside

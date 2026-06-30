@@ -336,7 +336,13 @@ func renderProgram(program ir.Program) string {
 
 	for idx := range program.Rules {
 		rule := program.Rules[idx]
-		appendIndentedLine(&builder, 2, "Rule "+rule.Name)
+		ruleLabel := "Rule"
+
+		if rule.Name != "" {
+			ruleLabel += " " + rule.Name
+		}
+
+		appendIndentedLine(&builder, 2, ruleLabel)
 		appendIndentedLine(&builder, 3, renderRuleMatch(program, rule))
 		appendIndentedLine(&builder, 3, "Where "+renderCondition(rule.Where))
 		appendIndentedLine(&builder, 3, "Report "+renderSeverity(rule.Report.Severity)+" at "+renderReportTarget(program, rule.Report)+" "+strconv.Quote(rule.Report.Message))
@@ -355,8 +361,14 @@ func renderRuleMatch(program ir.Program, rule ir.Rule) string {
 	}
 
 	switch rule.MatchScopeKind {
+	case ir.RuleMatchScopeParent:
+		label += " parent " + program.SyntaxNodes[rule.MatchScopeIndex].Name
+
 	case ir.RuleMatchScopeInside:
 		label += " inside " + program.SyntaxNodes[rule.MatchScopeIndex].Name
+
+	case ir.RuleMatchScopeParentOutside:
+		label += " outside parent " + program.SyntaxNodes[rule.MatchScopeIndex].Name
 
 	case ir.RuleMatchScopeOutside:
 		label += " outside " + program.SyntaxNodes[rule.MatchScopeIndex].Name

@@ -112,6 +112,13 @@ func Test_Lexer_Next_ScansSymbols(t *testing.T) {
 				makeToken(token.TokenEOF, 1, 1),
 			},
 		},
+		"When lexing a colon, the returned value is correct.": {
+			inSource: ":",
+			want: []token.Token{
+				makeToken(token.TokenColon, 0, 1),
+				makeToken(token.TokenEOF, 1, 1),
+			},
+		},
 		"When lexing a left brace, the returned value is correct.": {
 			inSource: "{",
 			want: []token.Token{

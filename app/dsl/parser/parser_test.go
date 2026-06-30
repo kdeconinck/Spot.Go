@@ -658,7 +658,13 @@ func appendDocument(source string, builder *strings.Builder, document ast.Docume
 		appendIndentedLine(builder, depth+1, formatLabelWithSpan("Rules", document.Rules.Span, includeSpans))
 
 		for _, rule := range document.SectionRules(document.Rules) {
-			appendIndentedLine(builder, depth+2, formatLabelWithSpan("Rule "+rule.Name.Value(source), rule.Span, includeSpans))
+			ruleLabel := "Rule"
+
+			if rule.Name.Value(source) != "" {
+				ruleLabel += " " + rule.Name.Value(source)
+			}
+
+			appendIndentedLine(builder, depth+2, formatLabelWithSpan(ruleLabel, rule.Span, includeSpans))
 			matchLabel := "Match " + rule.Match.Target.Value(source)
 
 			if rule.Match.Kind == ast.RuleMatchNode {
@@ -666,8 +672,14 @@ func appendDocument(source string, builder *strings.Builder, document ast.Docume
 			}
 
 			switch rule.Match.ScopeKind {
+			case ast.RuleMatchScopeParent:
+				matchLabel += " parent " + rule.Match.ScopeTarget.Value(source)
+
 			case ast.RuleMatchScopeInside:
 				matchLabel += " inside " + rule.Match.ScopeTarget.Value(source)
+
+			case ast.RuleMatchScopeParentOutside:
+				matchLabel += " outside parent " + rule.Match.ScopeTarget.Value(source)
 
 			case ast.RuleMatchScopeOutside:
 				matchLabel += " outside " + rule.Match.ScopeTarget.Value(source)

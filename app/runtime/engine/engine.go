@@ -199,6 +199,13 @@ func (engine Engine) evaluateSyntaxNode(program ir.Program, src string, tree syn
 
 func matchesSyntaxScope(rule ir.Rule, ancestors []uint32) bool {
 	switch rule.MatchScopeKind {
+	case ir.RuleMatchScopeParent:
+		if len(ancestors) == 0 {
+			return false
+		}
+
+		return int(ancestors[len(ancestors)-1]) == rule.MatchScopeIndex
+
 	case ir.RuleMatchScopeInside:
 		for idx := range ancestors {
 			if int(ancestors[idx]) == rule.MatchScopeIndex {
@@ -207,6 +214,13 @@ func matchesSyntaxScope(rule ir.Rule, ancestors []uint32) bool {
 		}
 
 		return false
+
+	case ir.RuleMatchScopeParentOutside:
+		if len(ancestors) == 0 {
+			return true
+		}
+
+		return int(ancestors[len(ancestors)-1]) != rule.MatchScopeIndex
 
 	case ir.RuleMatchScopeOutside:
 		for idx := range ancestors {

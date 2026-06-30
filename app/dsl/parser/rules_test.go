@@ -128,6 +128,48 @@ func Test_Parse_Rules(t *testing.T) {
 				        Message "Using outside namespace"
 			`),
 		},
+		"When parsing a selector rule with a direct parent query, a document is returned.": {
+			inSource: `scope {} syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { info "Using inside namespace" : Namespace > Using }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Syntax
+				    Node Using
+				      Reference Identifier
+				    Node Namespace
+				      Reference Using
+				    Node Root
+				      Reference Namespace
+				  Rules
+				    Rule
+				      Match node Using parent Namespace
+				      Report
+				        Severity info
+				        At Using
+				        Message "Using inside namespace"
+			`),
+		},
+		"When parsing a selector rule with a negated direct parent query, a document is returned.": {
+			inSource: `scope {} syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { warn "Using outside namespace" : Using:not(Namespace > *) }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Syntax
+				    Node Using
+				      Reference Identifier
+				    Node Namespace
+				      Reference Using
+				    Node Root
+				      Reference Namespace
+				  Rules
+				    Rule
+				      Match node Using outside parent Namespace
+				      Report
+				        Severity warn
+				        At Using
+				        Message "Using outside namespace"
+			`),
+		},
 		"When the rules opening brace is missing, a diagnostic is returned.": {
 			inSource:  "scope {} rules }",
 			wantDiags: `Expected '{', found '}'. [15:16]`,
@@ -159,6 +201,14 @@ func Test_Parse_Rules(t *testing.T) {
 		"When a syntax-node ancestor constraint is missing its target, a diagnostic is returned.": {
 			inSource:  `scope {} rules { rule PublicIdentifier { match node Identifier outside report warn at Identifier "x" } }`,
 			wantDiags: `Expected 'identifier', found 'report'. [71:77]`,
+		},
+		"When a selector rule is missing its colon, a diagnostic is returned.": {
+			inSource:  `scope {} rules { warn "x" Identifier }`,
+			wantDiags: `Expected ':', found 'identifier'. [26:36]`,
+		},
+		"When a selector negation is missing its wildcard, a diagnostic is returned.": {
+			inSource:  `scope {} rules { warn "x" : Using:not(Namespace > ) }`,
+			wantDiags: `Expected '*', found ')'. [50:51]`,
 		},
 		"When a where clause is missing its subject, a diagnostic is returned.": {
 			inSource:  `scope {} rules { rule PublicIdentifier { match Identifier where .text == "public" report warn at Identifier "x" } }`,
@@ -283,7 +333,9 @@ func rulesDSL(size int) string {
 				"        match node Root\n"+
 				"        where Root.length > 0\n"+
 				"        report warn at Root \"Root found\"\n"+
-				"    }\n",
+				"    }\n"+
+				"    info \"Word inside root\" : Root > Word\n"+
+				"    warn \"Word outside root\" : Word:not(Root > *)\n",
 			size,
 		) +
 		"}"

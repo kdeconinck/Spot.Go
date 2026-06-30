@@ -95,6 +95,25 @@ func Test_Validate_Rules(t *testing.T) {
 				expectDiagnostic(`Rule "PublicIdentifier" is already declared.`, 1),
 			},
 		},
+		"When a selector rule references declared syntax nodes, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node Using = Identifier
+					node Namespace = Using
+					node Root = Namespace
+				}
+				rules {
+					info "Using inside namespace" : Namespace > Using
+				}
+			`),
+			wantDiagnostics: nil,
+		},
 		"When a rule matches an undeclared token, a diagnostic is returned.": {
 			inSource: markedMultilineLiteral(`
 				scope {
