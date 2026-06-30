@@ -10,5 +10,6 @@ func (p *sizingParser) measureDocument() {
 	p.measureOptionalScopeSection()
 	p.measureOptionalDefinitionsSection()
 	p.measureOptionalTokensSection()
+	p.measureOptionalSyntaxSection()
 	p.measureOptionalRulesSection()
 }

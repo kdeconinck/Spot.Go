@@ -363,6 +363,67 @@ func rulesHappyPathDSL(size int) string {
 	return builder.String()
 }
 
+func syntaxHappyPathDSL(size int) string {
+	var builder strings.Builder
+
+	builder.WriteString("scope {\n")
+	builder.WriteString("    include \"**/*.go\"\n")
+	builder.WriteString("}\n")
+	builder.WriteString("tokens {\n")
+
+	for idx := 0; idx <= size; idx++ {
+		suffix := strconv.Itoa(idx)
+
+		builder.WriteString("    Identifier")
+		builder.WriteString(suffix)
+		builder.WriteString(" = \"id\"\n")
+		builder.WriteString("    KeywordPublic")
+		builder.WriteString(suffix)
+		builder.WriteString(" = \"public\"\n")
+		builder.WriteString("    KeywordInternal")
+		builder.WriteString(suffix)
+		builder.WriteString(" = \"internal\"\n")
+	}
+
+	builder.WriteString("}\n")
+	builder.WriteString("syntax {\n")
+
+	for idx := 0; idx <= size; idx++ {
+		suffix := strconv.Itoa(idx)
+
+		builder.WriteString("    node Word")
+		builder.WriteString(suffix)
+		builder.WriteString(" = Identifier")
+		builder.WriteString(suffix)
+		builder.WriteString(" | KeywordPublic")
+		builder.WriteString(suffix)
+		builder.WriteString("\n")
+		builder.WriteString("    node WordPair")
+		builder.WriteString(suffix)
+		builder.WriteString(" = Word")
+		builder.WriteString(suffix)
+		builder.WriteString(" Word")
+		builder.WriteString(suffix)
+		builder.WriteString("\n")
+		builder.WriteString("    node OptionalWord")
+		builder.WriteString(suffix)
+		builder.WriteString(" = (Word")
+		builder.WriteString(suffix)
+		builder.WriteString(" | KeywordInternal")
+		builder.WriteString(suffix)
+		builder.WriteString(")?\n")
+		builder.WriteString("    node WordList")
+		builder.WriteString(suffix)
+		builder.WriteString(" = Word")
+		builder.WriteString(suffix)
+		builder.WriteString("+\n")
+	}
+
+	builder.WriteString("}")
+
+	return builder.String()
+}
+
 func fullHappyPathValidationDSL(size int) string {
 	var builder strings.Builder
 
@@ -449,6 +510,40 @@ func fullHappyPathValidationDSL(size int) string {
 		builder.WriteString("    Whitespace")
 		builder.WriteString(suffix)
 		builder.WriteString(" = (' ' | '\\t' | '\\n' | '\\r')+ skip\n")
+	}
+
+	builder.WriteString("}\n")
+	builder.WriteString("syntax {\n")
+
+	for idx := 0; idx <= size; idx++ {
+		suffix := strconv.Itoa(idx)
+
+		builder.WriteString("    node Word")
+		builder.WriteString(suffix)
+		builder.WriteString(" = Identifier")
+		builder.WriteString(suffix)
+		builder.WriteString(" | KeywordPublic")
+		builder.WriteString(suffix)
+		builder.WriteString("\n")
+		builder.WriteString("    node WordPair")
+		builder.WriteString(suffix)
+		builder.WriteString(" = Word")
+		builder.WriteString(suffix)
+		builder.WriteString(" Word")
+		builder.WriteString(suffix)
+		builder.WriteString("\n")
+		builder.WriteString("    node OptionalWord")
+		builder.WriteString(suffix)
+		builder.WriteString(" = (Word")
+		builder.WriteString(suffix)
+		builder.WriteString(" | KeywordInternal")
+		builder.WriteString(suffix)
+		builder.WriteString(")?\n")
+		builder.WriteString("    node WordList")
+		builder.WriteString(suffix)
+		builder.WriteString(" = Word")
+		builder.WriteString(suffix)
+		builder.WriteString("+\n")
 	}
 
 	builder.WriteString("}\n")

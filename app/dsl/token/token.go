@@ -39,6 +39,12 @@ const (
 	// TokenRules marks the 'rules' section keyword.
 	TokenRules
 
+	// TokenSyntax marks the 'syntax' section keyword.
+	TokenSyntax
+
+	// TokenNode marks a syntax node declaration.
+	TokenNode
+
 	// TokenRule marks a rule declaration.
 	TokenRule
 
@@ -151,6 +157,12 @@ func LookupTokenKind(value string) TokenKind {
 	case "rules":
 		return TokenRules
 
+	case "syntax":
+		return TokenSyntax
+
+	case "node":
+		return TokenNode
+
 	case "rule":
 		return TokenRule
 
@@ -223,6 +235,12 @@ func (kind TokenKind) String() string {
 
 	case TokenRules:
 		return "rules"
+
+	case TokenSyntax:
+		return "syntax"
+
+	case TokenNode:
+		return "node"
 
 	case TokenRule:
 		return "rule"

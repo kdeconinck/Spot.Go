@@ -20,6 +20,9 @@ import (
 //   - Section entries stored in Document.ScopeEntries.
 //   - Definition declarations stored in Document.DefinitionList.
 //   - Token declarations stored in Document.TokenList.
+//   - Syntax node declarations stored in Document.SyntaxNodeList.
+//   - Syntax expression nodes stored in SyntaxExpressionArena.Nodes.
+//   - Syntax expression child references stored in SyntaxExpressionArena.ChildIDs.
 //   - Rule declarations stored in Document.RuleList.
 //   - Expression nodes stored in DefinitionExpressionArena.Nodes.
 //   - Expression child references stored in DefinitionExpressionArena.ChildIDs.
@@ -30,6 +33,9 @@ type documentCapacity struct {
 	amountOfScopeElements             int // The number of scope entries stored in Document.ScopeEntries.
 	amountOfDefinitionElements        int // The number of definitions stored in Document.DefinitionList.
 	amountOfTokenElements             int // The number of token declarations stored in Document.TokenList.
+	amountOfSyntaxElements            int // The number of syntax node declarations stored in Document.SyntaxNodeList.
+	amountOfSyntaxExpressionNodes     int // The number of syntax expression nodes stored in SyntaxExpressionArena.Nodes.
+	amountOfSyntaxExpressionChildren  int // The number of child references stored in SyntaxExpressionArena.ChildIDs.
 	amountOfRuleElements              int // The number of rules stored in Document.RuleList.
 	amountOfExpressionNodes           int // The number of expression nodes stored in DefinitionExpressionArena.Nodes.
 	amountOfExpressionChildReferences int // The number of child references stored in DefinitionExpressionArena.ChildIDs.
@@ -42,6 +48,9 @@ type documentCapacity struct {
 //   - Scope entries in Document.ScopeEntries.
 //   - Definitions in Document.DefinitionList.
 //   - Tokens in Document.TokenList.
+//   - Syntax node declarations in Document.SyntaxNodeList.
+//   - Syntax expression nodes in SyntaxExpressionArena.Nodes.
+//   - Syntax expression child links in SyntaxExpressionArena.ChildIDs.
 //   - Rules in Document.RuleList.
 //   - Expression nodes in DefinitionExpressionArena.Nodes.
 //   - Expression child links in DefinitionExpressionArena.ChildIDs.

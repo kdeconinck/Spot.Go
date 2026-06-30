@@ -25,6 +25,9 @@ type Resolution struct {
 	// Tokens stores the parsed token definitions in section order.
 	Tokens []ast.TokenDefinition
 
+	// SyntaxNodes stores the parsed syntax node declarations in section order.
+	SyntaxNodes []ast.SyntaxNode
+
 	// Rules stores the parsed rules in section order.
 	Rules []ast.Rule
 
@@ -34,6 +37,9 @@ type Resolution struct {
 	// TokenIndexes maps each token name to its first declaration index.
 	TokenIndexes map[string]int
 
+	// SyntaxNodeIndexes maps each syntax node name to its first declaration index.
+	SyntaxNodeIndexes map[string]int
+
 	// RuleIndexes maps each rule name to its first declaration index.
 	RuleIndexes map[string]int
 }
@@ -42,15 +48,18 @@ type Resolution struct {
 func Resolve(source string, document ast.Document) Resolution {
 	definitions := document.SectionDefinitions(document.Definitions)
 	tokens := document.SectionTokens(document.Tokens)
+	syntaxNodes := document.SectionSyntaxNodes(document.Syntax)
 	rules := document.SectionRules(document.Rules)
 	resolution := Resolution{
 		Document:          document,
 		ScopeEntries:      document.ScopeSectionEntries(document.Scope),
 		Definitions:       definitions,
 		Tokens:            tokens,
+		SyntaxNodes:       syntaxNodes,
 		Rules:             rules,
 		DefinitionIndexes: make(map[string]int, len(definitions)),
 		TokenIndexes:      make(map[string]int, len(tokens)),
+		SyntaxNodeIndexes: make(map[string]int, len(syntaxNodes)),
 		RuleIndexes:       make(map[string]int, len(rules)),
 	}
 
@@ -67,6 +76,14 @@ func Resolve(source string, document ast.Document) Resolution {
 
 		if _, ok := resolution.TokenIndexes[name]; !ok {
 			resolution.TokenIndexes[name] = idx
+		}
+	}
+
+	for idx := range syntaxNodes {
+		name := syntaxNodes[idx].Name.Value(source)
+
+		if _, ok := resolution.SyntaxNodeIndexes[name]; !ok {
+			resolution.SyntaxNodeIndexes[name] = idx
 		}
 	}
 
@@ -91,6 +108,13 @@ func (resolution Resolution) DefinitionIndex(name string) (int, bool) {
 // TokenIndex returns the first declaration index for name.
 func (resolution Resolution) TokenIndex(name string) (int, bool) {
 	idx, ok := resolution.TokenIndexes[name]
+
+	return idx, ok
+}
+
+// SyntaxNodeIndex returns the first declaration index for name.
+func (resolution Resolution) SyntaxNodeIndex(name string) (int, bool) {
+	idx, ok := resolution.SyntaxNodeIndexes[name]
 
 	return idx, ok
 }

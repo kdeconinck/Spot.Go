@@ -39,6 +39,11 @@ tokens {
     Identifier = letter (letter | digit | '_')*
 }
 
+syntax {
+    node FileHeader
+    node PackageClause
+}
+
 rules {
     rule PublicIdentifier {
         match Identifier
@@ -54,7 +59,8 @@ The recommended section order is:
 1. `scope`
 2. `definitions`
 3. `tokens`
-4. `rules`
+4. `syntax`
+5. `rules`
 
 # Comments
 
@@ -96,6 +102,28 @@ MultipleSpaces
 ```
 
 Identifiers must start with a letter and may contain letters, digits, and underscores.
+
+The following words are reserved and therefore cannot be used as user-defined names:
+
+* `scope`
+* `include`
+* `exclude`
+* `definitions`
+* `tokens`
+* `rules`
+* `syntax`
+* `node`
+* `rule`
+* `match`
+* `where`
+* `report`
+* `skip`
+* `info`
+* `warn`
+* `err`
+* `at`
+
+`syntax` and `node` are reserved for the syntax-tree construction layer.
 
 # Literals
 
@@ -452,6 +480,64 @@ A rule contains:
 2. Optional conditions.
 3. A report statement.
 
+# Syntax Section
+
+The `syntax` section declares syntax node kinds and their structure for future syntax-tree construction.
+
+```spot
+syntax {
+    node Word = Identifier | KeywordPublic
+    node WordPair = Word Word
+    node OptionalWord = (Word | KeywordInternal)?
+    node WordList = Word+
+}
+```
+
+Each declaration introduces one syntax node kind together with a syntax expression:
+
+```spot
+node UsingStatement = KeywordUsing QualifiedIdentifier Semicolon
+```
+
+Syntax expressions may contain:
+
+* Token references.
+* Syntax node references.
+* Grouping.
+* Concatenation.
+* Alternation.
+* Repetition.
+
+Examples:
+
+```spot
+node Word = Identifier | KeywordPublic
+node WordPair = Word Word
+node OptionalWord = (Word | KeywordInternal)?
+node WordList = Word+
+```
+
+Syntax expressions use the following precedence, from highest to lowest:
+
+| Precedence | Expression    | Example                       |
+| ---------- | ------------- | ----------------------------- |
+| 1          | Grouping      | `(Word | KeywordInternal)`    |
+| 2          | Repetition    | `Word*`                       |
+| 3          | Concatenation | `KeywordUsing Identifier`     |
+| 4          | Alternation   | `Identifier | KeywordPublic`  |
+
+For example, `Word KeywordInternal | Identifier` is parsed as `(Word KeywordInternal) | Identifier`.
+Use grouping when alternation should be part of a sequence: `Word (KeywordInternal | Identifier)`.
+
+Today, the `syntax` section is intentionally limited:
+
+* It only describes syntax node structure.
+* It does not yet build runtime syntax trees from token streams.
+* It does not yet introduce AST-based rules.
+
+This means the section is parsed and validated today, but it does not yet affect scanning, compilation, or rule
+execution.
+
 # Rule Match
 
 The current rule model matches a single token.
@@ -578,10 +664,13 @@ A valid DSL file must satisfy all validation rules.
 
 * Definition names must be unique.
 * Token names must be unique.
+* Syntax node names must be unique.
 * Rule names must be unique.
 * A definition and a token may not share the same name.
+* A syntax node and a token may not share the same name.
 * Referenced definitions must exist.
 * Referenced tokens must exist.
+* Referenced syntax expressions must resolve to a declared token or syntax node.
 
 ## Definition Validation
 
@@ -630,7 +719,6 @@ The current DSL does not include:
 * Functions.
 * Macros.
 * Semantic analysis.
-* AST matching.
 * Cross-file analysis.
 * Multi-token rule patterns.
 * Nested rule blocks.
@@ -638,6 +726,9 @@ The current DSL does not include:
 * Custom diagnostic codes.
 * Autofix support.
 * Configuration inheritance.
+
+The DSL now includes syntax node structure declarations, but runtime syntax-tree construction and AST-based rule
+evaluation are still outside the current scope.
 
 These may be added later if justified by concrete requirements.
 

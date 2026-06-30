@@ -52,6 +52,14 @@ func Test_LookupTokenKind(t *testing.T) {
 			inValue: "rules",
 			want:    token.TokenRules,
 		},
+		"When using 'syntax', the correct value is returned.": {
+			inValue: "syntax",
+			want:    token.TokenSyntax,
+		},
+		"When using 'node', the correct value is returned.": {
+			inValue: "node",
+			want:    token.TokenNode,
+		},
 		"When using 'rule', the correct value is returned.": {
 			inValue: "rule",
 			want:    token.TokenRule,
@@ -210,6 +218,14 @@ func Test_TokenKind_String(t *testing.T) {
 		"When using a rules token kind, the returned value is correct.": {
 			inKind: token.TokenRules,
 			want:   "rules",
+		},
+		"When using a syntax token kind, the returned value is correct.": {
+			inKind: token.TokenSyntax,
+			want:   "syntax",
+		},
+		"When using a node token kind, the returned value is correct.": {
+			inKind: token.TokenNode,
+			want:   "node",
 		},
 		"When using a rule token kind, the returned value is correct.": {
 			inKind: token.TokenRule,

@@ -25,6 +25,10 @@ Parser
     ↓
 Syntax Tree
     ↓
+Resolver
+    ↓
+Resolved Syntax
+    ↓
 Validator
     ↓
 Configuration
@@ -69,7 +73,8 @@ Responsibilities:
 * Produce syntax nodes.
 * Preserve source locations.
 * Detect syntax errors.
-* Recover from syntax errors when practical.
+* Stop at the first syntax error and return it.
+* Materialize syntax data in parser-owned flat storage.
 
 Non-responsibilities:
 
@@ -83,12 +88,20 @@ The parser answers the question:
 
 > Is this DSL syntactically valid?
 
+Implementation notes:
+
+* The current parser stores syntax data in flat slices rather than as a pointer-linked object graph.
+* Definition and token expressions are stored in a shared expression arena and referenced by indices.
+* The parser performs a counting pass before materialization so flat storage can be allocated with exact capacities.
+* This layout reduces allocation churn, keeps syntax data densely packed in memory, and makes parser cost more
+  predictable during later traversal by the validator and compiler.
+
 ## Validator
 
 Input:
 
 ```text
-Syntax tree
+Resolved syntax
 ```
 
 Output:
@@ -117,12 +130,50 @@ The validator answers the question:
 
 > Is this DSL semantically valid?
 
+## Resolver
+
+Input:
+
+```text
+Syntax tree
+```
+
+Output:
+
+```text
+Resolved syntax
+```
+
+Responsibilities:
+
+* Expose parsed sections in traversal order.
+* Build reusable name-to-declaration lookups.
+* Preserve first-declaration indices for duplicate checks.
+* Share resolution data with later stages.
+
+Non-responsibilities:
+
+* Semantic validation.
+* Execution.
+* Compilation.
+* Tokenization.
+
+The resolver answers the question:
+
+> Which parsed declarations does each name refer to?
+
+Implementation notes:
+
+* The resolver is a cheap indexing pass over parser output.
+* It does not copy parser-owned flat syntax storage.
+* It builds lookup tables once so the validator and compiler do not rebuild temporary maps independently.
+
 ## Compiler
 
 Input:
 
 ```text
-Configuration
+Resolved syntax
 ```
 
 Output:
@@ -133,7 +184,6 @@ Compiled configuration
 
 Responsibilities:
 
-* Resolve reusable definitions.
 * Prepare token definitions for execution.
 * Prepare rule definitions for execution.
 * Produce efficient runtime structures.
@@ -148,6 +198,10 @@ Non-responsibilities:
 The compiler answers the question:
 
 > Can this configuration be executed efficiently?
+
+Implementation note:
+
+* The compiler assumes semantic validation has already succeeded and reuses resolver output for declaration lookups.
 
 ## Scanner
 
@@ -236,6 +290,8 @@ Properties:
 * Mirrors DSL syntax.
 * May contain invalid references.
 * May contain invalid semantics.
+* May be stored in flat parser-owned arenas and section-indexed slices.
+* Is optimized for compact storage and fast sequential traversal rather than in-place tree mutation.
 
 The syntax tree exists solely to represent parsed syntax.
 
@@ -247,6 +303,18 @@ Properties:
 
 * Semantically valid.
 * References resolved.
+
+## Resolved Syntax
+
+Represents parsed DSL syntax together with reusable declaration lookups.
+
+Properties:
+
+* Preserves source locations.
+* Reuses parser-owned flat syntax storage.
+* Maps names to first declaration indices.
+* May still contain semantic errors.
+* Exists to avoid rebuilding the same lookup structures in multiple later stages.
 * Executable after compilation.
 
 A configuration represents a valid Spot program.

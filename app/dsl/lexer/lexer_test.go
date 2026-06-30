@@ -502,6 +502,20 @@ func Test_Lexer_Next_ScansIdentifiers(t *testing.T) {
 				makeToken(token.TokenEOF, 5, 5),
 			},
 		},
+		"When lexing the syntax keyword, the returned value is correct.": {
+			inSource: "syntax",
+			want: []token.Token{
+				makeToken(token.TokenSyntax, 0, 6),
+				makeToken(token.TokenEOF, 6, 6),
+			},
+		},
+		"When lexing the node keyword, the returned value is correct.": {
+			inSource: "node",
+			want: []token.Token{
+				makeToken(token.TokenNode, 0, 4),
+				makeToken(token.TokenEOF, 4, 4),
+			},
+		},
 		"When lexing the rule keyword, the returned value is correct.": {
 			inSource: "rule",
 			want: []token.Token{

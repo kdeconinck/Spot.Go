@@ -15,6 +15,7 @@ func Validate(source string, resolution resolver.Resolution) []Diagnostic {
 	diagnostics = validateScope(source, resolution.Document.Scope, resolution.ScopeEntries, diagnostics)
 	diagnostics = validateDefinitions(source, resolution, diagnostics)
 	diagnostics = validateTokens(source, resolution, diagnostics)
+	diagnostics = validateSyntax(source, resolution, diagnostics)
 	diagnostics = validateRules(source, resolution, diagnostics)
 
 	return diagnostics

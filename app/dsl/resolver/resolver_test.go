@@ -23,7 +23,7 @@ func Test_Resolve_ReturnsSectionData(t *testing.T) {
 	t.Parallel()
 
 	// Arrange.
-	source := `scope { include "**/*.go" } definitions { letter = 'a' digit = '0' } tokens { Identifier = letter } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } }`
+	source := `scope { include "**/*.go" } definitions { letter = 'a' digit = '0' } tokens { Identifier = letter } syntax { node Word = Identifier } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } }`
 	document, parseErr := parser.Parse(source)
 
 	// Act.
@@ -34,6 +34,7 @@ func Test_Resolve_ReturnsSectionData(t *testing.T) {
 	claim.Equal(t, "When resolving a full DSL source, scope entries are preserved.", 1, len(resolution.ScopeEntries), "Scope Entry Count")
 	claim.Equal(t, "When resolving a full DSL source, definitions are preserved.", 2, len(resolution.Definitions), "Definition Count")
 	claim.Equal(t, "When resolving a full DSL source, tokens are preserved.", 1, len(resolution.Tokens), "Token Count")
+	claim.Equal(t, "When resolving a full DSL source, syntax nodes are preserved.", 1, len(resolution.SyntaxNodes), "Syntax Node Count")
 	claim.Equal(t, "When resolving a full DSL source, rules are preserved.", 1, len(resolution.Rules), "Rule Count")
 }
 
@@ -41,22 +42,25 @@ func Test_Resolve_IndexesFirstDeclarations(t *testing.T) {
 	t.Parallel()
 
 	// Arrange.
-	source := `scope { include "**/*.go" } definitions { value = 'a' value = 'b' } tokens { Identifier = "id" Identifier = "other" } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } rule PublicIdentifier { match Identifier report warn at Identifier "x" } }`
+	source := `scope { include "**/*.go" } definitions { value = 'a' value = 'b' } tokens { Identifier = "id" Identifier = "other" } syntax { node Word = Identifier node Word = Identifier } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } rule PublicIdentifier { match Identifier report warn at Identifier "x" } }`
 	document, parseErr := parser.Parse(source)
 
 	// Act.
 	resolution := resolver.Resolve(source, document)
 	definitionIndex, definitionOK := resolution.DefinitionIndex("value")
 	tokenIndex, tokenOK := resolution.TokenIndex("Identifier")
+	syntaxNodeIndex, syntaxNodeOK := resolution.SyntaxNodeIndex("Word")
 	ruleIndex, ruleOK := resolution.RuleIndex("PublicIdentifier")
 
 	// Assert.
 	claim.Equal(t, "When resolving duplicated declarations, no parse error is returned.", error(nil), parseErr, "Parse Error")
 	claim.Equal(t, "When resolving duplicated definitions, the first declaration index is stored.", 0, definitionIndex, "Definition Index")
 	claim.Equal(t, "When resolving duplicated tokens, the first declaration index is stored.", 0, tokenIndex, "Token Index")
+	claim.Equal(t, "When resolving duplicated syntax nodes, the first declaration index is stored.", 0, syntaxNodeIndex, "Syntax Node Index")
 	claim.Equal(t, "When resolving duplicated rules, the first declaration index is stored.", 0, ruleIndex, "Rule Index")
 	claim.Equal(t, "When resolving duplicated definitions, the name is found.", true, definitionOK, "Definition Found")
 	claim.Equal(t, "When resolving duplicated tokens, the name is found.", true, tokenOK, "Token Found")
+	claim.Equal(t, "When resolving duplicated syntax nodes, the name is found.", true, syntaxNodeOK, "Syntax Node Found")
 	claim.Equal(t, "When resolving duplicated rules, the name is found.", true, ruleOK, "Rule Found")
 }
 
@@ -123,6 +127,26 @@ func resolverDSL(size int) string {
 		builder.WriteString(" identifierPart")
 		builder.WriteString(suffix)
 		builder.WriteString("*\n")
+	}
+
+	builder.WriteString("}\n")
+	builder.WriteString("syntax {\n")
+
+	for idx := 0; idx <= size; idx++ {
+		suffix := strconv.Itoa(idx)
+
+		builder.WriteString("    node Word")
+		builder.WriteString(suffix)
+		builder.WriteString(" = Identifier")
+		builder.WriteString(suffix)
+		builder.WriteString("\n")
+		builder.WriteString("    node WordPair")
+		builder.WriteString(suffix)
+		builder.WriteString(" = Word")
+		builder.WriteString(suffix)
+		builder.WriteString(" Word")
+		builder.WriteString(suffix)
+		builder.WriteString("\n")
 	}
 
 	builder.WriteString("}\n")

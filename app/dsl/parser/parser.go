@@ -109,9 +109,14 @@ func newParser(src string, capacity documentCapacity) parser {
 				Nodes:    make([]ast.DefinitionExpressionNode, 0, capacity.amountOfExpressionNodes),
 				ChildIDs: make([]ast.DefinitionExpressionID, 0, capacity.amountOfExpressionChildReferences),
 			},
+			SyntaxExpressions: ast.SyntaxExpressionArena{
+				Nodes:    make([]ast.SyntaxExpressionNode, 0, capacity.amountOfSyntaxExpressionNodes),
+				ChildIDs: make([]ast.SyntaxExpressionID, 0, capacity.amountOfSyntaxExpressionChildren),
+			},
 			ScopeEntries:   make([]ast.ScopeEntry, 0, capacity.amountOfScopeElements),
 			DefinitionList: make([]ast.Definition, 0, capacity.amountOfDefinitionElements),
 			TokenList:      make([]ast.TokenDefinition, 0, capacity.amountOfTokenElements),
+			SyntaxNodeList: make([]ast.SyntaxNode, 0, capacity.amountOfSyntaxElements),
 			RuleList:       make([]ast.Rule, 0, capacity.amountOfRuleElements),
 		},
 	}

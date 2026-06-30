@@ -30,6 +30,12 @@ func (p *parser) parseDocument() (ast.Document, error) {
 		return ast.Document{}, err
 	}
 
+	syntax, err := p.parseOptionalSyntaxSection()
+
+	if err != nil {
+		return ast.Document{}, err
+	}
+
 	rules, err := p.parseOptionalRulesSection()
 
 	if err != nil {
@@ -45,6 +51,7 @@ func (p *parser) parseDocument() (ast.Document, error) {
 	p.document.Scope = scope
 	p.document.Definitions = definitions
 	p.document.Tokens = tokens
+	p.document.Syntax = syntax
 	p.document.Rules = rules
 	p.document.Span = span(scope.Span.Start, end.Span.End)
 

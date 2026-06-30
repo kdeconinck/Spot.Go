@@ -95,6 +95,17 @@ type Document struct {
 	// Tokens.FirstToken and Tokens.TokenCount describe which range belongs to the tokens section.
 	TokenList []TokenDefinition
 
+	// Syntax is the parsed syntax section.
+	Syntax SyntaxSection
+
+	// SyntaxNodeList stores every parsed syntax node declaration in source order.
+	// Syntax.FirstElementIdx and Syntax.AmountOfElements describe which range belongs to the syntax section.
+	SyntaxNodeList []SyntaxNode
+
+	// SyntaxExpressions stores every parsed syntax node expression.
+	// Syntax nodes refer into this arena by SyntaxExpressionID.
+	SyntaxExpressions SyntaxExpressionArena
+
 	// Rules is the parsed rules section.
 	Rules RulesSection
 
@@ -123,6 +134,11 @@ func (document Document) SectionDefinitions(section DefinitionsSection) []Defini
 // SectionTokens returns the token definitions declared in section.
 func (document Document) SectionTokens(section TokensSection) []TokenDefinition {
 	return document.TokenList[section.FirstElementIdx : section.FirstElementIdx+section.AmountOfElements]
+}
+
+// SectionSyntaxNodes returns the syntax node declarations declared in section.
+func (document Document) SectionSyntaxNodes(section SyntaxSection) []SyntaxNode {
+	return document.SyntaxNodeList[section.FirstElementIdx : section.FirstElementIdx+section.AmountOfElements]
 }
 
 // SectionRules returns the rules declared in section.
