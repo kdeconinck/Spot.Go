@@ -85,6 +85,28 @@ func Test_Parse_Rules(t *testing.T) {
 				        Message "Long identifier found"
 			`),
 		},
+		"When parsing a rules block with a syntax-node match, a document is returned.": {
+			inSource: `scope {} syntax { node File = Identifier } rules { rule FileRule { match node File where File.length > 0 report warn at File "File found" } }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Syntax
+				    Node File
+				      Reference Identifier
+				  Rules
+				    Rule FileRule
+				      Match node File
+				      Where
+				        Subject File
+				        Property length
+				        Operator >
+				        Value 0
+				      Report
+				        Severity warn
+				        At File
+				        Message "File found"
+			`),
+		},
 		"When the rules opening brace is missing, a diagnostic is returned.": {
 			inSource:  "scope {} rules }",
 			wantDiags: `Expected '{', found '}'. [15:16]`,
@@ -191,6 +213,10 @@ func rulesDSL(size int) string {
 		"tokens {\n" +
 		"    Identifier = 'a'..'z'+\n" +
 		"}\n" +
+		"syntax {\n" +
+		"    node Word = Identifier\n" +
+		"    node Root = Word+\n" +
+		"}\n" +
 		"rules {\n" +
 		strings.Repeat(
 			""+
@@ -227,6 +253,11 @@ func rulesDSL(size int) string {
 				"    rule AnyIdentifier {\n"+
 				"        match Identifier\n"+
 				"        report info at Identifier \"Identifier found\"\n"+
+				"    }\n"+
+				"    rule RootNode {\n"+
+				"        match node Root\n"+
+				"        where Root.length > 0\n"+
+				"        report warn at Root \"Root found\"\n"+
 				"    }\n",
 			size,
 		) +

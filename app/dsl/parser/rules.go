@@ -108,15 +108,23 @@ func (p *parser) parseRuleMatch() (ast.RuleMatch, error) {
 		return ast.RuleMatch{}, err
 	}
 
-	tok, err := p.expect(token.TokenIdentifier)
+	matchKind := ast.RuleMatchToken
+
+	if p.isAt(token.TokenNode) {
+		p.advance()
+		matchKind = ast.RuleMatchNode
+	}
+
+	target, err := p.expect(token.TokenIdentifier)
 
 	if err != nil {
 		return ast.RuleMatch{}, err
 	}
 
 	return ast.RuleMatch{
-		Token: tok,
-		Span:  span(start.Span.Start, tok.Span.End),
+		Kind:   matchKind,
+		Target: target,
+		Span:   span(start.Span.Start, target.Span.End),
 	}, nil
 }
 

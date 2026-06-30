@@ -14,6 +14,7 @@ import (
 
 func validateRules(source string, resolution resolver.Resolution, diagnostics []Diagnostic) []Diagnostic {
 	rules := resolution.Rules
+	hasSyntaxRules := false
 
 	if len(rules) > 1 {
 		for idx := range rules {
@@ -32,66 +33,154 @@ func validateRules(source string, resolution resolver.Resolution, diagnostics []
 	}
 
 	for idx := range rules {
+		if rules[idx].Match.Kind == ast.RuleMatchNode {
+			hasSyntaxRules = true
+		}
+
 		diagnostics = validateRuleReferences(source, rules[idx], resolution, diagnostics)
+	}
+
+	if hasSyntaxRules {
+		rootCount := amountOfSyntaxRoots(source, resolution)
+
+		if rootCount != 1 {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: "Syntax rules require exactly one root syntax node.",
+				Span:    resolution.Document.Rules.Span,
+			})
+		}
 	}
 
 	return diagnostics
 }
 
 func validateRuleReferences(source string, rule ast.Rule, resolution resolver.Resolution, diagnostics []Diagnostic) []Diagnostic {
-	matchedToken := rule.Match.Token
-	matchedTokenName := matchedToken.Value(source)
+	matchedTarget := rule.Match.Target
+	matchedTargetName := matchedTarget.Value(source)
 	where := rule.Where
 	report := rule.Report
 
-	if _, ok := resolution.TokenIndex(matchedTokenName); !ok {
-		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Token "` + matchedTokenName + `" is not declared.`,
-			Span:    matchedToken.Span,
-		})
+	switch rule.Match.Kind {
+	case ast.RuleMatchToken:
+		if _, ok := resolution.TokenIndex(matchedTargetName); !ok {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: `Token "` + matchedTargetName + `" is not declared.`,
+				Span:    matchedTarget.Span,
+			})
+		}
+
+		if where.Subject.Value(source) != "" && where.Subject.Value(source) != matchedTargetName {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: `Where clause must reference matched token "` + matchedTargetName + `".`,
+				Span:    where.Subject.Span,
+			})
+		}
+
+		if report.Target.Value(source) != "" && report.Target.Value(source) != matchedTargetName {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: `Report target must reference matched token "` + matchedTargetName + `".`,
+				Span:    report.Target.Span,
+			})
+		}
+
+		diagnostics = validateRulePropertyRules(where, "Token", source, diagnostics)
+
+	default:
+		if _, ok := resolution.SyntaxNodeIndex(matchedTargetName); !ok {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: `Syntax node "` + matchedTargetName + `" is not declared.`,
+				Span:    matchedTarget.Span,
+			})
+		}
+
+		if where.Subject.Value(source) != "" && where.Subject.Value(source) != matchedTargetName {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: `Where clause must reference matched syntax node "` + matchedTargetName + `".`,
+				Span:    where.Subject.Span,
+			})
+		}
+
+		if report.Target.Value(source) != "" && report.Target.Value(source) != matchedTargetName {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: `Report target must reference matched syntax node "` + matchedTargetName + `".`,
+				Span:    report.Target.Span,
+			})
+		}
+
+		diagnostics = validateRulePropertyRules(where, "Syntax node", source, diagnostics)
 	}
 
-	if where.Subject.Value(source) != "" && where.Subject.Value(source) != matchedTokenName {
-		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Where clause must reference matched token "` + matchedTokenName + `".`,
-			Span:    where.Subject.Span,
-		})
-	}
+	return diagnostics
+}
 
+func validateRulePropertyRules(where ast.RuleCondition, subjectLabel string, source string, diagnostics []Diagnostic) []Diagnostic {
 	if where.Property.Value(source) != "" && where.Property.Value(source) != "text" && where.Property.Value(source) != "length" {
 		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Token property "` + where.Property.Value(source) + `" is not declared.`,
+			Message: subjectLabel + ` property "` + where.Property.Value(source) + `" is not declared.`,
 			Span:    where.Property.Span,
 		})
 	}
 
 	if where.Property.Value(source) == "text" && where.Operator.Kind != token.TokenEqualEqual && where.Operator.Kind != token.TokenBangEqual {
 		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Token property "text" only supports equality operators.`,
+			Message: subjectLabel + ` property "text" only supports equality operators.`,
 			Span:    where.Operator.Span,
 		})
 	}
 
 	if where.Property.Value(source) == "text" && where.Value.Kind != token.TokenString {
 		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Token property "text" must be compared with a string literal.`,
+			Message: subjectLabel + ` property "text" must be compared with a string literal.`,
 			Span:    where.Value.Span,
 		})
 	}
 
 	if where.Property.Value(source) == "length" && where.Value.Kind != token.TokenInteger {
 		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Token property "length" must be compared with an integer literal.`,
+			Message: subjectLabel + ` property "length" must be compared with an integer literal.`,
 			Span:    where.Value.Span,
 		})
 	}
 
-	if report.Target.Value(source) != "" && report.Target.Value(source) != matchedTokenName {
-		diagnostics = append(diagnostics, Diagnostic{
-			Message: `Report target must reference matched token "` + matchedTokenName + `".`,
-			Span:    report.Target.Span,
-		})
+	return diagnostics
+}
+
+func amountOfSyntaxRoots(source string, resolution resolver.Resolution) int {
+	referenced := make([]bool, len(resolution.SyntaxNodes))
+	expressions := resolution.Document.SyntaxExpressions
+
+	for idx := range resolution.SyntaxNodes {
+		markReferencedSyntaxNodes(source, resolution, expressions, resolution.SyntaxNodes[idx].Expression, referenced)
 	}
 
-	return diagnostics
+	amountOfRoots := 0
+
+	for idx := range referenced {
+		if !referenced[idx] {
+			amountOfRoots++
+		}
+	}
+
+	return amountOfRoots
+}
+
+func markReferencedSyntaxNodes(source string, resolution resolver.Resolution, expressions ast.SyntaxExpressionArena, expressionID ast.SyntaxExpressionID, referenced []bool) {
+	expression := expressions.Node(expressionID)
+
+	switch expression.Kind {
+	case ast.SyntaxExpressionReference:
+		referencedIndex, ok := resolution.SyntaxNodeIndex(expression.Reference.Value(source))
+
+		if ok {
+			referenced[referencedIndex] = true
+		}
+
+	case ast.SyntaxExpressionAlternation, ast.SyntaxExpressionConcatenation:
+		for _, childID := range expressions.Children(expression) {
+			markReferencedSyntaxNodes(source, resolution, expressions, childID, referenced)
+		}
+
+	case ast.SyntaxExpressionGroup, ast.SyntaxExpressionRepetition:
+		markReferencedSyntaxNodes(source, resolution, expressions, expressions.Children(expression)[0], referenced)
+	}
 }

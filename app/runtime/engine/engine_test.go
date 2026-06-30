@@ -251,6 +251,29 @@ rules {
 				diagnostic(engine.SeverityErr, "No token matched at byte offset 1.", 1, 2),
 			},
 		},
+		"When a syntax-node rule matches, a diagnostic is returned for the matched node span.": {
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Whitespace = ' '+ skip
+    KeywordPackage = "package"
+    Identifier = "main"
+}
+syntax {
+    node PackageClause = KeywordPackage Identifier
+    node Root = PackageClause
+}
+rules {
+    rule PackageRule {
+        match node PackageClause
+        where PackageClause.text == "package main"
+        report warn at PackageClause "package clause found"
+    }
+}`,
+			inSource: "package main",
+			wantDiagnostics: []engine.Diagnostic{
+				diagnostic(engine.SeverityWarn, "package clause found", 0, 12),
+			},
+		},
 	} {
 		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()
@@ -317,6 +340,12 @@ tokens {
     Identifier = identifierStart identifierPart*
     Number = digit+
 }
+syntax {
+    node NumberNode = Number
+    node IdentifierNode = Identifier
+    node Statement = IdentifierNode NumberNode
+    node Root = Statement+
+}
 rules {
     rule PublicIdentifier {
         match Identifier
@@ -327,6 +356,11 @@ rules {
         match Number
         where Number.length >= 3
         report err at Number "Number too large"
+    }
+    rule StatementRule {
+        match node Statement
+        where Statement.length > 0
+        report info at Statement "statement"
     }
 }`
 }

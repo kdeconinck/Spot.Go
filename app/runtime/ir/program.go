@@ -20,6 +20,10 @@ type Program struct {
 	// SyntaxExpressions stores compiled syntax node expressions in flat slices.
 	SyntaxExpressions SyntaxExpressionArena
 
+	// SyntaxRoot is the source-order syntax node index that represents the single file-level syntax root.
+	// It is -1 when the compiled program does not define a unique root.
+	SyntaxRoot int
+
 	// Rules are the compiled rule definitions in source order.
 	Rules []Rule
 }
@@ -230,13 +234,27 @@ type SyntaxExpressionNode struct {
 	Repetition RepetitionKind
 }
 
+// RuleMatchKind identifies what a compiled rule matches.
+type RuleMatchKind uint8
+
+const (
+	// RuleMatchToken matches one emitted token.
+	RuleMatchToken RuleMatchKind = iota
+
+	// RuleMatchSyntaxNode matches one runtime syntax node.
+	RuleMatchSyntaxNode
+)
+
 // Rule is a compiled diagnostic rule.
 type Rule struct {
 	// Name is the DSL rule name.
 	Name string
 
-	// MatchToken is the source-order token index matched by the rule.
-	MatchToken int
+	// MatchKind identifies whether the rule matches a token or a syntax node.
+	MatchKind RuleMatchKind
+
+	// MatchIndex is the source-order token or syntax node index matched by the rule.
+	MatchIndex int
 
 	// Where is the optional compiled condition.
 	Where Condition
@@ -316,8 +334,11 @@ type Report struct {
 	// Severity identifies the diagnostic severity to emit.
 	Severity Severity
 
-	// TargetToken is the source-order token index whose span receives the diagnostic.
-	TargetToken int
+	// TargetKind identifies whether the report span comes from a token or a syntax node.
+	TargetKind RuleMatchKind
+
+	// TargetIndex is the source-order token or syntax node index whose span receives the diagnostic.
+	TargetIndex int
 
 	// Message is the emitted diagnostic message.
 	Message string

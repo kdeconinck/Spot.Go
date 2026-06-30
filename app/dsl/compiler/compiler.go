@@ -34,7 +34,8 @@ func Compile(source string, resolution resolver.Resolution) ir.Program {
 			Nodes:    make([]ir.SyntaxExpressionNode, len(syntaxExpressions.Nodes)),
 			ChildIDs: make([]ir.SyntaxExpressionID, len(syntaxExpressions.ChildIDs)),
 		},
-		Rules: make([]ir.Rule, 0, len(ruleList)),
+		SyntaxRoot: findSyntaxRootIndex(source, resolution),
+		Rules:      make([]ir.Rule, 0, len(ruleList)),
 	}
 
 	copy(program.Expressions.ChildIDs, reinterpretExpressionChildren(expressions.ChildIDs))
@@ -67,13 +68,22 @@ func Compile(source string, resolution resolver.Resolution) ir.Program {
 }
 
 func compileRule(source string, rule ast.Rule, resolution resolver.Resolution) ir.Rule {
-	matchTokenIndex, _ := resolution.TokenIndex(rule.Match.Token.Value(source))
+	matchKind := ir.RuleMatchToken
+	matchIndex := 0
+
+	if rule.Match.Kind == ast.RuleMatchNode {
+		matchKind = ir.RuleMatchSyntaxNode
+		matchIndex, _ = resolution.SyntaxNodeIndex(rule.Match.Target.Value(source))
+	} else {
+		matchIndex, _ = resolution.TokenIndex(rule.Match.Target.Value(source))
+	}
 
 	return ir.Rule{
 		Name:       rule.Name.Value(source),
-		MatchToken: matchTokenIndex,
+		MatchKind:  matchKind,
+		MatchIndex: matchIndex,
 		Where:      compileCondition(source, rule.Where),
-		Report:     compileReport(source, rule.Report, resolution),
+		Report:     compileReport(source, rule, resolution),
 	}
 }
 
@@ -100,12 +110,22 @@ func compileCondition(source string, condition ast.RuleCondition) ir.Condition {
 	return compiled
 }
 
-func compileReport(source string, report ast.RuleReport, resolution resolver.Resolution) ir.Report {
-	targetTokenIndex, _ := resolution.TokenIndex(report.Target.Value(source))
+func compileReport(source string, rule ast.Rule, resolution resolver.Resolution) ir.Report {
+	report := rule.Report
+	targetKind := ir.RuleMatchToken
+	targetIndex := 0
+
+	if rule.Match.Kind == ast.RuleMatchNode {
+		targetKind = ir.RuleMatchSyntaxNode
+		targetIndex, _ = resolution.SyntaxNodeIndex(report.Target.Value(source))
+	} else {
+		targetIndex, _ = resolution.TokenIndex(report.Target.Value(source))
+	}
 
 	return ir.Report{
 		Severity:    severityValue(report.Severity),
-		TargetToken: targetTokenIndex,
+		TargetKind:  targetKind,
+		TargetIndex: targetIndex,
 		Message:     stringValue(source, report.Message),
 	}
 }
@@ -229,6 +249,52 @@ func countStringExpressions(expressions ast.DefinitionExpressionArena) int {
 	}
 
 	return count
+}
+
+func findSyntaxRootIndex(source string, resolution resolver.Resolution) int {
+	referenced := make([]bool, len(resolution.SyntaxNodes))
+	expressions := resolution.Document.SyntaxExpressions
+
+	for idx := range resolution.SyntaxNodes {
+		markReferencedSyntaxNodes(source, resolution, expressions, resolution.SyntaxNodes[idx].Expression, referenced)
+	}
+
+	rootIndex := -1
+
+	for idx := range referenced {
+		if referenced[idx] {
+			continue
+		}
+
+		if rootIndex != -1 {
+			return -1
+		}
+
+		rootIndex = idx
+	}
+
+	return rootIndex
+}
+
+func markReferencedSyntaxNodes(source string, resolution resolver.Resolution, expressions ast.SyntaxExpressionArena, expressionID ast.SyntaxExpressionID, referenced []bool) {
+	expression := expressions.Node(expressionID)
+
+	switch expression.Kind {
+	case ast.SyntaxExpressionReference:
+		referencedIndex, ok := resolution.SyntaxNodeIndex(expression.Reference.Value(source))
+
+		if ok {
+			referenced[referencedIndex] = true
+		}
+
+	case ast.SyntaxExpressionAlternation, ast.SyntaxExpressionConcatenation:
+		for _, childID := range expressions.Children(expression) {
+			markReferencedSyntaxNodes(source, resolution, expressions, childID, referenced)
+		}
+
+	case ast.SyntaxExpressionGroup, ast.SyntaxExpressionRepetition:
+		markReferencedSyntaxNodes(source, resolution, expressions, expressions.Children(expression)[0], referenced)
+	}
 }
 
 func repetitionKind(kind token.TokenKind) ir.RepetitionKind {

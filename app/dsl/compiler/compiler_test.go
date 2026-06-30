@@ -74,11 +74,20 @@ func Test_Compile_DSL(t *testing.T) {
 				    Node WordList
 				      Repetition +
 				        Node Word
+				    Node Root
+				      Concatenation
+				        Node OptionalWord
+				        Node WordPair
+				        Node WordList
 				  Rules
 				    Rule PublicIdentifier
-				      MatchToken 0
+				      MatchToken Identifier
 				      Where text == "public"
-				      Report warn at 0 "Public identifier found"
+				      Report warn at Identifier "Public identifier found"
+				    Rule RootRule
+				      MatchNode Root
+				      Where length > 0
+				      Report info at Root "Root found"
 			`),
 		},
 	} {
@@ -194,6 +203,7 @@ func dsl(size int) string {
 	sb.WriteString("    node WordPair = Word Word\n")
 	sb.WriteString("    node OptionalWord = (Word | KeywordInternal)?\n")
 	sb.WriteString("    node WordList = Word+\n")
+	sb.WriteString("    node Root = OptionalWord WordPair WordList\n")
 
 	for idx := 1; idx <= size; idx++ {
 		sb.WriteString("    node Word")
@@ -222,6 +232,15 @@ func dsl(size int) string {
 		sb.WriteString(" = Word")
 		sb.WriteString(strconv.Itoa(idx))
 		sb.WriteString("+\n")
+		sb.WriteString("    node Root")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" = OptionalWord")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" WordPair")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" WordList")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("\n")
 	}
 
 	sb.WriteString("}\n")
@@ -230,6 +249,11 @@ func dsl(size int) string {
 	sb.WriteString("        match Identifier\n")
 	sb.WriteString("        where Identifier.text == \"public\"\n")
 	sb.WriteString("        report warn at Identifier \"Public identifier found\"\n")
+	sb.WriteString("    }\n")
+	sb.WriteString("    rule RootRule {\n")
+	sb.WriteString("        match node Root\n")
+	sb.WriteString("        where Root.length > 0\n")
+	sb.WriteString("        report info at Root \"Root found\"\n")
 	sb.WriteString("    }\n")
 
 	for idx := 1; idx <= size; idx++ {
@@ -245,6 +269,19 @@ func dsl(size int) string {
 		sb.WriteString("        report warn at Identifier")
 		sb.WriteString(strconv.Itoa(idx))
 		sb.WriteString(" \"Public identifier found\"\n")
+		sb.WriteString("    }\n")
+		sb.WriteString("    rule RootRule")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" {\n")
+		sb.WriteString("        match node Root")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("\n")
+		sb.WriteString("        where Root")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(".length > 0\n")
+		sb.WriteString("        report info at Root")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" \"Root found\"\n")
 		sb.WriteString("    }\n")
 	}
 
@@ -296,12 +333,20 @@ func renderProgram(program ir.Program) string {
 	for idx := range program.Rules {
 		rule := program.Rules[idx]
 		appendIndentedLine(&builder, 2, "Rule "+rule.Name)
-		appendIndentedLine(&builder, 3, "MatchToken "+strconv.Itoa(rule.MatchToken))
+		appendIndentedLine(&builder, 3, renderRuleMatch(program, rule))
 		appendIndentedLine(&builder, 3, "Where "+renderCondition(rule.Where))
-		appendIndentedLine(&builder, 3, "Report "+renderSeverity(rule.Report.Severity)+" at "+strconv.Itoa(rule.Report.TargetToken)+" "+strconv.Quote(rule.Report.Message))
+		appendIndentedLine(&builder, 3, "Report "+renderSeverity(rule.Report.Severity)+" at "+renderReportTarget(program, rule.Report)+" "+strconv.Quote(rule.Report.Message))
 	}
 
 	return strings.TrimSpace(builder.String())
+}
+
+func renderRuleMatch(program ir.Program, rule ir.Rule) string {
+	if rule.MatchKind == ir.RuleMatchSyntaxNode {
+		return "MatchNode " + program.SyntaxNodes[rule.MatchIndex].Name
+	}
+
+	return "MatchToken " + program.Tokens[rule.MatchIndex].Name
 }
 
 func appendExpression(builder *strings.Builder, program ir.Program, expressionID ir.ExpressionID, depth int) {
@@ -460,6 +505,14 @@ func renderSeverity(severity ir.Severity) string {
 	default:
 		return "err"
 	}
+}
+
+func renderReportTarget(program ir.Program, report ir.Report) string {
+	if report.TargetKind == ir.RuleMatchSyntaxNode {
+		return program.SyntaxNodes[report.TargetIndex].Name
+	}
+
+	return program.Tokens[report.TargetIndex].Name
 }
 
 func appendIndentedLine(builder *strings.Builder, depth int, text string) {

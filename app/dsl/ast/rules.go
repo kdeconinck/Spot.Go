@@ -23,7 +23,18 @@ type RulesSection struct {
 	Span location.Span
 }
 
-// Rule is a diagnostic declaration over matched tokens.
+// RuleMatchKind identifies what a rule matches.
+type RuleMatchKind uint8
+
+const (
+	// RuleMatchToken matches one emitted token.
+	RuleMatchToken RuleMatchKind = iota
+
+	// RuleMatchNode matches one runtime syntax node.
+	RuleMatchNode
+)
+
+// Rule is a diagnostic declaration over matched tokens or syntax nodes.
 type Rule struct {
 	// Name is the identifier token naming the rule.
 	Name token.Token
@@ -41,10 +52,13 @@ type Rule struct {
 	Span location.Span
 }
 
-// RuleMatch is a token match statement inside a rule.
+// RuleMatch is a match statement inside a rule.
 type RuleMatch struct {
-	// Token is the identifier token naming the token to match.
-	Token token.Token
+	// Kind identifies whether the rule matches a token or a syntax node.
+	Kind RuleMatchKind
+
+	// Target is the identifier token naming the matched token or syntax node.
+	Target token.Token
 
 	// Span is the byte range covered by the match statement.
 	Span location.Span

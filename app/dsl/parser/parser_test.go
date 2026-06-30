@@ -654,7 +654,13 @@ func appendDocument(source string, builder *strings.Builder, document ast.Docume
 
 		for _, rule := range document.SectionRules(document.Rules) {
 			appendIndentedLine(builder, depth+2, formatLabelWithSpan("Rule "+rule.Name.Value(source), rule.Span, includeSpans))
-			appendIndentedLine(builder, depth+3, formatLabelWithSpan("Match "+rule.Match.Token.Value(source), rule.Match.Span, includeSpans))
+			matchLabel := "Match " + rule.Match.Target.Value(source)
+
+			if rule.Match.Kind == ast.RuleMatchNode {
+				matchLabel = "Match node " + rule.Match.Target.Value(source)
+			}
+
+			appendIndentedLine(builder, depth+3, formatLabelWithSpan(matchLabel, rule.Match.Span, includeSpans))
 
 			if rule.Where.Span != (location.Span{}) {
 				appendIndentedLine(builder, depth+3, formatLabelWithSpan("Where", rule.Where.Span, includeSpans))

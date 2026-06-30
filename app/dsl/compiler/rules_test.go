@@ -41,13 +41,13 @@ func Test_Compile_Rules(t *testing.T) {
 				        Range '0' '9'
 				  Rules
 				    Rule First
-				      MatchToken 0
+				      MatchToken Identifier
 				      Where none
-				      Report info at 0 "first"
+				      Report info at Identifier "first"
 				    Rule Second
-				      MatchToken 1
+				      MatchToken Number
 				      Where length >= 2
-				      Report err at 1 "second"
+				      Report err at Number "second"
 			`),
 		},
 		"When compiling a text inequality rule, the text condition is compiled.": {
@@ -59,9 +59,9 @@ func Test_Compile_Rules(t *testing.T) {
 				      String "id"
 				  Rules
 				    Rule NotPublic
-				      MatchToken 0
+				      MatchToken Identifier
 				      Where text != "public"
-				      Report warn at 0 "message"
+				      Report warn at Identifier "message"
 			`),
 		},
 		"When compiling a length less-than rule, the numeric condition is compiled.": {
@@ -73,9 +73,9 @@ func Test_Compile_Rules(t *testing.T) {
 				      String "id"
 				  Rules
 				    Rule Short
-				      MatchToken 0
+				      MatchToken Identifier
 				      Where length < 10
-				      Report warn at 0 "message"
+				      Report warn at Identifier "message"
 			`),
 		},
 		"When compiling a length less-than-or-equal rule, the numeric condition is compiled.": {
@@ -87,9 +87,9 @@ func Test_Compile_Rules(t *testing.T) {
 				      String "id"
 				  Rules
 				    Rule ShortOrEqual
-				      MatchToken 0
+				      MatchToken Identifier
 				      Where length <= 10
-				      Report warn at 0 "message"
+				      Report warn at Identifier "message"
 			`),
 		},
 		"When compiling a length greater-than rule, the numeric condition is compiled.": {
@@ -101,9 +101,29 @@ func Test_Compile_Rules(t *testing.T) {
 				      String "id"
 				  Rules
 				    Rule Long
-				      MatchToken 0
+				      MatchToken Identifier
 				      Where length > 10
-				      Report warn at 0 "message"
+				      Report warn at Identifier "message"
+			`),
+		},
+		"When compiling a syntax-node rule, the node match is compiled.": {
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Word = Identifier node Root = Word+ } rules { rule RootRule { match node Root where Root.length > 0 report warn at Root "message" } }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				  Syntax
+				    Node Word
+				      Token Identifier
+				    Node Root
+				      Repetition +
+				        Node Word
+				  Rules
+				    Rule RootRule
+				      MatchNode Root
+				      Where length > 0
+				      Report warn at Root "message"
 			`),
 		},
 	} {

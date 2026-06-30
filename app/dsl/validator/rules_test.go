@@ -289,6 +289,52 @@ func Test_Validate_Rules(t *testing.T) {
 				expectDiagnostic(`Report target must reference matched token "Identifier".`, 0),
 			},
 		},
+		"When a rule matches a declared syntax node, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node Word = Identifier
+					node Root = Word+
+				}
+				rules {
+					rule RootRule {
+						match node Root
+						where Root.length > 0
+						report warn at Root "x"
+					}
+				}
+			`),
+			wantDiagnostics: nil,
+		},
+		"When syntax rules are declared without a unique syntax root, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node Word = Identifier
+					node Root = Word
+					node OtherRoot = Identifier
+				}
+				[[rules {
+					rule RootRule {
+						match node Root
+						report warn at Root "x"
+					}
+				}]]
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic("Syntax rules require exactly one root syntax node.", 0),
+			},
+		},
 	} {
 		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()

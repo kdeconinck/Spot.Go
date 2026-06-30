@@ -10,6 +10,7 @@ import (
 	"github.com/kdeconinck/spot/location"
 	"github.com/kdeconinck/spot/runtime/ir"
 	"github.com/kdeconinck/spot/runtime/scanner"
+	"github.com/kdeconinck/spot/runtime/syntax"
 )
 
 // Severity identifies the severity of a runtime diagnostic.
@@ -47,33 +48,59 @@ type Options struct {
 // Engine evaluates compiled rules over source text.
 type Engine struct {
 	rulesByTokenName map[string][]ir.Rule
+	rulesBySyntaxID  [][]ir.Rule
+	syntaxParser     syntax.Parser
+	hasSyntaxParser  bool
 }
 
 // New returns an analysis engine for program.
 func New(program ir.Program) Engine {
 	rulesByTokenName := make(map[string][]ir.Rule, len(program.Tokens))
+	rulesBySyntaxID := make([][]ir.Rule, len(program.SyntaxNodes))
 
 	for idx := range program.Rules {
 		rule := program.Rules[idx]
-		tokenName := program.Tokens[rule.MatchToken].Name
-		rulesByTokenName[tokenName] = append(rulesByTokenName[tokenName], rule)
+
+		if rule.MatchKind == ir.RuleMatchToken {
+			tokenName := program.Tokens[rule.MatchIndex].Name
+			rulesByTokenName[tokenName] = append(rulesByTokenName[tokenName], rule)
+			continue
+		}
+
+		rulesBySyntaxID[rule.MatchIndex] = append(rulesBySyntaxID[rule.MatchIndex], rule)
+	}
+
+	syntaxParser := syntax.Parser{}
+	hasSyntaxParser := false
+
+	if len(program.SyntaxNodes) > 0 && program.SyntaxRoot >= 0 {
+		var err error
+		syntaxParser, err = syntax.New(program, program.SyntaxNodes[program.SyntaxRoot].Name)
+
+		if err == nil {
+			hasSyntaxParser = true
+		}
 	}
 
 	return Engine{
 		rulesByTokenName: rulesByTokenName,
+		rulesBySyntaxID:  rulesBySyntaxID,
+		syntaxParser:     syntaxParser,
+		hasSyntaxParser:  hasSyntaxParser,
 	}
 }
 
-// Analyze scans src and evaluates compiled rules in one pass.
+// Analyze scans src, builds the runtime syntax tree when configured, and evaluates compiled rules.
 func (engine Engine) Analyze(program ir.Program, src string, options Options) []Diagnostic {
 	scan := scanner.New(program, src)
+	tokens := make([]scanner.Token, 0, len(src))
 	var diagnostics []Diagnostic
 
 	for {
-		token, scanDiagnostic, ok := scan.Next()
+		scannedToken, scanDiagnostic, ok := scan.Next()
 
 		if !ok {
-			return diagnostics
+			break
 		}
 
 		if scanDiagnostic.Message != "" {
@@ -86,19 +113,20 @@ func (engine Engine) Analyze(program ir.Program, src string, options Options) []
 			return diagnostics
 		}
 
-		rules := engine.rulesByTokenName[token.Name]
+		tokens = append(tokens, scannedToken)
+		rules := engine.rulesByTokenName[scannedToken.Name]
 
 		for idx := range rules {
 			rule := rules[idx]
 
-			if !matchesCondition(rule.Where, token) {
+			if !matchesCondition(rule.Where, scannedToken.Text, len(scannedToken.Text)) {
 				continue
 			}
 
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: severity(rule.Report.Severity),
 				Message:  rule.Report.Message,
-				Span:     token.Span,
+				Span:     scannedToken.Span,
 			})
 
 			if options.StopOnFirstDiagnostic {
@@ -106,18 +134,98 @@ func (engine Engine) Analyze(program ir.Program, src string, options Options) []
 			}
 		}
 	}
+
+	if !engine.hasSyntaxParser || len(engine.rulesBySyntaxID) == 0 {
+		return diagnostics
+	}
+
+	var tree syntax.Tree
+
+	if !engine.syntaxParser.ParseInto(tokens, &tree) {
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityErr,
+			Message:  `Source text does not match syntax root "` + program.SyntaxNodes[program.SyntaxRoot].Name + `".`,
+			Span: location.Span{
+				Start: 0,
+				End:   location.Position(len(src)),
+			},
+		})
+
+		return diagnostics
+	}
+
+	engine.evaluateSyntaxNode(program, src, tree, tree.Root, &diagnostics, options)
+
+	return diagnostics
 }
 
-func matchesCondition(condition ir.Condition, token scanner.Token) bool {
+func (engine Engine) evaluateSyntaxNode(program ir.Program, src string, tree syntax.Tree, nodeID syntax.NodeID, diagnostics *[]Diagnostic, options Options) bool {
+	node := tree.Node(nodeID)
+	nodeRules := engine.rulesBySyntaxID[node.Kind]
+	nodeText, nodeSpan := syntaxNodeTextAndSpan(src, tree, node)
+
+	for idx := range nodeRules {
+		rule := nodeRules[idx]
+
+		if !matchesCondition(rule.Where, nodeText, len(nodeText)) {
+			continue
+		}
+
+		*diagnostics = append(*diagnostics, Diagnostic{
+			Severity: severity(rule.Report.Severity),
+			Message:  rule.Report.Message,
+			Span:     nodeSpan,
+		})
+
+		if options.StopOnFirstDiagnostic {
+			return true
+		}
+	}
+
+	for _, childID := range tree.Children(node) {
+		if engine.evaluateSyntaxNode(program, src, tree, childID, diagnostics, options) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func matchesCondition(condition ir.Condition, text string, length int) bool {
 	switch condition.Property {
 	case ir.ConditionPropertyNone:
 		return true
 
 	case ir.ConditionPropertyText:
-		return compareStrings(token.Text, condition.String, condition.Operator)
+		return compareStrings(text, condition.String, condition.Operator)
 
 	default:
-		return compareIntegers(len(token.Text), condition.Integer, condition.Operator)
+		return compareIntegers(length, condition.Integer, condition.Operator)
+	}
+}
+
+func syntaxNodeTextAndSpan(src string, tree syntax.Tree, node syntax.Node) (string, location.Span) {
+	if node.AmountOfTokens == 0 {
+		position := location.Position(0)
+
+		if node.FirstTokenIndex < uint32(len(tree.Tokens)) {
+			position = tree.Tokens[node.FirstTokenIndex].Span.Start
+		} else if len(tree.Tokens) > 0 {
+			position = tree.Tokens[len(tree.Tokens)-1].Span.End
+		}
+
+		return "", location.Span{
+			Start: position,
+			End:   position,
+		}
+	}
+
+	startToken := tree.Tokens[node.FirstTokenIndex]
+	endToken := tree.Tokens[node.FirstTokenIndex+node.AmountOfTokens-1]
+
+	return src[startToken.Span.Start:endToken.Span.End], location.Span{
+		Start: startToken.Span.Start,
+		End:   endToken.Span.End,
 	}
 }
 
