@@ -48,12 +48,32 @@ func Test_Compile_DSL(t *testing.T) {
 				            Character '_'
 				    Token KeywordPublic
 				      String "public"
+				    Token KeywordInternal
+				      String "internal"
 				    Token Whitespace
 				      Repetition +
 				        Alternation
 				          Character ' '
 				          Character '\t'
 				      Skip
+				  Syntax
+				    Node Word
+				      Alternation
+				        Token Identifier
+				        Token KeywordPublic
+				    Node WordPair
+				      Concatenation
+				        Node Word
+				        Node Word
+				    Node OptionalWord
+				      Repetition ?
+				        Group
+				          Alternation
+				            Node Word
+				            Token KeywordInternal
+				    Node WordList
+				      Repetition +
+				        Node Word
 				  Rules
 				    Rule PublicIdentifier
 				      MatchToken 0
@@ -148,6 +168,7 @@ func dsl(size int) string {
 	sb.WriteString("tokens {\n")
 	sb.WriteString("    Identifier = identifier\n")
 	sb.WriteString("    KeywordPublic = \"public\"\n")
+	sb.WriteString("    KeywordInternal = \"internal\"\n")
 	sb.WriteString("    Whitespace = (' ' | '\\t')+ skip\n")
 
 	for idx := 1; idx <= size; idx++ {
@@ -159,9 +180,48 @@ func dsl(size int) string {
 		sb.WriteString("    KeywordPublic")
 		sb.WriteString(strconv.Itoa(idx))
 		sb.WriteString(" = \"public\"\n")
+		sb.WriteString("    KeywordInternal")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" = \"internal\"\n")
 		sb.WriteString("    Whitespace")
 		sb.WriteString(strconv.Itoa(idx))
 		sb.WriteString(" = (' ' | '\\t')+ skip\n")
+	}
+
+	sb.WriteString("}\n")
+	sb.WriteString("syntax {\n")
+	sb.WriteString("    node Word = Identifier | KeywordPublic\n")
+	sb.WriteString("    node WordPair = Word Word\n")
+	sb.WriteString("    node OptionalWord = (Word | KeywordInternal)?\n")
+	sb.WriteString("    node WordList = Word+\n")
+
+	for idx := 1; idx <= size; idx++ {
+		sb.WriteString("    node Word")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" = Identifier")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" | KeywordPublic")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("\n")
+		sb.WriteString("    node WordPair")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" = Word")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" Word")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("\n")
+		sb.WriteString("    node OptionalWord")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" = (Word")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" | KeywordInternal")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(")?\n")
+		sb.WriteString("    node WordList")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" = Word")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("+\n")
 	}
 
 	sb.WriteString("}\n")
@@ -221,6 +281,16 @@ func renderProgram(program ir.Program) string {
 		}
 	}
 
+	if len(program.SyntaxNodes) > 0 {
+		builder.WriteString("  Syntax\n")
+
+		for idx := range program.SyntaxNodes {
+			syntaxNode := program.SyntaxNodes[idx]
+			appendIndentedLine(&builder, 2, "Node "+syntaxNode.Name)
+			appendSyntaxExpression(&builder, program, syntaxNode.Expression, 3)
+		}
+	}
+
 	builder.WriteString("  Rules\n")
 
 	for idx := range program.Rules {
@@ -274,12 +344,61 @@ func appendExpression(builder *strings.Builder, program ir.Program, expressionID
 	}
 }
 
+func appendSyntaxExpression(builder *strings.Builder, program ir.Program, expressionID ir.SyntaxExpressionID, depth int) {
+	expression := program.SyntaxExpressions.Node(expressionID)
+
+	switch expression.Kind {
+	case ir.SyntaxExpressionReference:
+		label := "Token "
+
+		if expression.ReferenceKind == ir.SyntaxReferenceNode {
+			label = "Node "
+		}
+
+		appendIndentedLine(builder, depth, label+syntaxReferenceName(program, expression))
+
+	case ir.SyntaxExpressionConcatenation:
+		appendIndentedLine(builder, depth, "Concatenation")
+
+		for _, childID := range program.SyntaxExpressions.Children(expression) {
+			appendSyntaxExpression(builder, program, childID, depth+1)
+		}
+
+	case ir.SyntaxExpressionAlternation:
+		appendIndentedLine(builder, depth, "Alternation")
+
+		for _, childID := range program.SyntaxExpressions.Children(expression) {
+			appendSyntaxExpression(builder, program, childID, depth+1)
+		}
+
+	case ir.SyntaxExpressionGroup:
+		appendIndentedLine(builder, depth, "Group")
+		appendSyntaxExpression(builder, program, firstSyntaxExpressionChild(program.SyntaxExpressions, expression), depth+1)
+
+	default:
+		appendIndentedLine(builder, depth, "Repetition "+renderRepetition(expression.Repetition))
+		appendSyntaxExpression(builder, program, firstSyntaxExpressionChild(program.SyntaxExpressions, expression), depth+1)
+	}
+}
+
 func firstExpressionChild(arena ir.ExpressionArena, expression ir.ExpressionNode) ir.ExpressionID {
 	if expression.Kind == ir.ExpressionReference {
 		return expression.Reference
 	}
 
 	return arena.Children(expression)[0]
+}
+
+func firstSyntaxExpressionChild(arena ir.SyntaxExpressionArena, expression ir.SyntaxExpressionNode) ir.SyntaxExpressionID {
+	return arena.Children(expression)[0]
+}
+
+func syntaxReferenceName(program ir.Program, expression ir.SyntaxExpressionNode) string {
+	if expression.ReferenceKind == ir.SyntaxReferenceToken {
+		return program.Tokens[expression.Reference].Name
+	}
+
+	return program.SyntaxNodes[expression.Reference].Name
 }
 
 func renderRepetition(repetition ir.RepetitionKind) string {

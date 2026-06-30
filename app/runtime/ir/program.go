@@ -14,6 +14,12 @@ type Program struct {
 	// Expressions stores compiled token and definition expressions in flat slices.
 	Expressions ExpressionArena
 
+	// SyntaxNodes are the compiled syntax node definitions in source order.
+	SyntaxNodes []SyntaxNode
+
+	// SyntaxExpressions stores compiled syntax node expressions in flat slices.
+	SyntaxExpressions SyntaxExpressionArena
+
 	// Rules are the compiled rule definitions in source order.
 	Rules []Rule
 }
@@ -126,6 +132,93 @@ type ExpressionNode struct {
 
 	// StringID identifies the exact string literal in a string expression.
 	StringID uint32
+
+	// FirstElementIdx is the start offset of this node's children in ChildIDs.
+	FirstElementIdx uint32
+
+	// AmountOfElements is the number of children stored for this node.
+	AmountOfElements uint32
+
+	// Repetition identifies the repetition operator.
+	Repetition RepetitionKind
+}
+
+// SyntaxNode is a compiled syntax node definition.
+type SyntaxNode struct {
+	// Name is the declared syntax node name.
+	Name string
+
+	// Expression is the root compiled syntax expression.
+	Expression SyntaxExpressionID
+}
+
+// SyntaxExpressionKind identifies the form of a compiled syntax expression.
+type SyntaxExpressionKind uint8
+
+const (
+	// SyntaxExpressionReference is a token or syntax node reference.
+	SyntaxExpressionReference SyntaxExpressionKind = iota
+
+	// SyntaxExpressionConcatenation is a sequence of syntax expressions.
+	SyntaxExpressionConcatenation
+
+	// SyntaxExpressionAlternation is a list of alternative syntax expressions.
+	SyntaxExpressionAlternation
+
+	// SyntaxExpressionGroup is a parenthesized syntax expression.
+	SyntaxExpressionGroup
+
+	// SyntaxExpressionRepetition is a repeated syntax expression.
+	SyntaxExpressionRepetition
+)
+
+// SyntaxReferenceKind identifies the target kind of a syntax reference.
+type SyntaxReferenceKind uint8
+
+const (
+	// SyntaxReferenceToken targets a compiled token definition.
+	SyntaxReferenceToken SyntaxReferenceKind = iota
+
+	// SyntaxReferenceNode targets a compiled syntax node definition.
+	SyntaxReferenceNode
+)
+
+// SyntaxExpressionID identifies a node in a SyntaxExpressionArena.
+type SyntaxExpressionID uint32
+
+// SyntaxExpressionArena stores compiled syntax expressions in flat slices.
+//
+// Nodes contains the actual syntax expression records. ChildIDs stores the adjacency data for nodes that have
+// children, such as alternations, concatenations, groups, and repetitions. A node's FirstElementIdx and
+// AmountOfElements describe which segment of ChildIDs belongs to that node.
+type SyntaxExpressionArena struct {
+	// Nodes contains every compiled syntax expression node referenced by the program.
+	Nodes []SyntaxExpressionNode
+
+	// ChildIDs stores child node identifiers for branch nodes.
+	ChildIDs []SyntaxExpressionID
+}
+
+// Node returns the syntax expression node identified by id.
+func (arena SyntaxExpressionArena) Node(id SyntaxExpressionID) SyntaxExpressionNode {
+	return arena.Nodes[id]
+}
+
+// Children returns the child syntax expression identifiers for node.
+func (arena SyntaxExpressionArena) Children(node SyntaxExpressionNode) []SyntaxExpressionID {
+	return arena.ChildIDs[node.FirstElementIdx : node.FirstElementIdx+node.AmountOfElements]
+}
+
+// SyntaxExpressionNode is one compiled syntax expression node.
+type SyntaxExpressionNode struct {
+	// Kind identifies the form of expression.
+	Kind SyntaxExpressionKind
+
+	// ReferenceKind identifies whether Reference targets a token or syntax node.
+	ReferenceKind SyntaxReferenceKind
+
+	// Reference identifies the target token or syntax node in a reference expression.
+	Reference uint32
 
 	// FirstElementIdx is the start offset of this node's children in ChildIDs.
 	FirstElementIdx uint32

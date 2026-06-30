@@ -18,7 +18,9 @@ import (
 // Compile compiles validated resolved Spot DSL syntax into a runtime program.
 func Compile(source string, resolution resolver.Resolution) ir.Program {
 	expressions := resolution.Document.Expressions
+	syntaxExpressions := resolution.Document.SyntaxExpressions
 	tokenList := resolution.Tokens
+	syntaxNodes := resolution.SyntaxNodes
 	ruleList := resolution.Rules
 	program := ir.Program{
 		Tokens: make([]ir.Token, 0, len(tokenList)),
@@ -27,11 +29,18 @@ func Compile(source string, resolution resolver.Resolution) ir.Program {
 			ChildIDs: make([]ir.ExpressionID, len(expressions.ChildIDs)),
 			Strings:  make([]string, 0, countStringExpressions(expressions)),
 		},
+		SyntaxNodes: make([]ir.SyntaxNode, 0, len(syntaxNodes)),
+		SyntaxExpressions: ir.SyntaxExpressionArena{
+			Nodes:    make([]ir.SyntaxExpressionNode, len(syntaxExpressions.Nodes)),
+			ChildIDs: make([]ir.SyntaxExpressionID, len(syntaxExpressions.ChildIDs)),
+		},
 		Rules: make([]ir.Rule, 0, len(ruleList)),
 	}
 
 	copy(program.Expressions.ChildIDs, reinterpretExpressionChildren(expressions.ChildIDs))
 	compileExpressionArena(source, resolution, &program.Expressions)
+	copy(program.SyntaxExpressions.ChildIDs, reinterpretSyntaxExpressionChildren(syntaxExpressions.ChildIDs))
+	compileSyntaxExpressionArena(source, resolution, &program.SyntaxExpressions)
 
 	for idx := range tokenList {
 		tok := tokenList[idx]
@@ -39,6 +48,14 @@ func Compile(source string, resolution resolver.Resolution) ir.Program {
 			Name:       tok.Name.Value(source),
 			Expression: ir.ExpressionID(tok.Expression),
 			Skip:       tok.Skip.Kind == token.TokenSkip,
+		})
+	}
+
+	for idx := range syntaxNodes {
+		syntaxNode := syntaxNodes[idx]
+		program.SyntaxNodes = append(program.SyntaxNodes, ir.SyntaxNode{
+			Name:       syntaxNode.Name.Value(source),
+			Expression: ir.SyntaxExpressionID(syntaxNode.Expression),
 		})
 	}
 
@@ -141,11 +158,62 @@ func compileExpressionArena(source string, resolution resolver.Resolution, arena
 	}
 }
 
+func compileSyntaxExpressionArena(source string, resolution resolver.Resolution, arena *ir.SyntaxExpressionArena) {
+	expressions := resolution.Document.SyntaxExpressions
+
+	for idx := range expressions.Nodes {
+		expression := expressions.Nodes[idx]
+		node := ir.SyntaxExpressionNode{
+			FirstElementIdx:  expression.FirstElementIdx,
+			AmountOfElements: expression.AmountOfElements,
+		}
+
+		switch expression.Kind {
+		case ast.SyntaxExpressionReference:
+			node.Kind = ir.SyntaxExpressionReference
+
+			if tokenIndex, ok := resolution.TokenIndex(expression.Reference.Value(source)); ok {
+				node.ReferenceKind = ir.SyntaxReferenceToken
+				node.Reference = uint32(tokenIndex)
+			} else {
+				syntaxNodeIndex, _ := resolution.SyntaxNodeIndex(expression.Reference.Value(source))
+				node.ReferenceKind = ir.SyntaxReferenceNode
+				node.Reference = uint32(syntaxNodeIndex)
+			}
+
+		case ast.SyntaxExpressionConcatenation:
+			node.Kind = ir.SyntaxExpressionConcatenation
+
+		case ast.SyntaxExpressionAlternation:
+			node.Kind = ir.SyntaxExpressionAlternation
+
+		case ast.SyntaxExpressionGroup:
+			node.Kind = ir.SyntaxExpressionGroup
+
+		default:
+			node.Kind = ir.SyntaxExpressionRepetition
+			node.Repetition = repetitionKind(expression.Operator.Kind)
+		}
+
+		arena.Nodes[idx] = node
+	}
+}
+
 func reinterpretExpressionChildren(children []ast.DefinitionExpressionID) []ir.ExpressionID {
 	compiled := make([]ir.ExpressionID, len(children))
 
 	for idx := range children {
 		compiled[idx] = ir.ExpressionID(children[idx])
+	}
+
+	return compiled
+}
+
+func reinterpretSyntaxExpressionChildren(children []ast.SyntaxExpressionID) []ir.SyntaxExpressionID {
+	compiled := make([]ir.SyntaxExpressionID, len(children))
+
+	for idx := range children {
+		compiled[idx] = ir.SyntaxExpressionID(children[idx])
 	}
 
 	return compiled
