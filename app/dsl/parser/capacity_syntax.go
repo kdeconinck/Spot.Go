@@ -89,6 +89,13 @@ func (p *sizingParser) measureSyntaxPrimaryExpression() {
 		return
 	}
 
+	if p.isAt(token.TokenAny) {
+		p.advance()
+		p.countMeasuredSyntaxExpressionNode(0)
+
+		return
+	}
+
 	p.expect(token.TokenIdentifier)
 	p.countMeasuredSyntaxExpressionNode(0)
 }
@@ -98,7 +105,7 @@ func (p *sizingParser) startsSyntaxExpressionContinuation() bool {
 		return false
 	}
 
-	return p.isAt(token.TokenLeftParen) || p.isAt(token.TokenIdentifier)
+	return p.isAt(token.TokenLeftParen) || p.isAt(token.TokenIdentifier) || p.isAt(token.TokenAny)
 }
 
 func (p *sizingParser) measureGroupedSyntaxExpressionCapacity() {

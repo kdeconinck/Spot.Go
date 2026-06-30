@@ -43,7 +43,7 @@ func Test_Parse_Syntax(t *testing.T) {
 			`),
 		},
 		"When parsing a syntax block with node declarations, a document is returned.": {
-			inSource: "scope {} tokens { Identifier = \"id\" KeywordPublic = \"public\" KeywordInternal = \"internal\" } syntax { node Word = Identifier | KeywordPublic node WordPair = Word Word node OptionalWord = (Word | KeywordInternal)? }",
+			inSource: "scope {} tokens { Identifier = \"id\" KeywordPublic = \"public\" KeywordInternal = \"internal\" } syntax { node Word = Identifier | KeywordPublic node WordPair = Word Word node OptionalWord = (Word | KeywordInternal)? node UnknownStatement = any+ }",
 			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
@@ -69,6 +69,9 @@ func Test_Parse_Syntax(t *testing.T) {
 				          Alternation
 				            Reference Word
 				            Reference KeywordInternal
+				    Node UnknownStatement
+				      Repetition +
+				        Any
 			`),
 		},
 		"When the syntax opening brace is missing, a diagnostic is returned.": {
@@ -149,7 +152,8 @@ func syntaxDSL(size int) string {
 				"    node Word = Identifier | KeywordPublic\n"+
 				"    node WordPair = Word Word\n"+
 				"    node OptionalWord = (Word | KeywordInternal)?\n"+
-				"    node WordList = Word+\n",
+				"    node WordList = Word+\n"+
+				"    node UnknownStatement = any+\n",
 			size,
 		) +
 		"}"

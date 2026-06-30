@@ -9,6 +9,7 @@ package validator
 import (
 	"github.com/kdeconinck/spot/dsl/ast"
 	"github.com/kdeconinck/spot/dsl/resolver"
+	"github.com/kdeconinck/spot/dsl/token"
 )
 
 func validateSyntax(source string, resolution resolver.Resolution, diagnostics []Diagnostic) []Diagnostic {
@@ -61,6 +62,7 @@ func validateSyntaxExpression(source string, expressionID ast.SyntaxExpressionID
 			})
 		}
 
+	case ast.SyntaxExpressionAny:
 	case ast.SyntaxExpressionAlternation, ast.SyntaxExpressionConcatenation:
 		for _, childID := range expressions.Children(expression) {
 			diagnostics = validateSyntaxExpression(source, childID, resolution, diagnostics)
@@ -135,6 +137,7 @@ func validateSyntaxExpressionCycle(source string, expressionID ast.SyntaxExpress
 
 		diagnostics = validateSyntaxCycle(source, referencedIndex, resolution, states, diagnostics)
 
+	case ast.SyntaxExpressionAny:
 	case ast.SyntaxExpressionAlternation, ast.SyntaxExpressionConcatenation:
 		for _, childID := range expressions.Children(expression) {
 			diagnostics = validateSyntaxExpressionCycle(source, childID, resolution, states, diagnostics)
@@ -171,6 +174,9 @@ func syntaxExpressionMatchesEmpty(source string, expressionID ast.SyntaxExpressi
 
 		return syntaxExpressionMatchesEmpty(source, resolution.SyntaxNodes[syntaxNodeIndex].Expression, resolution, depth+1)
 
+	case ast.SyntaxExpressionAny:
+		return false
+
 	case ast.SyntaxExpressionConcatenation:
 		for _, childID := range children {
 			if !syntaxExpressionMatchesEmpty(source, childID, resolution, depth) {
@@ -193,6 +199,10 @@ func syntaxExpressionMatchesEmpty(source string, expressionID ast.SyntaxExpressi
 		return syntaxExpressionMatchesEmpty(source, children[0], resolution, depth)
 
 	case ast.SyntaxExpressionRepetition:
+		if expression.Operator.Kind == token.TokenPlus {
+			return syntaxExpressionMatchesEmpty(source, children[0], resolution, depth)
+		}
+
 		return true
 
 	default:

@@ -22,6 +22,9 @@ import (
 	"github.com/kdeconinck/spot/dsl/validator"
 	"github.com/kdeconinck/spot/location"
 	"github.com/kdeconinck/spot/runtime/engine"
+	"github.com/kdeconinck/spot/runtime/ir"
+	"github.com/kdeconinck/spot/runtime/scanner"
+	"github.com/kdeconinck/spot/runtime/syntax"
 )
 
 func main() {
@@ -29,14 +32,17 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	if len(args) != 2 {
-		fmt.Fprintln(stderr, "usage: spot <dsl-file> <directory>")
+	options, err := parseCLIOptions(args)
+
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		fmt.Fprintln(stderr, "usage: spot [-print-ast] <dsl-file> <directory>")
 
 		return 2
 	}
 
-	dslPath := args[0]
-	rootPath := args[1]
+	dslPath := options.dslPath
+	rootPath := options.rootPath
 	source, err := os.ReadFile(dslPath)
 
 	if err != nil {
@@ -117,6 +123,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return err
 		}
 
+		if options.printAST {
+			writeRuntimeSyntaxTree(stdout, relativePath, program, string(content))
+		}
+
 		diagnostics := analysisEngine.Analyze(program, string(content), engine.Options{})
 
 		for idx := range diagnostics {
@@ -144,6 +154,40 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	return 0
+}
+
+type cliOptions struct {
+	dslPath  string
+	rootPath string
+	printAST bool
+}
+
+func parseCLIOptions(args []string) (cliOptions, error) {
+	options := cliOptions{}
+	paths := make([]string, 0, 2)
+
+	for idx := range args {
+		switch args[idx] {
+		case "-print-ast", "--print-ast":
+			options.printAST = true
+
+		default:
+			if strings.HasPrefix(args[idx], "-") {
+				return cliOptions{}, fmt.Errorf("unknown flag %q", args[idx])
+			}
+
+			paths = append(paths, args[idx])
+		}
+	}
+
+	if len(paths) != 2 {
+		return cliOptions{}, fmt.Errorf("expected DSL file path and analysis directory")
+	}
+
+	options.dslPath = paths[0]
+	options.rootPath = paths[1]
+
+	return options, nil
 }
 
 type scope struct {
@@ -286,4 +330,75 @@ func severityName(severity engine.Severity) string {
 	default:
 		return "err"
 	}
+}
+
+func writeRuntimeSyntaxTree(stdout io.Writer, relativePath string, program ir.Program, src string) {
+	if program.SyntaxRoot < 0 || len(program.SyntaxNodes) == 0 {
+		return
+	}
+
+	tokens, ok := scanSource(program, src)
+
+	if !ok {
+		return
+	}
+
+	syntaxParser, err := syntax.New(program, program.SyntaxNodes[program.SyntaxRoot].Name)
+
+	if err != nil {
+		return
+	}
+
+	var tree syntax.Tree
+
+	if !syntaxParser.ParseInto(tokens, &tree) {
+		return
+	}
+
+	fmt.Fprintf(stdout, "%s\n%s\n", relativePath, renderRuntimeSyntaxTree(program, tree))
+}
+
+func scanSource(program ir.Program, src string) ([]scanner.Token, bool) {
+	scan := scanner.New(program, src)
+	tokens := make([]scanner.Token, 0, len(src))
+
+	for {
+		token, diagnostic, ok := scan.Next()
+
+		if !ok {
+			return tokens, true
+		}
+
+		if diagnostic.Message != "" {
+			return nil, false
+		}
+
+		tokens = append(tokens, token)
+	}
+}
+
+func renderRuntimeSyntaxTree(program ir.Program, tree syntax.Tree) string {
+	var builder strings.Builder
+
+	builder.WriteString("Tree\n")
+	appendRuntimeSyntaxNode(&builder, program, tree, tree.Root, 1)
+
+	return strings.TrimSpace(builder.String())
+}
+
+func appendRuntimeSyntaxNode(builder *strings.Builder, program ir.Program, tree syntax.Tree, nodeID syntax.NodeID, depth int) {
+	node := tree.Node(nodeID)
+	end := node.FirstTokenIndex + node.AmountOfTokens
+
+	appendIndentedLine(builder, depth, "Node "+program.SyntaxNodes[node.Kind].Name+" ["+strconv.Itoa(int(node.FirstTokenIndex))+":"+strconv.Itoa(int(end))+"]")
+
+	for _, childID := range tree.Children(node) {
+		appendRuntimeSyntaxNode(builder, program, tree, childID, depth+1)
+	}
+}
+
+func appendIndentedLine(builder *strings.Builder, depth int, text string) {
+	builder.WriteString(strings.Repeat("  ", depth))
+	builder.WriteString(text)
+	builder.WriteByte('\n')
 }

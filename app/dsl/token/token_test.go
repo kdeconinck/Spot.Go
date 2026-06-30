@@ -64,6 +64,10 @@ func Test_LookupTokenKind(t *testing.T) {
 			inValue: "node",
 			want:    token.TokenNode,
 		},
+		"When using 'any', the correct value is returned.": {
+			inValue: "any",
+			want:    token.TokenAny,
+		},
 		"When using 'rule', the correct value is returned.": {
 			inValue: "rule",
 			want:    token.TokenRule,
@@ -234,6 +238,10 @@ func Test_TokenKind_String(t *testing.T) {
 		"When using a node token kind, the returned value is correct.": {
 			inKind: token.TokenNode,
 			want:   "node",
+		},
+		"When using an any token kind, the returned value is correct.": {
+			inKind: token.TokenAny,
+			want:   "any",
 		},
 		"When using a rule token kind, the returned value is correct.": {
 			inKind: token.TokenRule,

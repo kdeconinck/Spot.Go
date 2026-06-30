@@ -418,6 +418,9 @@ func appendSyntaxExpression(builder *strings.Builder, program ir.Program, expres
 
 		appendIndentedLine(builder, depth, label+syntaxReferenceName(program, expression))
 
+	case ir.SyntaxExpressionAny:
+		appendIndentedLine(builder, depth, "Any")
+
 	case ir.SyntaxExpressionConcatenation:
 		appendIndentedLine(builder, depth, "Concatenation")
 

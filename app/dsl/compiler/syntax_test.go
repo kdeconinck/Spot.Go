@@ -37,6 +37,7 @@ func Test_Compile_Syntax(t *testing.T) {
 				`    node WordPair = Word Word`,
 				`    node OptionalWord = (Word | KeywordInternal)?`,
 				`    node WordList = Word+`,
+				`    node UnknownStatement = any+`,
 				`}`,
 			}, "\n"),
 			wantProgram: normalizeMultilineLiteral(`
@@ -66,6 +67,9 @@ func Test_Compile_Syntax(t *testing.T) {
 				    Node WordList
 				      Repetition +
 				        Node Word
+				    Node UnknownStatement
+				      Repetition +
+				        Any
 				  Rules
 			`),
 		},
@@ -137,6 +141,7 @@ func syntaxDSL(size int) string {
 	builder.WriteString("    node WordPair = Word Word\n")
 	builder.WriteString("    node OptionalWord = (Word | KeywordInternal)?\n")
 	builder.WriteString("    node WordList = Word+\n")
+	builder.WriteString("    node UnknownStatement = any+\n")
 
 	for idx := 1; idx <= size; idx++ {
 		builder.WriteString("    node Word")
@@ -165,6 +170,9 @@ func syntaxDSL(size int) string {
 		builder.WriteString(" = Word")
 		builder.WriteString(strconv.Itoa(idx))
 		builder.WriteString("+\n")
+		builder.WriteString("    node UnknownStatement")
+		builder.WriteString(strconv.Itoa(idx))
+		builder.WriteString(" = any+\n")
 	}
 
 	builder.WriteString("}")

@@ -48,6 +48,9 @@ const (
 	// TokenNode marks a syntax node declaration.
 	TokenNode
 
+	// TokenAny marks a syntax expression that matches any emitted token.
+	TokenAny
+
 	// TokenRule marks a rule declaration.
 	TokenRule
 
@@ -175,6 +178,9 @@ func LookupTokenKind(value string) TokenKind {
 	case "node":
 		return TokenNode
 
+	case "any":
+		return TokenAny
+
 	case "rule":
 		return TokenRule
 
@@ -262,6 +268,9 @@ func (kind TokenKind) String() string {
 
 	case TokenNode:
 		return "node"
+
+	case TokenAny:
+		return "any"
 
 	case TokenRule:
 		return "rule"

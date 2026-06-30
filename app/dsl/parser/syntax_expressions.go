@@ -105,6 +105,16 @@ func (p *parser) parseSyntaxPrimary() (ast.SyntaxExpressionID, error) {
 		return p.parseGroupedSyntaxExpression()
 	}
 
+	if p.isAt(token.TokenAny) {
+		anyToken := p.current
+		p.advance()
+
+		return p.addSyntaxExpressionNode(ast.SyntaxExpressionNode{
+			Kind: ast.SyntaxExpressionAny,
+			Span: anyToken.Span,
+		}), nil
+	}
+
 	reference, err := p.expect(token.TokenIdentifier)
 
 	if err != nil {
@@ -123,7 +133,7 @@ func (p *parser) atSyntaxExpressionContinuationStart() bool {
 		return false
 	}
 
-	return p.isAt(token.TokenLeftParen) || p.isAt(token.TokenIdentifier)
+	return p.isAt(token.TokenLeftParen) || p.isAt(token.TokenIdentifier) || p.isAt(token.TokenAny)
 }
 
 func (p *parser) parseGroupedSyntaxExpression() (ast.SyntaxExpressionID, error) {

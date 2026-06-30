@@ -118,3 +118,46 @@ rules {
 	claim.Equal(t, "When scoped analysis succeeds, stderr remains empty.", "", stderr.String(), "Stderr")
 	claim.Equal(t, "When analyzing a directory, only included non-excluded files are reported.", "main.go:0-6: warn: Public identifier found\n", stdout.String(), "Stdout")
 }
+
+func Test_run_WithPrintAST_PrintsRuntimeSyntaxTree(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	dslPath := filepath.Join(root, "spot.dsl")
+	sourcePath := filepath.Join(root, "main.go")
+
+	err := os.WriteFile(dslPath, []byte(`scope {
+    include "**/*.go"
+}
+definitions {
+    lower = 'a'..'z'
+    upper = 'A'..'Z'
+    letter = lower | upper
+}
+tokens {
+    Whitespace = ' '+ skip
+    KeywordPackage = "package"
+    Identifier = letter+
+}
+syntax {
+    node PackageClause = KeywordPackage Identifier
+    node Root = PackageClause
+}
+rules {
+}`), 0o644)
+	claim.Equal(t, "When writing the DSL file for AST printing, no error is returned.", nil, err, "DSL Write Error")
+
+	err = os.WriteFile(sourcePath, []byte("package main"), 0o644)
+	claim.Equal(t, "When writing the source file for AST printing, no error is returned.", nil, err, "Source Write Error")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	// Act.
+	exitCode := run([]string{"-print-ast", dslPath, root}, &stdout, &stderr)
+
+	// Assert.
+	claim.Equal(t, "When AST printing is enabled and analysis succeeds, the CLI exits with status 0.", 0, exitCode, "Exit Code")
+	claim.Equal(t, "When AST printing is enabled and analysis succeeds, stderr remains empty.", "", stderr.String(), "Stderr")
+	claim.Equal(t, "When AST printing is enabled, the runtime syntax tree is written before diagnostics.", "main.go\nTree\n  Node Root [0:2]\n    Node PackageClause [0:2]\n", stdout.String(), "Stdout")
+}

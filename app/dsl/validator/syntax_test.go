@@ -136,6 +136,35 @@ func Test_Validate_Syntax(t *testing.T) {
 				expectDiagnostic(`Syntax reference "Other" is not declared as a token or syntax node.`, 1),
 			},
 		},
+		"When a syntax repetition uses one-or-more over non-empty input, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Unknown = fallback
+				}
+				syntax {
+					node UnknownStatement = Unknown+
+					node Root = UnknownStatement*
+				}
+			`),
+			wantDiagnostics: nil,
+		},
+		"When a syntax any expression is declared, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node UnknownStatement = any+
+				}
+			`),
+			wantDiagnostics: nil,
+		},
 		"When a syntax node is recursive, a diagnostic is returned.": {
 			inSource: markedMultilineLiteral(`
 				scope {

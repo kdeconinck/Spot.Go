@@ -166,6 +166,9 @@ const (
 	// SyntaxExpressionReference is a token or syntax node reference.
 	SyntaxExpressionReference SyntaxExpressionKind = iota
 
+	// SyntaxExpressionAny matches one emitted token of any kind.
+	SyntaxExpressionAny
+
 	// SyntaxExpressionConcatenation is a sequence of syntax expressions.
 	SyntaxExpressionConcatenation
 

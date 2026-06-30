@@ -417,6 +417,9 @@ func syntaxHappyPathDSL(size int) string {
 		builder.WriteString(" = Word")
 		builder.WriteString(suffix)
 		builder.WriteString("+\n")
+		builder.WriteString("    node UnknownStatement")
+		builder.WriteString(suffix)
+		builder.WriteString(" = any+\n")
 	}
 
 	builder.WriteString("}")

@@ -699,6 +699,9 @@ func appendSyntaxExpression(source string, builder *strings.Builder, expressions
 	case ast.SyntaxExpressionReference:
 		appendIndentedLine(builder, depth, formatLabelWithSpan("Reference "+expression.Reference.Value(source), expression.Span, includeSpans))
 
+	case ast.SyntaxExpressionAny:
+		appendIndentedLine(builder, depth, formatLabelWithSpan("Any", expression.Span, includeSpans))
+
 	case ast.SyntaxExpressionAlternation:
 		appendIndentedLine(builder, depth, formatLabelWithSpan("Alternation", expression.Span, includeSpans))
 

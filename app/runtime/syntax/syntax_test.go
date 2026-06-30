@@ -68,11 +68,11 @@ func Test_Parse(t *testing.T) {
 		"When parsing a full syntax tree, a flat tree is returned.": {
 			inDSL:      rootSyntaxDSL(),
 			inRootNode: "Root",
-			inSource:   "internal public id public id id",
+			inSource:   "internal public id public id id internal",
 			wantOK:     true,
 			wantTree: normalizeMultilineLiteral(`
 				Tree
-				  Node Root [0:6]
+				  Node Root [0:7]
 				    Node OptionalWord [0:1]
 				    Node WordPair [1:3]
 				      Node Word [1:2]
@@ -81,7 +81,8 @@ func Test_Parse(t *testing.T) {
 				      Node Word [3:4]
 				      Node Word [4:5]
 				      Node Word [5:6]
-				    Node WordTail [6:6]
+				    Node UnknownStatement [6:7]
+				    Node WordTail [7:7]
 			`),
 		},
 		"When the root node does not consume the entire token slice, parsing fails.": {
@@ -95,6 +96,50 @@ func Test_Parse(t *testing.T) {
 			inRootNode: "Root",
 			inSource:   "public internal",
 			wantOK:     false,
+		},
+		"When parsing a partially modeled file with any, parsing succeeds.": {
+			inDSL: strings.Join([]string{
+				`scope { include "**/*.cs" }`,
+				`definitions {`,
+				`    lower = 'a'..'z'`,
+				`    upper = 'A'..'Z'`,
+				`    digit = '0'..'9'`,
+				`    identifierStart = lower | upper | '_'`,
+				`    identifierPart = identifierStart | digit`,
+				`}`,
+				`tokens {`,
+				`    Whitespace = (' ' | '\t' | '\n' | '\r')+ skip`,
+				`    KeywordUsing = "using"`,
+				`    KeywordNamespace = "namespace"`,
+				`    Identifier = identifierStart identifierPart*`,
+				`    Dot = "."`,
+				`    Semicolon = ";"`,
+				`    LeftBrace = "{"`,
+				`    RightBrace = "}"`,
+				`    Unknown = fallback`,
+				`}`,
+				`syntax {`,
+				`    node QualifiedIdentifierTail = Dot Identifier`,
+				`    node QualifiedIdentifier = Identifier QualifiedIdentifierTail*`,
+				`    node UsingDirective = KeywordUsing QualifiedIdentifier Semicolon`,
+				`    node NamespaceBody = LeftBrace (UsingDirective | any)* RightBrace`,
+				`    node NamespaceDeclaration = KeywordNamespace QualifiedIdentifier NamespaceBody`,
+				`    node Root = (UsingDirective | NamespaceDeclaration | any)*`,
+				`}`,
+			}, "\n"),
+			inRootNode: "Root",
+			inSource: strings.Join([]string{
+				`using System;`,
+				``,
+				`namespace Example {`,
+				`    using System.Text;`,
+				``,
+				`    public static void Main(string[] args) {`,
+				`        Console.WriteLine("Hello, World!");`,
+				`    }`,
+				`}`,
+			}, "\n"),
+			wantOK: true,
 		},
 	} {
 		t.Run(tcName, func(t *testing.T) {
@@ -132,11 +177,11 @@ func Test_ParseInto(t *testing.T) {
 		"When parsing a full syntax tree into a reused buffer, a flat tree is returned.": {
 			inDSL:      rootSyntaxDSL(),
 			inRootNode: "Root",
-			inSource:   "internal public id public id id",
+			inSource:   "internal public id public id id internal",
 			wantOK:     true,
 			wantTree: normalizeMultilineLiteral(`
 				Tree
-				  Node Root [0:6]
+				  Node Root [0:7]
 				    Node OptionalWord [0:1]
 				    Node WordPair [1:3]
 				      Node Word [1:2]
@@ -145,7 +190,8 @@ func Test_ParseInto(t *testing.T) {
 				      Node Word [3:4]
 				      Node Word [4:5]
 				      Node Word [5:6]
-				    Node WordTail [6:6]
+				    Node UnknownStatement [6:7]
+				    Node WordTail [7:7]
 			`),
 		},
 		"When parsing fails, the reused buffer is cleared.": {
@@ -319,9 +365,10 @@ func rootSyntaxDSL() string {
 		`    node Word = Identifier | KeywordPublic`,
 		`    node WordPair = Word Word`,
 		`    node OptionalWord = (Word | KeywordInternal)?`,
+		`    node UnknownStatement = any+`,
 		`    node WordTail = Word*`,
 		`    node WordList = Word+`,
-		`    node Root = OptionalWord WordPair WordList WordTail`,
+		`    node Root = OptionalWord WordPair WordList UnknownStatement? WordTail`,
 		`}`,
 	}, "\n")
 }
@@ -340,9 +387,10 @@ func syntaxDSL(size int) string {
 	builder.WriteString("    node Word = Identifier | KeywordPublic\n")
 	builder.WriteString("    node WordPair = Word Word\n")
 	builder.WriteString("    node OptionalWord = (Word | KeywordInternal)?\n")
+	builder.WriteString("    node UnknownStatement = any+\n")
 	builder.WriteString("    node WordTail = Word*\n")
 	builder.WriteString("    node WordList = Word+\n")
-	builder.WriteString("    node Chunk = OptionalWord WordPair WordList WordTail\n")
+	builder.WriteString("    node Chunk = OptionalWord WordPair WordList UnknownStatement? WordTail\n")
 	builder.WriteString("    node Root = Chunk+\n")
 
 	for idx := 1; idx <= size; idx++ {
@@ -361,6 +409,9 @@ func syntaxDSL(size int) string {
 		builder.WriteString(" = (Word")
 		builder.WriteString(strconv.Itoa(idx))
 		builder.WriteString(" | KeywordInternal)?\n")
+		builder.WriteString("    node UnknownStatement")
+		builder.WriteString(strconv.Itoa(idx))
+		builder.WriteString(" = any+\n")
 		builder.WriteString("    node WordTail")
 		builder.WriteString(strconv.Itoa(idx))
 		builder.WriteString(" = Word")
@@ -379,6 +430,9 @@ func syntaxDSL(size int) string {
 		builder.WriteString(strconv.Itoa(idx))
 		builder.WriteString(" WordList")
 		builder.WriteString(strconv.Itoa(idx))
+		builder.WriteString(" UnknownStatement")
+		builder.WriteString(strconv.Itoa(idx))
+		builder.WriteString("?")
 		builder.WriteString(" WordTail")
 		builder.WriteString(strconv.Itoa(idx))
 		builder.WriteString("\n")
@@ -395,11 +449,11 @@ func syntaxDSL(size int) string {
 }
 
 func syntaxSource(size int) string {
-	parts := make([]string, 0, 6+size*6)
-	parts = append(parts, "internal", "public", "id", "public", "id", "id")
+	parts := make([]string, 0, 7+size*7)
+	parts = append(parts, "internal", "public", "id", "public", "id", "id", "internal")
 
 	for range size {
-		parts = append(parts, "internal", "public", "id", "public", "id", "id")
+		parts = append(parts, "internal", "public", "id", "public", "id", "id", "internal")
 	}
 
 	return strings.Join(parts, " ")

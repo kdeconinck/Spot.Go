@@ -218,6 +218,9 @@ func compileSyntaxExpressionArena(source string, resolution resolver.Resolution,
 				node.Reference = uint32(syntaxNodeIndex)
 			}
 
+		case ast.SyntaxExpressionAny:
+			node.Kind = ir.SyntaxExpressionAny
+
 		case ast.SyntaxExpressionConcatenation:
 			node.Kind = ir.SyntaxExpressionConcatenation
 

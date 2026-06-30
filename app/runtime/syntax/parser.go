@@ -18,6 +18,14 @@ type Parser struct {
 	program         ir.Program
 	rootNode        int
 	scratchChildIDs []NodeID
+	checkpoints     []parseCheckpoint
+}
+
+type parseCheckpoint struct {
+	end             int
+	nodeCount       int
+	childCount      int
+	scratchChildCnt int
 }
 
 // New returns a parser for rootNodeName.
@@ -54,6 +62,7 @@ func (parser *Parser) Parse(tokens []scanner.Token) (Tree, bool) {
 func (parser *Parser) ParseInto(tokens []scanner.Token, tree *Tree) bool {
 	tree.Reset(tokens)
 	parser.scratchChildIDs = parser.scratchChildIDs[:0]
+	parser.checkpoints = parser.checkpoints[:0]
 
 	if cap(tree.Nodes) < len(tokens) {
 		tree.Nodes = make([]Node, 0, len(tokens))
@@ -114,6 +123,9 @@ func (parser *Parser) matchSyntaxExpression(tokens []scanner.Token, tree *Tree, 
 	case ir.SyntaxExpressionReference:
 		return parser.matchSyntaxReference(tokens, tree, expression, start)
 
+	case ir.SyntaxExpressionAny:
+		return parser.matchAnySyntaxToken(tokens, start)
+
 	case ir.SyntaxExpressionConcatenation:
 		return parser.matchSyntaxConcatenation(tokens, tree, expression, start)
 
@@ -126,6 +138,14 @@ func (parser *Parser) matchSyntaxExpression(tokens []scanner.Token, tree *Tree, 
 	default:
 		return parser.matchSyntaxRepetition(tokens, tree, expression, start)
 	}
+}
+
+func (parser *Parser) matchAnySyntaxToken(tokens []scanner.Token, start int) (int, bool) {
+	if start >= len(tokens) {
+		return 0, false
+	}
+
+	return start + 1, true
 }
 
 func (parser *Parser) matchSyntaxReference(tokens []scanner.Token, tree *Tree, expression ir.SyntaxExpressionNode, start int) (int, bool) {
@@ -153,26 +173,7 @@ func (parser *Parser) matchSyntaxReference(tokens []scanner.Token, tree *Tree, e
 }
 
 func (parser *Parser) matchSyntaxConcatenation(tokens []scanner.Token, tree *Tree, expression ir.SyntaxExpressionNode, start int) (int, bool) {
-	savedNodes := len(tree.Nodes)
-	savedChildren := len(tree.ChildIDs)
-	savedScratchChildren := len(parser.scratchChildIDs)
-	current := start
-
-	for _, childID := range parser.program.SyntaxExpressions.Children(expression) {
-		next, ok := parser.matchSyntaxExpression(tokens, tree, childID, current)
-
-		if !ok {
-			tree.Nodes = tree.Nodes[:savedNodes]
-			tree.ChildIDs = tree.ChildIDs[:savedChildren]
-			parser.scratchChildIDs = parser.scratchChildIDs[:savedScratchChildren]
-
-			return 0, false
-		}
-
-		current = next
-	}
-
-	return current, true
+	return parser.matchSyntaxConcatenationChildren(tokens, tree, parser.program.SyntaxExpressions.Children(expression), start)
 }
 
 func (parser *Parser) matchSyntaxAlternation(tokens []scanner.Token, tree *Tree, expression ir.SyntaxExpressionNode, start int) (int, bool) {
@@ -222,6 +223,76 @@ func (parser *Parser) matchSyntaxRepetition(tokens []scanner.Token, tree *Tree, 
 	}
 }
 
+func (parser *Parser) matchSyntaxConcatenationChildren(tokens []scanner.Token, tree *Tree, children []ir.SyntaxExpressionID, start int) (int, bool) {
+	if len(children) == 0 {
+		return start, true
+	}
+
+	expression := parser.program.SyntaxExpressions.Node(children[0])
+
+	if expression.Kind == ir.SyntaxExpressionRepetition {
+		return parser.matchSyntaxRepetitionWithTail(tokens, tree, expression, children[1:], start)
+	}
+
+	checkpoint := parser.snapshot(tree, start)
+	next, ok := parser.matchSyntaxExpression(tokens, tree, children[0], start)
+
+	if !ok {
+		return 0, false
+	}
+
+	end, ok := parser.matchSyntaxConcatenationChildren(tokens, tree, children[1:], next)
+
+	if ok {
+		return end, true
+	}
+
+	parser.restore(tree, checkpoint)
+
+	return 0, false
+}
+
+func (parser *Parser) matchSyntaxRepetitionWithTail(tokens []scanner.Token, tree *Tree, expression ir.SyntaxExpressionNode, tail []ir.SyntaxExpressionID, start int) (int, bool) {
+	minimum := 0
+
+	if expression.Repetition == ir.RepetitionOneOrMore {
+		minimum = 1
+	}
+
+	childID := parser.program.SyntaxExpressions.Children(expression)[0]
+	base := len(parser.checkpoints)
+	parser.checkpoints = append(parser.checkpoints, parser.snapshot(tree, start))
+	current := start
+
+	for {
+		next, ok := parser.matchSyntaxExpression(tokens, tree, childID, current)
+
+		if !ok || next == current {
+			break
+		}
+
+		current = next
+		parser.checkpoints = append(parser.checkpoints, parser.snapshot(tree, current))
+	}
+
+	for idx := len(parser.checkpoints) - 1; idx >= base+minimum; idx-- {
+		checkpoint := parser.checkpoints[idx]
+		parser.restore(tree, checkpoint)
+		end, ok := parser.matchSyntaxConcatenationChildren(tokens, tree, tail, checkpoint.end)
+
+		if ok {
+			parser.checkpoints = parser.checkpoints[:base]
+
+			return end, true
+		}
+	}
+
+	parser.restore(tree, parser.checkpoints[base])
+	parser.checkpoints = parser.checkpoints[:base]
+
+	return 0, false
+}
+
 func (parser *Parser) matchSyntaxMany(tokens []scanner.Token, tree *Tree, childID ir.SyntaxExpressionID, start int, requireOne bool) (int, bool) {
 	current := start
 	count := 0
@@ -257,4 +328,19 @@ func (parser *Parser) matchSyntaxMany(tokens []scanner.Token, tree *Tree, childI
 	}
 
 	return current, true
+}
+
+func (parser *Parser) snapshot(tree *Tree, end int) parseCheckpoint {
+	return parseCheckpoint{
+		end:             end,
+		nodeCount:       len(tree.Nodes),
+		childCount:      len(tree.ChildIDs),
+		scratchChildCnt: len(parser.scratchChildIDs),
+	}
+}
+
+func (parser *Parser) restore(tree *Tree, checkpoint parseCheckpoint) {
+	tree.Nodes = tree.Nodes[:checkpoint.nodeCount]
+	tree.ChildIDs = tree.ChildIDs[:checkpoint.childCount]
+	parser.scratchChildIDs = parser.scratchChildIDs[:checkpoint.scratchChildCnt]
 }

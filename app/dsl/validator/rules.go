@@ -191,6 +191,7 @@ func markReferencedSyntaxNodes(source string, resolution resolver.Resolution, ex
 			referenced[referencedIndex] = true
 		}
 
+	case ast.SyntaxExpressionAny:
 	case ast.SyntaxExpressionAlternation, ast.SyntaxExpressionConcatenation:
 		for _, childID := range expressions.Children(expression) {
 			markReferencedSyntaxNodes(source, resolution, expressions, childID, referenced)
