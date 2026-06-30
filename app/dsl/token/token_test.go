@@ -48,6 +48,10 @@ func Test_LookupTokenKind(t *testing.T) {
 			inValue: "skip",
 			want:    token.TokenSkip,
 		},
+		"When using 'fallback', the correct value is returned.": {
+			inValue: "fallback",
+			want:    token.TokenFallback,
+		},
 		"When using 'rules', the correct value is returned.": {
 			inValue: "rules",
 			want:    token.TokenRules,
@@ -214,6 +218,10 @@ func Test_TokenKind_String(t *testing.T) {
 		"When using a skip token kind, the returned value is correct.": {
 			inKind: token.TokenSkip,
 			want:   "skip",
+		},
+		"When using a fallback token kind, the returned value is correct.": {
+			inKind: token.TokenFallback,
+			want:   "fallback",
 		},
 		"When using a rules token kind, the returned value is correct.": {
 			inKind: token.TokenRules,

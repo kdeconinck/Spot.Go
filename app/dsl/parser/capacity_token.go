@@ -35,7 +35,12 @@ func (p *sizingParser) measureTokenDeclaration() {
 
 	p.expect(token.TokenIdentifier)
 	p.expect(token.TokenEqual)
-	p.measureExpressionCapacity(true)
+
+	if p.isAt(token.TokenFallback) {
+		p.advance()
+	} else {
+		p.measureExpressionCapacity(true)
+	}
 
 	if p.isAt(token.TokenSkip) {
 		p.advance()

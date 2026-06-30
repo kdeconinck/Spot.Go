@@ -47,6 +47,10 @@ func validateTokens(source string, resolution resolver.Resolution, diagnostics [
 	}
 
 	for idx := range tokenList {
+		if tokenList[idx].Fallback.Kind == token.TokenFallback {
+			continue
+		}
+
 		expressionID := tokenList[idx].Expression
 		expression := resolution.Document.Expressions.Node(expressionID)
 
@@ -56,6 +60,23 @@ func validateTokens(source string, resolution resolver.Resolution, diagnostics [
 			diagnostics = append(diagnostics, Diagnostic{
 				Message: "Token expression must not match empty input.",
 				Span:    expression.Span,
+			})
+		}
+	}
+
+	amountOfFallbackTokens := 0
+
+	for idx := range tokenList {
+		if tokenList[idx].Fallback.Kind != token.TokenFallback {
+			continue
+		}
+
+		amountOfFallbackTokens++
+
+		if amountOfFallbackTokens > 1 {
+			diagnostics = append(diagnostics, Diagnostic{
+				Message: "Tokens may contain at most one fallback token.",
+				Span:    tokenList[idx].Fallback.Span,
 			})
 		}
 	}

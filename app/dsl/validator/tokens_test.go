@@ -57,6 +57,31 @@ func Test_Validate_Tokens(t *testing.T) {
 			`),
 			wantDiagnostics: nil,
 		},
+		"When a fallback token is declared, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Unknown = fallback
+				}
+			`),
+			wantDiagnostics: nil,
+		},
+		"When multiple fallback tokens are declared, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Unknown = fallback
+					Other = [[fallback]]
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic("Tokens may contain at most one fallback token.", 0),
+			},
+		},
 		"When a token name conflicts with a definition name, a diagnostic is returned.": {
 			inSource: markedMultilineLiteral(`
 				scope {

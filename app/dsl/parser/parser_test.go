@@ -632,7 +632,12 @@ func appendDocument(source string, builder *strings.Builder, document ast.Docume
 
 		for _, definition := range document.SectionTokens(document.Tokens) {
 			appendIndentedLine(builder, depth+2, formatLabelWithSpan("Token "+definition.Name.Value(source), definition.Span, includeSpans))
-			appendExpression(source, builder, document.Expressions, definition.Expression, depth+3, includeSpans)
+
+			if definition.Fallback.Kind == token.TokenFallback {
+				appendIndentedLine(builder, depth+3, formatLabelWithSpan("Fallback", definition.Fallback.Span, includeSpans))
+			} else {
+				appendExpression(source, builder, document.Expressions, definition.Expression, depth+3, includeSpans)
+			}
 
 			if definition.Skip.Kind == token.TokenSkip {
 				appendIndentedLine(builder, depth+3, formatLabelWithSpan("Skip", definition.Skip.Span, includeSpans))

@@ -62,13 +62,26 @@ func (p *parser) parseTokenDefinition() (ast.TokenDefinition, error) {
 		return ast.TokenDefinition{}, err
 	}
 
-	expressionID, err := p.parseExpression(true)
+	var expressionID ast.DefinitionExpressionID
+	var err error
+	var fallbackToken token.Token
 
-	if err != nil {
-		return ast.TokenDefinition{}, err
+	if p.isAt(token.TokenFallback) {
+		fallbackToken = p.current
+		p.advance()
+	} else {
+		expressionID, err = p.parseExpression(true)
+
+		if err != nil {
+			return ast.TokenDefinition{}, err
+		}
 	}
 
-	end := p.expressionNode(expressionID).Span.End
+	end := fallbackToken.Span.End
+
+	if fallbackToken.Kind != token.TokenFallback {
+		end = p.expressionNode(expressionID).Span.End
+	}
 
 	var skipToken token.Token
 
@@ -83,6 +96,7 @@ func (p *parser) parseTokenDefinition() (ast.TokenDefinition, error) {
 	return ast.TokenDefinition{
 		Name:       name,
 		Expression: expressionID,
+		Fallback:   fallbackToken,
 		Skip:       skipToken,
 		Span:       span(name.Span.Start, end),
 	}, nil

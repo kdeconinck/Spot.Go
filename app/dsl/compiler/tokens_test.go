@@ -125,6 +125,16 @@ func Test_Compile_Tokens(t *testing.T) {
 				  Rules
 			`),
 		},
+		"When compiling a fallback token, fallback is preserved.": {
+			inSource: `scope { include "**/*.go" } tokens { Unknown = fallback }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Unknown
+				      Fallback
+				  Rules
+			`),
+		},
 		"When compiling a token with zero-or-one repetition inside a concatenation, the repetition kind is preserved.": {
 			inSource: `scope { include "**/*.go" } tokens { Optional = "a"? "b" }`,
 			wantProgram: normalizeMultilineLiteral(`

@@ -36,6 +36,9 @@ const (
 	// TokenSkip marks a skipped token declaration.
 	TokenSkip
 
+	// TokenFallback marks a token fallback declaration.
+	TokenFallback
+
 	// TokenRules marks the 'rules' section keyword.
 	TokenRules
 
@@ -160,6 +163,9 @@ func LookupTokenKind(value string) TokenKind {
 	case "skip":
 		return TokenSkip
 
+	case "fallback":
+		return TokenFallback
+
 	case "rules":
 		return TokenRules
 
@@ -244,6 +250,9 @@ func (kind TokenKind) String() string {
 
 	case TokenSkip:
 		return "skip"
+
+	case TokenFallback:
+		return "fallback"
 
 	case TokenRules:
 		return "rules"

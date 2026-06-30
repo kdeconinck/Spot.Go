@@ -186,6 +186,33 @@ tokens {
 				diagnostic("No token matched at byte offset 1.", 1, 2),
 			},
 		},
+		{
+			name: "When no regular token matches and a fallback token exists, the fallback token is emitted.",
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Identifier = "a"
+    Unknown = fallback
+}`,
+			inSource: "ab",
+			wantTokens: []scanner.Token{
+				token("Identifier", "a", 0, 1),
+				token("Unknown", "b", 1, 2),
+			},
+			wantDiagnostics: []scanner.Diagnostic{},
+		},
+		{
+			name: "When a fallback token is skipped, unmatched bytes are consumed without emitted diagnostics.",
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Identifier = "a"
+    Unknown = fallback skip
+}`,
+			inSource: "ab",
+			wantTokens: []scanner.Token{
+				token("Identifier", "a", 0, 1),
+			},
+			wantDiagnostics: []scanner.Diagnostic{},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

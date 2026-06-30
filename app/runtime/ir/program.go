@@ -36,6 +36,9 @@ type Token struct {
 	// Expression is the root compiled token expression.
 	Expression ExpressionID
 
+	// Fallback reports whether this token consumes one otherwise-unmatched byte.
+	Fallback bool
+
 	// Skip reports whether matches for this token should be emitted.
 	Skip bool
 }

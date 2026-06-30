@@ -23,6 +23,8 @@ type Scanner struct {
 	src          string
 	offset       int
 	scratch      scanScratch
+	fallback     tokenDefinition
+	hasFallback  bool
 }
 
 // Token is a scanner output token.
@@ -57,10 +59,20 @@ func New(program ir.Program, src string) Scanner {
 
 	for idx := range program.Tokens {
 		token := program.Tokens[idx]
+
+		if token.Fallback {
+			builder.tokens = append(builder.tokens, tokenDefinition{
+				name: token.Name,
+				skip: token.Skip,
+			})
+
+			continue
+		}
+
 		fragment := builder.buildExpression(token.Expression)
 		accept := builder.newState(state{
 			kind:       stateAccept,
-			tokenIndex: idx,
+			tokenIndex: len(builder.tokens),
 		})
 
 		builder.link(fragment.end, accept)
@@ -71,28 +83,56 @@ func New(program ir.Program, src string) Scanner {
 		tokenStarts = append(tokenStarts, fragment.start)
 	}
 
-	start := tokenStarts[0]
+	start := -1
 
-	for idx := 1; idx < len(tokenStarts); idx++ {
-		start = builder.newState(state{
-			kind: stateSplit,
-			next: tokenStarts[idx],
-			alt:  start,
-		})
+	if len(tokenStarts) > 0 {
+		start = tokenStarts[0]
+
+		for idx := 1; idx < len(tokenStarts); idx++ {
+			start = builder.newState(state{
+				kind: stateSplit,
+				next: tokenStarts[idx],
+				alt:  start,
+			})
+		}
 	}
 
 	closures := buildClosures(builder.states)
+	fallback := tokenDefinition{}
+	hasFallback := false
+
+	for idx := range program.Tokens {
+		if !program.Tokens[idx].Fallback {
+			continue
+		}
+
+		fallback = tokenDefinition{
+			name: program.Tokens[idx].Name,
+			skip: program.Tokens[idx].Skip,
+		}
+		hasFallback = true
+
+		break
+	}
+
+	startClosure := []int(nil)
+
+	if start >= 0 {
+		startClosure = closures[start]
+	}
 
 	return Scanner{
 		tokens:       builder.tokens,
 		states:       builder.states,
 		start:        start,
-		startClosure: closures[start],
+		startClosure: startClosure,
 		closures:     closures,
 		src:          src,
 		scratch: scanScratch{
 			nextSeen: make([]bool, len(builder.states)),
 		},
+		fallback:    fallback,
+		hasFallback: hasFallback,
 	}
 }
 
@@ -112,6 +152,24 @@ func (scanner *Scanner) Next() (Token, Diagnostic, bool) {
 		match, ok := scanner.match(scanner.offset)
 
 		if !ok {
+			if scanner.hasFallback {
+				start := scanner.offset
+				scanner.offset++
+
+				if scanner.fallback.skip {
+					continue
+				}
+
+				return Token{
+					Name: scanner.fallback.name,
+					Text: scanner.src[start:scanner.offset],
+					Span: location.Span{
+						Start: location.Position(start),
+						End:   location.Position(scanner.offset),
+					},
+				}, Diagnostic{}, true
+			}
+
 			diagnostic := Diagnostic{
 				Message: "No token matched at byte offset " + strconv.Itoa(scanner.offset) + ".",
 				Span: location.Span{
@@ -157,6 +215,10 @@ type match struct {
 }
 
 func (scanner *Scanner) match(start int) (match, bool) {
+	if scanner.start < 0 {
+		return match{}, false
+	}
+
 	best := match{
 		tokenIndex: -1,
 		end:        start,

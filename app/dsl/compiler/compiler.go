@@ -48,6 +48,7 @@ func Compile(source string, resolution resolver.Resolution) ir.Program {
 		program.Tokens = append(program.Tokens, ir.Token{
 			Name:       tok.Name.Value(source),
 			Expression: ir.ExpressionID(tok.Expression),
+			Fallback:   tok.Fallback.Kind == token.TokenFallback,
 			Skip:       tok.Skip.Kind == token.TokenSkip,
 		})
 	}

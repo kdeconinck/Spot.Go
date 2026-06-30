@@ -31,6 +31,9 @@ type TokenDefinition struct {
 	// Expression is the root expression node assigned to the token.
 	Expression DefinitionExpressionID
 
+	// Fallback marks a token declaration that consumes one otherwise-unmatched byte.
+	Fallback token.Token
+
 	// Skip marks a token declaration whose matches are not emitted.
 	Skip token.Token
 

@@ -135,6 +135,27 @@ func Test_Parse_Tokens(t *testing.T) {
 				      Skip
 			`),
 		},
+		"When parsing a tokens block with a fallback token, a document is returned.": {
+			inSource: `scope {} tokens { Unknown = fallback }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Tokens
+				    Token Unknown
+				      Fallback
+			`),
+		},
+		"When parsing a skipped fallback token, a document is returned.": {
+			inSource: `scope {} tokens { Unknown = fallback skip }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Tokens
+				    Token Unknown
+				      Fallback
+				      Skip
+			`),
+		},
 		"When the tokens opening brace is missing, a diagnostic is returned.": {
 			inSource:  "scope {} tokens }",
 			wantDiags: `Expected '{', found '}'. [16:17]`,
@@ -226,7 +247,8 @@ func tokensDSL(size int) string {
 				"    Sign = \"+\" | \"-\"\n"+
 				"    OptionalSign = (\"+\" | \"-\")?\n"+
 				"    SignedInteger = optionalSign digit+\n"+
-				"    Whitespace = (' ' | '\\t' | '\\n' | '\\r')+ skip\n",
+				"    Whitespace = (' ' | '\\t' | '\\n' | '\\r')+ skip\n"+
+				"    Unknown = fallback\n",
 			size,
 		) +
 		"}"

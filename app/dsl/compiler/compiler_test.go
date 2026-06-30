@@ -311,7 +311,11 @@ func renderProgram(program ir.Program) string {
 		builder.WriteString("    Token ")
 		builder.WriteString(tok.Name)
 		builder.WriteByte('\n')
-		appendExpression(&builder, program, tok.Expression, 3)
+		if tok.Fallback {
+			appendIndentedLine(&builder, 3, "Fallback")
+		} else {
+			appendExpression(&builder, program, tok.Expression, 3)
+		}
 
 		if tok.Skip {
 			appendIndentedLine(&builder, 3, "Skip")
