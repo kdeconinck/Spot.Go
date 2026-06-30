@@ -532,11 +532,11 @@ Use grouping when alternation should be part of a sequence: `Word (KeywordIntern
 Today, the `syntax` section is intentionally limited:
 
 * It only describes syntax node structure.
-* It does not yet build runtime syntax trees from token streams.
+* It can be compiled and matched against token streams.
 * It does not yet introduce AST-based rules.
 
-This means the section is parsed and validated today, but it does not yet affect scanning, compilation, or rule
-execution.
+This means the section is parsed, validated, compiled, and consumable by the runtime syntax parser today, but Spot's
+rule engine does not yet evaluate rules over runtime syntax trees.
 
 # Rule Match
 
@@ -700,6 +700,23 @@ tokens {
 ```
 
 because it can match an empty string.
+
+## Syntax Validation
+
+* Syntax node references must resolve to declared tokens or syntax nodes.
+* Recursive syntax nodes are invalid.
+* A syntax repetition expression must not repeat something that can match empty input.
+
+Invalid:
+
+```spot
+syntax {
+    node Word = Identifier?
+    node WordList = Word*
+}
+```
+
+because `Word` can match empty input, so repeating it is ambiguous and not executable safely.
 
 ## Rule Validation
 

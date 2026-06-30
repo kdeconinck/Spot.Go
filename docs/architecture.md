@@ -41,6 +41,10 @@ Scanner
     ↓
 Token Stream
     ↓
+Syntax Parser
+    ↓
+Runtime Syntax Tree
+    ↓
 Rule Engine
     ↓
 Diagnostics
@@ -185,6 +189,7 @@ Compiled configuration
 Responsibilities:
 
 * Prepare token definitions for execution.
+* Prepare syntax definitions for execution.
 * Prepare rule definitions for execution.
 * Produce efficient runtime structures.
 
@@ -202,6 +207,8 @@ The compiler answers the question:
 Implementation note:
 
 * The compiler assumes semantic validation has already succeeded and reuses resolver output for declaration lookups.
+* Compiled token expressions are stored in flat arenas and referenced by indices rather than rebuilt as pointer-linked
+  runtime trees.
 
 ## Scanner
 
@@ -240,7 +247,43 @@ Implementation note:
 
 * Spot's current runtime scanner is implemented as an Nfa-backed matcher.
 * The scanner design and construction details are documented in `docs/nfa.md`.
-* The current rule engine consumes scanner output as a stream rather than materializing the full token stream first.
+* The syntax parser consumes scanner output as a token slice.
+
+## Syntax Parser
+
+Input:
+
+```text
+Compiled syntax definitions
+Token stream
+```
+
+Output:
+
+```text
+Runtime syntax tree
+```
+
+Responsibilities:
+
+* Match compiled syntax nodes against token streams.
+* Build flat runtime syntax trees.
+* Preserve token coverage for matched syntax nodes.
+
+Non-responsibilities:
+
+* Tokenization.
+* Semantic analysis.
+* Diagnostic generation.
+
+The syntax parser answers the question:
+
+> Which syntax nodes can be built from this token stream?
+
+Implementation notes:
+
+* The current syntax parser matches one caller-selected root syntax node.
+* It stores matched runtime nodes in flat slices rather than a pointer-linked tree.
 
 ## Rule Engine
 
