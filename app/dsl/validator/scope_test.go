@@ -10,61 +10,82 @@
 package validator_test
 
 import (
-	"strings"
 	"testing"
 
-	"github.com/kdeconinck/spot/dsl/parser"
 	"github.com/kdeconinck/spot/dsl/validator"
-	"github.com/kdeconinck/spot/location"
 	"github.com/kdeconinck/spot/qa/claim"
 )
 
 func Test_Validate_Scope(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		name            string
-		inSource        string
-		wantDiagnostics []validator.Diagnostic
+	for tcName, tc := range map[string]struct {
+		inSource        markedSource
+		wantDiagnostics []expectedDiagnostic
 	}{
-		{
-			name:     "When scope contains an include pattern, no diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Token = "x" }`,
+		"When scope contains an include pattern, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Token = "x"
+				}
+			`),
+			wantDiagnostics: nil,
 		},
-		{
-			name:     "When scope contains no include pattern, a diagnostic is returned.",
-			inSource: `scope { exclude "vendor/**" } tokens { Token = "x" }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic("Scope must contain at least one include.", 0, 29),
+		"When an include pattern is empty, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include [[""]]
+				}
+				tokens {
+					Token = "x"
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic("Scope pattern must not be empty.", 0),
 			},
 		},
-		{
-			name:     "When an include pattern is empty, a diagnostic is returned.",
-			inSource: `scope { include "" } tokens { Token = "x" }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic("Scope pattern must not be empty.", 16, 18),
+		"When an exclude pattern is empty, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+					exclude [[""]]
+				}
+				tokens {
+					Token = "x"
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic("Scope pattern must not be empty.", 0),
 			},
 		},
-		{
-			name:     "When an exclude pattern is empty, a diagnostic is returned.",
-			inSource: `scope { include "**/*.go" exclude "" } tokens { Token = "x" }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic("Scope pattern must not be empty.", 34, 36),
+		"When scope contains no include pattern, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				[[scope {
+					exclude "vendor/**"
+				}]]
+				tokens {
+					Token = "x"
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic("Scope must contain at least one include.", 0),
 			},
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()
 
 			// Arrange.
-			document, parseErr := parser.Parse(tc.inSource)
+			resolution := parseResolution(t, tcName, tc.inSource.text)
 
 			// Act.
-			gotDiagnostics := validator.Validate(tc.inSource, document)
+			gotDiagnostics := validator.Validate(tc.inSource.text, resolution)
 
 			// Assert.
-			claim.Equal(t, tc.name, error(nil), parseErr, "Parse Error")
-			claim.DeepEqual(t, tc.name, tc.wantDiagnostics, gotDiagnostics, "Diagnostic")
+			claim.DeepEqual(t, tcName, realizeDiagnostics(tc.inSource, tc.wantDiagnostics), gotDiagnostics, "Diagnostic")
 		})
 	}
 }
@@ -78,28 +99,5 @@ func Benchmark_Validate_Scope_1000(b *testing.B) { benchmark_Validate_Scope(b, 1
 func benchmark_Validate_Scope(b *testing.B, size int) {
 	b.Helper()
 
-	source := scopeDSL(size)
-	document, parseErr := parser.Parse(source)
-	claim.Equal(b, "Scope benchmark.", error(nil), parseErr, "Parse Error")
-
-	for b.Loop() {
-		_ = validator.Validate(source, document)
-	}
-}
-
-func scopeDSL(size int) string {
-	return "scope {\n" +
-		strings.Repeat("    include \"**/*.go\"\n    exclude \"vendor/**\"\n", size) +
-		"}\n" +
-		"tokens { Token = \"x\" }"
-}
-
-func diagnostic(message string, start, end location.Position) validator.Diagnostic {
-	return validator.Diagnostic{
-		Message: message,
-		Span: location.Span{
-			Start: start,
-			End:   end,
-		},
-	}
+	benchmark_Validate(b, scopeHappyPathDSL(size))
 }

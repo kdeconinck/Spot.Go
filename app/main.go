@@ -18,6 +18,7 @@ import (
 	"github.com/kdeconinck/spot/dsl/ast"
 	"github.com/kdeconinck/spot/dsl/compiler"
 	"github.com/kdeconinck/spot/dsl/parser"
+	"github.com/kdeconinck/spot/dsl/resolver"
 	"github.com/kdeconinck/spot/dsl/validator"
 	"github.com/kdeconinck/spot/location"
 	"github.com/kdeconinck/spot/runtime/engine"
@@ -53,7 +54,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	validationDiagnostics := validator.Validate(string(source), document)
+	resolution := resolver.Resolve(string(source), document)
+	validationDiagnostics := validator.Validate(string(source), resolution)
 
 	if len(validationDiagnostics) != 0 {
 		for idx := range validationDiagnostics {
@@ -63,7 +65,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	scope, err := compileScope(document.ScopeSectionEntries(document.Scope), string(source))
+	scope, err := compileScope(resolution.ScopeEntries, string(source))
 
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to compile scope patterns: %v\n", err)
@@ -85,7 +87,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	program := compiler.Compile(string(source), document)
+	program := compiler.Compile(string(source), resolution)
 	analysisEngine := engine.New(program)
 	diagnosticCount := 0
 	walkErr := filepath.WalkDir(rootPath, func(path string, entry fs.DirEntry, err error) error {

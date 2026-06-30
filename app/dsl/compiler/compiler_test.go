@@ -16,6 +16,7 @@ import (
 
 	"github.com/kdeconinck/spot/dsl/compiler"
 	"github.com/kdeconinck/spot/dsl/parser"
+	"github.com/kdeconinck/spot/dsl/resolver"
 	"github.com/kdeconinck/spot/dsl/validator"
 	"github.com/kdeconinck/spot/qa/claim"
 	"github.com/kdeconinck/spot/runtime/ir"
@@ -27,7 +28,8 @@ func Test_Compile_DSL(t *testing.T) {
 	// Arrange.
 	source := dsl(0)
 	document, parseErr := parser.Parse(source)
-	validationDiagnostics := validator.Validate(source, document)
+	resolution := resolver.Resolve(source, document)
+	validationDiagnostics := validator.Validate(source, resolution)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
 			{
@@ -102,7 +104,7 @@ func Test_Compile_DSL(t *testing.T) {
 	}
 
 	// Act.
-	gotProgram := compiler.Compile(source, document)
+	gotProgram := compiler.Compile(source, resolution)
 
 	// Assert.
 	claim.Equal(t, "When compiling a full DSL file, no parse error is returned.", error(nil), parseErr, "Parse Error")
@@ -121,12 +123,13 @@ func benchmark_Compile_DSL(b *testing.B, size int) {
 
 	source := dsl(size)
 	document, parseErr := parser.Parse(source)
-	validationDiagnostics := validator.Validate(source, document)
+	resolution := resolver.Resolve(source, document)
+	validationDiagnostics := validator.Validate(source, resolution)
 	claim.Equal(b, "Compile DSL benchmark parse error.", error(nil), parseErr, "Parse Error")
 	claim.Equal(b, "Compile DSL benchmark validation diagnostics.", 0, len(validationDiagnostics), "Validation Diagnostic Count")
 
 	for b.Loop() {
-		_ = compiler.Compile(source, document)
+		_ = compiler.Compile(source, resolution)
 	}
 }
 

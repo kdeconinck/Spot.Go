@@ -10,23 +10,15 @@ import (
 	"strconv"
 
 	"github.com/kdeconinck/spot/dsl/ast"
+	"github.com/kdeconinck/spot/dsl/resolver"
 	"github.com/kdeconinck/spot/dsl/token"
 	"github.com/kdeconinck/spot/runtime/ir"
 )
 
-// Compile compiles a validated Spot DSL document into a runtime program.
-func Compile(source string, document ast.Document) ir.Program {
-	definitions := map[string]ast.Definition{}
-	tokenIndexes := map[string]int{}
-	definitionList := document.SectionDefinitions(document.Definitions)
-	tokenList := document.SectionTokens(document.Tokens)
-	ruleList := document.SectionRules(document.Rules)
-
-	for idx := range definitionList {
-		definition := definitionList[idx]
-		definitions[definition.Name.Value(source)] = definition
-	}
-
+// Compile compiles validated resolved Spot DSL syntax into a runtime program.
+func Compile(source string, resolution resolver.Resolution) ir.Program {
+	tokenList := resolution.Tokens
+	ruleList := resolution.Rules
 	program := ir.Program{
 		Tokens: make([]ir.Token, 0, len(tokenList)),
 		Rules:  make([]ir.Rule, 0, len(ruleList)),
@@ -34,27 +26,28 @@ func Compile(source string, document ast.Document) ir.Program {
 
 	for idx := range tokenList {
 		tok := tokenList[idx]
-		tokenIndexes[tok.Name.Value(source)] = idx
 		program.Tokens = append(program.Tokens, ir.Token{
 			Name:       tok.Name.Value(source),
-			Expression: compileExpression(source, tok.Expression, document.Expressions, definitions),
+			Expression: compileExpression(source, tok.Expression, resolution),
 			Skip:       tok.Skip.Kind == token.TokenSkip,
 		})
 	}
 
 	for idx := range ruleList {
-		program.Rules = append(program.Rules, compileRule(source, ruleList[idx], tokenIndexes))
+		program.Rules = append(program.Rules, compileRule(source, ruleList[idx], resolution))
 	}
 
 	return program
 }
 
-func compileRule(source string, rule ast.Rule, tokenIndexes map[string]int) ir.Rule {
+func compileRule(source string, rule ast.Rule, resolution resolver.Resolution) ir.Rule {
+	matchTokenIndex, _ := resolution.TokenIndex(rule.Match.Token.Value(source))
+
 	return ir.Rule{
 		Name:       rule.Name.Value(source),
-		MatchToken: tokenIndexes[rule.Match.Token.Value(source)],
+		MatchToken: matchTokenIndex,
 		Where:      compileCondition(source, rule.Where),
-		Report:     compileReport(source, rule.Report, tokenIndexes),
+		Report:     compileReport(source, rule.Report, resolution),
 	}
 }
 
@@ -81,15 +74,18 @@ func compileCondition(source string, condition ast.RuleCondition) ir.Condition {
 	return compiled
 }
 
-func compileReport(source string, report ast.RuleReport, tokenIndexes map[string]int) ir.Report {
+func compileReport(source string, report ast.RuleReport, resolution resolver.Resolution) ir.Report {
+	targetTokenIndex, _ := resolution.TokenIndex(report.Target.Value(source))
+
 	return ir.Report{
 		Severity:    severityValue(report.Severity),
-		TargetToken: tokenIndexes[report.Target.Value(source)],
+		TargetToken: targetTokenIndex,
 		Message:     stringValue(source, report.Message),
 	}
 }
 
-func compileExpression(source string, expressionID ast.DefinitionExpressionID, expressions ast.DefinitionExpressionArena, definitions map[string]ast.Definition) ir.Expression {
+func compileExpression(source string, expressionID ast.DefinitionExpressionID, resolution resolver.Resolution) ir.Expression {
+	expressions := resolution.Document.Expressions
 	expression := expressions.Node(expressionID)
 
 	switch expression.Kind {
@@ -113,37 +109,39 @@ func compileExpression(source string, expressionID ast.DefinitionExpressionID, e
 		}
 
 	case ast.DefinitionExpressionReference:
-		return compileExpression(source, definitions[expression.Start.Value(source)].Expression, expressions, definitions)
+		definitionIndex, _ := resolution.DefinitionIndex(expression.Start.Value(source))
+
+		return compileExpression(source, resolution.Definitions[definitionIndex].Expression, resolution)
 
 	case ast.DefinitionExpressionConcatenation:
 		return ir.Expression{
 			Kind:  ir.ExpressionConcatenation,
-			Terms: compileTerms(source, expressions.Children(expression), expressions, definitions),
+			Terms: compileTerms(source, expressions.Children(expression), resolution),
 		}
 
 	case ast.DefinitionExpressionAlternation:
 		return ir.Expression{
 			Kind:  ir.ExpressionAlternation,
-			Terms: compileTerms(source, expressions.Children(expression), expressions, definitions),
+			Terms: compileTerms(source, expressions.Children(expression), resolution),
 		}
 
 	case ast.DefinitionExpressionGroup:
-		return compileExpression(source, expressions.Children(expression)[0], expressions, definitions)
+		return compileExpression(source, expressions.Children(expression)[0], resolution)
 
 	default:
 		return ir.Expression{
 			Kind:       ir.ExpressionRepetition,
-			Inner:      pointer(compileExpression(source, expressions.Children(expression)[0], expressions, definitions)),
+			Inner:      pointer(compileExpression(source, expressions.Children(expression)[0], resolution)),
 			Repetition: repetitionKind(expression.Operator.Kind),
 		}
 	}
 }
 
-func compileTerms(source string, expressionIDs []ast.DefinitionExpressionID, expressions ast.DefinitionExpressionArena, definitions map[string]ast.Definition) []ir.Expression {
+func compileTerms(source string, expressionIDs []ast.DefinitionExpressionID, resolution resolver.Resolution) []ir.Expression {
 	terms := make([]ir.Expression, 0, len(expressionIDs))
 
 	for idx := range expressionIDs {
-		terms = append(terms, compileExpression(source, expressionIDs[idx], expressions, definitions))
+		terms = append(terms, compileExpression(source, expressionIDs[idx], resolution))
 	}
 
 	return terms

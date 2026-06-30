@@ -10,11 +10,8 @@
 package validator_test
 
 import (
-	"strconv"
-	"strings"
 	"testing"
 
-	"github.com/kdeconinck/spot/dsl/parser"
 	"github.com/kdeconinck/spot/dsl/validator"
 	"github.com/kdeconinck/spot/qa/claim"
 )
@@ -22,104 +19,288 @@ import (
 func Test_Validate_Rules(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		name            string
-		inSource        string
-		wantDiagnostics []validator.Diagnostic
+	for tcName, tc := range map[string]struct {
+		inSource        markedSource
+		wantDiagnostics []expectedDiagnostic
 	}{
-		{
-			name:     "When rule names are unique, no diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } rule LongIdentifier { match Identifier report warn at Identifier "x" } }`,
+		"When rule names are unique, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						report warn at Identifier "x"
+					}
+					rule LongIdentifier {
+						match Identifier
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: nil,
 		},
-		{
-			name:     "When a rule name is declared twice, a diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } rule PublicIdentifier { match Identifier report warn at Identifier "x" } }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic(`Rule "PublicIdentifier" is already declared.`, 143, 159),
+		"When a rule name is declared twice, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						report warn at Identifier "x"
+					}
+					rule [[PublicIdentifier]] {
+						match Identifier
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Rule "PublicIdentifier" is already declared.`, 0),
 			},
 		},
-		{
-			name:     "When a rule name is declared three times, diagnostics are returned for the second and third declarations.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } rule PublicIdentifier { match Identifier report warn at Identifier "x" } rule PublicIdentifier { match Identifier report warn at Identifier "x" } }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic(`Rule "PublicIdentifier" is already declared.`, 143, 159),
-				diagnostic(`Rule "PublicIdentifier" is already declared.`, 216, 232),
+		"When a rule name is declared three times, diagnostics are returned for the second and third declarations.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						report warn at Identifier "x"
+					}
+					rule [[PublicIdentifier]] {
+						match Identifier
+						report warn at Identifier "x"
+					}
+					rule [[PublicIdentifier]] {
+						match Identifier
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Rule "PublicIdentifier" is already declared.`, 0),
+				expectDiagnostic(`Rule "PublicIdentifier" is already declared.`, 1),
 			},
 		},
-		{
-			name:     "When a rule matches an undeclared token, a diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Missing report warn at Missing "x" } }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic(`Token "Missing" is not declared.`, 95, 102),
+		"When a rule matches an undeclared token, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match [[Missing]]
+						report warn at Missing "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Token "Missing" is not declared.`, 0),
 			},
 		},
-		{
-			name:     "When a where clause references a token other than the matched token, a diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" Keyword = "kw" } rules { rule PublicIdentifier { match Identifier where Keyword.text == "public" report warn at Identifier "x" } }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic(`Where clause must reference matched token "Identifier".`, 127, 134),
+		"When a where clause references a token other than the matched token, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+					Keyword = "kw"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						where [[Keyword]].text == "public"
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Where clause must reference matched token "Identifier".`, 0),
 			},
 		},
-		{
-			name:     "When a where clause references the text property, no diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.text == "public" report warn at Identifier "x" } }`,
+		"When a where clause references the text property, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						where Identifier.text == "public"
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: nil,
 		},
-		{
-			name:     "When a text property uses an inequality operator, no diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.text != "public" report warn at Identifier "x" } }`,
+		"When a text property uses an inequality operator, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						where Identifier.text != "public"
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: nil,
 		},
-		{
-			name:     "When a text property uses an ordering operator, a diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.text > "public" report warn at Identifier "x" } }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic(`Token property "text" only supports equality operators.`, 128, 129),
+		"When a text property uses an ordering operator, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						where Identifier.text [[>]] "public"
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Token property "text" only supports equality operators.`, 0),
 			},
 		},
-		{
-			name:     "When a where clause references the length property, no diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.length > 1 report warn at Identifier "x" } }`,
+		"When a where clause references the length property, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						where Identifier.length > 1
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: nil,
 		},
-		{
-			name:     "When a where clause references an unknown property, a diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.unknown == "public" report warn at Identifier "x" } }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic(`Token property "unknown" is not declared.`, 123, 130),
+		"When a where clause references an unknown property, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						where Identifier.[[unknown]] == "public"
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Token property "unknown" is not declared.`, 0),
 			},
 		},
-		{
-			name:     "When a text property is compared with an integer literal, a diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.text == 1 report warn at Identifier "x" } }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic(`Token property "text" must be compared with a string literal.`, 131, 132),
+		"When a text property is compared with an integer literal, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						where Identifier.text == [[1]]
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Token property "text" must be compared with a string literal.`, 0),
 			},
 		},
-		{
-			name:     "When a length property is compared with a string literal, a diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } rules { rule PublicIdentifier { match Identifier where Identifier.length > "public" report warn at Identifier "x" } }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic(`Token property "length" must be compared with an integer literal.`, 132, 140),
+		"When a length property is compared with a string literal, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						where Identifier.length > [["public"]]
+						report warn at Identifier "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Token property "length" must be compared with an integer literal.`, 0),
 			},
 		},
-		{
-			name:     "When a report target references a token other than the matched token, a diagnostic is returned.",
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" Keyword = "kw" } rules { rule PublicIdentifier { match Identifier report warn at Keyword "x" } }`,
-			wantDiagnostics: []validator.Diagnostic{
-				diagnostic(`Report target must reference matched token "Identifier".`, 136, 143),
+		"When a report target references a token other than the matched token, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+					Keyword = "kw"
+				}
+				rules {
+					rule PublicIdentifier {
+						match Identifier
+						report warn at [[Keyword]] "x"
+					}
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Report target must reference matched token "Identifier".`, 0),
 			},
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tcName, func(t *testing.T) {
 			t.Parallel()
 
 			// Arrange.
-			document, parseErr := parser.Parse(tc.inSource)
+			resolution := parseResolution(t, tcName, tc.inSource.text)
 
 			// Act.
-			gotDiagnostics := validator.Validate(tc.inSource, document)
+			gotDiagnostics := validator.Validate(tc.inSource.text, resolution)
 
 			// Assert.
-			claim.Equal(t, tc.name, error(nil), parseErr, "Parse Error")
-			claim.DeepEqual(t, tc.name, tc.wantDiagnostics, gotDiagnostics, "Diagnostic")
+			claim.DeepEqual(t, tcName, realizeDiagnostics(tc.inSource, tc.wantDiagnostics), gotDiagnostics, "Diagnostic")
 		})
 	}
 }
@@ -133,29 +314,5 @@ func Benchmark_Validate_Rules_1000(b *testing.B) { benchmark_Validate_Rules(b, 1
 func benchmark_Validate_Rules(b *testing.B, size int) {
 	b.Helper()
 
-	source := rulesDSL(size)
-	document, parseErr := parser.Parse(source)
-	claim.Equal(b, "Rules benchmark.", error(nil), parseErr, "Parse Error")
-
-	for b.Loop() {
-		_ = validator.Validate(source, document)
-	}
-}
-
-func rulesDSL(size int) string {
-	var sb strings.Builder
-
-	sb.WriteString("scope { include \"**/*.go\" }\n")
-	sb.WriteString("tokens { Identifier = \"id\" }\n")
-	sb.WriteString("rules {\n")
-
-	for idx := range size {
-		sb.WriteString("    rule Rule")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" { match Identifier report warn at Identifier \"x\" }\n")
-	}
-
-	sb.WriteString("}")
-
-	return sb.String()
+	benchmark_Validate(b, rulesHappyPathDSL(size))
 }

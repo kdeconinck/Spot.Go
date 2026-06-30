@@ -16,6 +16,7 @@ import (
 
 	"github.com/kdeconinck/spot/dsl/compiler"
 	"github.com/kdeconinck/spot/dsl/parser"
+	"github.com/kdeconinck/spot/dsl/resolver"
 	"github.com/kdeconinck/spot/dsl/validator"
 	"github.com/kdeconinck/spot/location"
 	"github.com/kdeconinck/spot/qa/claim"
@@ -289,7 +290,8 @@ func compileProgram(tb testing.TB, source string) ir.Program {
 	tb.Helper()
 
 	document, parseErr := parser.Parse(source)
-	validationDiagnostics := validator.Validate(source, document)
+	resolution := resolver.Resolve(source, document)
+	validationDiagnostics := validator.Validate(source, resolution)
 
 	if parseErr != nil {
 		tb.Fatalf("engine test parse error: got %v, want nil", parseErr)
@@ -299,7 +301,7 @@ func compileProgram(tb testing.TB, source string) ir.Program {
 		tb.Fatalf("engine test validation diagnostics: got %d, want 0", len(validationDiagnostics))
 	}
 
-	return compiler.Compile(source, document)
+	return compiler.Compile(source, resolution)
 }
 
 func engineDSL() string {

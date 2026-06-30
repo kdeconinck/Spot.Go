@@ -6,16 +6,16 @@
 // Package validator validates parsed Spot DSL syntax.
 package validator
 
-import "github.com/kdeconinck/spot/dsl/ast"
+import "github.com/kdeconinck/spot/dsl/resolver"
 
-// Validate validates parsed DSL syntax and returns semantic diagnostics.
-func Validate(source string, document ast.Document) []Diagnostic {
+// Validate validates resolved DSL syntax and returns semantic diagnostics.
+func Validate(source string, resolution resolver.Resolution) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	diagnostics = validateScope(source, document.Scope, document.ScopeSectionEntries(document.Scope), diagnostics)
-	diagnostics = validateDefinitions(source, document.Definitions, document.SectionDefinitions(document.Definitions), document.Expressions, diagnostics)
-	diagnostics = validateTokens(source, document.Tokens, document.SectionTokens(document.Tokens), document.SectionDefinitions(document.Definitions), document.Expressions, diagnostics)
-	diagnostics = validateRules(source, document.Rules, document.SectionRules(document.Rules), document.SectionTokens(document.Tokens), diagnostics)
+	diagnostics = validateScope(source, resolution.Document.Scope, resolution.ScopeEntries, diagnostics)
+	diagnostics = validateDefinitions(source, resolution, diagnostics)
+	diagnostics = validateTokens(source, resolution, diagnostics)
+	diagnostics = validateRules(source, resolution, diagnostics)
 
 	return diagnostics
 }

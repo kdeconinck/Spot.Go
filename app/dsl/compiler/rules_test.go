@@ -14,6 +14,7 @@ import (
 
 	"github.com/kdeconinck/spot/dsl/compiler"
 	"github.com/kdeconinck/spot/dsl/parser"
+	"github.com/kdeconinck/spot/dsl/resolver"
 	"github.com/kdeconinck/spot/dsl/validator"
 	"github.com/kdeconinck/spot/qa/claim"
 	"github.com/kdeconinck/spot/runtime/ir"
@@ -28,7 +29,8 @@ func Test_Compile_Rules_PreservesSourceOrder(t *testing.T) {
 		rule Second { match Number where Number.length >= 2 report err at Number "second" }
 	}`
 	document, parseErr := parser.Parse(source)
-	validationDiagnostics := validator.Validate(source, document)
+	resolution := resolver.Resolve(source, document)
+	validationDiagnostics := validator.Validate(source, resolution)
 	wantProgram := ir.Program{
 		Tokens: []ir.Token{
 			{Name: "Identifier", Expression: ir.Expression{Kind: ir.ExpressionString, String: "id"}},
@@ -72,7 +74,7 @@ func Test_Compile_Rules_PreservesSourceOrder(t *testing.T) {
 	}
 
 	// Act.
-	gotProgram := compiler.Compile(source, document)
+	gotProgram := compiler.Compile(source, resolution)
 
 	// Assert.
 	claim.Equal(t, "When compiling rules, no parse error is returned.", error(nil), parseErr, "Parse Error")
@@ -194,10 +196,11 @@ func Test_Compile_Rules_CompilesConditionOperators(t *testing.T) {
 
 			// Arrange.
 			document, parseErr := parser.Parse(tc.inSource)
-			validationDiagnostics := validator.Validate(tc.inSource, document)
+			resolution := resolver.Resolve(tc.inSource, document)
+			validationDiagnostics := validator.Validate(tc.inSource, resolution)
 
 			// Act.
-			gotProgram := compiler.Compile(tc.inSource, document)
+			gotProgram := compiler.Compile(tc.inSource, resolution)
 
 			// Assert.
 			claim.Equal(t, tc.name, error(nil), parseErr, "Parse Error")
