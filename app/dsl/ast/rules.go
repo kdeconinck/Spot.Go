@@ -34,6 +34,17 @@ const (
 	RuleMatchNode
 )
 
+// RuleMatchRelationKind identifies whether a rule matches one syntax node or a relation between two syntax nodes.
+type RuleMatchRelationKind uint8
+
+const (
+	// RuleMatchRelationNone matches a single token or syntax node.
+	RuleMatchRelationNone RuleMatchRelationKind = iota
+
+	// RuleMatchRelationAdjacentSibling matches two adjacent sibling syntax nodes.
+	RuleMatchRelationAdjacentSibling
+)
+
 // RuleMatchScopeKind identifies whether a syntax-node rule constrains ancestor nodes.
 type RuleMatchScopeKind uint8
 
@@ -77,8 +88,14 @@ type RuleMatch struct {
 	// Kind identifies whether the rule matches a token or a syntax node.
 	Kind RuleMatchKind
 
+	// RelationKind identifies whether the rule matches one syntax node or a syntax-node relation.
+	RelationKind RuleMatchRelationKind
+
 	// Target is the identifier token naming the matched token or syntax node.
 	Target token.Token
+
+	// RelatedTarget is the identifier token naming the second syntax node in a relational selector.
+	RelatedTarget token.Token
 
 	// ScopeKind identifies whether the match constrains ancestor syntax nodes.
 	ScopeKind RuleMatchScopeKind
@@ -92,16 +109,28 @@ type RuleMatch struct {
 
 // RuleCondition is a comparison condition inside a rule.
 type RuleCondition struct {
-	// Subject is the identifier token naming the token being inspected.
+	// Subject is the identifier token naming the left-hand token, syntax node, or the synthetic 'gap' subject.
 	Subject token.Token
 
-	// Property is the identifier token naming the inspected token property.
+	// Path stores named syntax-field segments between Subject and Property.
+	Path []token.Token
+
+	// Property is the identifier token naming the inspected property.
 	Property token.Token
 
 	// Operator is the comparison operator token.
 	Operator token.Token
 
-	// Value is the literal token compared against the property.
+	// OtherSubject is the optional identifier token naming the right-hand token, syntax node, or 'gap'.
+	OtherSubject token.Token
+
+	// OtherPath stores named syntax-field segments between OtherSubject and OtherProperty.
+	OtherPath []token.Token
+
+	// OtherProperty is the optional identifier token naming the right-hand property.
+	OtherProperty token.Token
+
+	// Value is the literal token compared against the property when the right-hand side is a literal.
 	Value token.Token
 
 	// Span is the byte range covered by the where statement.

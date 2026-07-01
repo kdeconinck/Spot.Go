@@ -48,11 +48,17 @@ const (
 	// TokenNode marks a syntax node declaration.
 	TokenNode
 
+	// TokenOneOf marks a syntax-node variant block.
+	TokenOneOf
+
 	// TokenAny marks a syntax expression that matches any emitted token.
 	TokenAny
 
 	// TokenNot marks selector negation.
 	TokenNot
+
+	// TokenStartsWith marks a string-prefix comparison operator in rule conditions.
+	TokenStartsWith
 
 	// TokenRule marks a rule declaration.
 	TokenRule
@@ -184,11 +190,17 @@ func LookupTokenKind(value string) TokenKind {
 	case "node":
 		return TokenNode
 
+	case "oneOf":
+		return TokenOneOf
+
 	case "any":
 		return TokenAny
 
 	case "not":
 		return TokenNot
+
+	case "startsWith":
+		return TokenStartsWith
 
 	case "rule":
 		return TokenRule
@@ -278,11 +290,17 @@ func (kind TokenKind) String() string {
 	case TokenNode:
 		return "node"
 
+	case TokenOneOf:
+		return "oneOf"
+
 	case TokenAny:
 		return "any"
 
 	case TokenNot:
 		return "not"
+
+	case TokenStartsWith:
+		return "startsWith"
 
 	case TokenRule:
 		return "rule"

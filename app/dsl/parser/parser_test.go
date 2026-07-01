@@ -101,17 +101,20 @@ func Test_Parse_ReturnsDocument(t *testing.T) {
 		        Reference KeywordPublic
 		    Node WordPair
 		      Concatenation
-		        Reference Word
-		        Reference Word
+		        Capture left
+		          Reference Word
+		        Capture right
+		          Reference Word
 		    Node OptionalWord
-		      Repetition ?
-		        Group
+		      Capture value
+		        Repetition ?
 		          Alternation
 		            Reference Word
 		            Reference KeywordInternal
 		    Node WordList
-		      Repetition +
-		        Reference Word
+		      Capture values
+		        Repetition +
+		          Reference Word
 		  Rules
 		    Rule PublicIdentifier
 		      Match Identifier
@@ -201,7 +204,7 @@ func Test_Parse_PreservesSpans(t *testing.T) {
 	// Arrange.
 	source := fullHappyPathDSL(1)
 	want := normalizeMultilineLiteral(`
-		Document [0:1804]
+		Document [0:1974]
 		  Scope [0:55]
 		    Include "**/*.go" [12:29]
 		    Exclude "vendor/**" [34:53]
@@ -268,97 +271,100 @@ func Test_Parse_PreservesSpans(t *testing.T) {
 		            Character '\n' [558:562]
 		            Character '\r' [565:569]
 		      Skip [572:576]
-		  Syntax [579:738]
-		    Node Word [592:630]
-		      Alternation [604:630]
-		        Reference Identifier [604:614]
-		        Reference KeywordPublic [617:630]
-		    Node WordPair [635:660]
-		      Concatenation [651:660]
-		        Reference Word [651:655]
-		        Reference Word [656:660]
-		    Node OptionalWord [665:710]
-		      Repetition ? [685:710]
-		        Group [685:709]
-		          Alternation [686:708]
-		            Reference Word [686:690]
-		            Reference KeywordInternal [693:708]
-		    Node WordList [715:736]
-		      Repetition + [731:736]
-		        Reference Word [731:735]
-		  Rules [739:1804]
-		    Rule PublicIdentifier [751:907]
-		      Match Identifier [783:799]
-		      Where [808:841]
-		        Subject Identifier [814:824]
-		        Property text [825:829]
-		        Operator == [830:832]
-		        Value "public" [833:841]
-		      Report [850:901]
-		        Severity warn [857:861]
-		        At Identifier [865:875]
-		        Message "Public identifier found" [876:901]
-		    Rule InternalIdentifier [912:1074]
-		      Match Identifier [946:962]
-		      Where [971:1006]
-		        Subject Identifier [977:987]
-		        Property text [988:992]
-		        Operator != [993:995]
-		        Value "internal" [996:1006]
-		      Report [1015:1068]
-		        Severity info [1022:1026]
-		        At Identifier [1030:1040]
-		        Message "Internal identifier found" [1041:1068]
-		    Rule ShortIdentifier [1079:1227]
-		      Match Identifier [1110:1126]
-		      Where [1135:1162]
-		        Subject Identifier [1141:1151]
-		        Property length [1152:1158]
-		        Operator < [1159:1160]
-		        Value 3 [1161:1162]
-		      Report [1171:1221]
-		        Severity info [1178:1182]
-		        At Identifier [1186:1196]
-		        Message "Short identifier found" [1197:1221]
-		    Rule MediumIdentifier [1232:1383]
-		      Match Identifier [1264:1280]
-		      Where [1289:1317]
-		        Subject Identifier [1295:1305]
-		        Property length [1306:1312]
-		        Operator <= [1313:1315]
-		        Value 4 [1316:1317]
-		      Report [1326:1377]
-		        Severity warn [1333:1337]
-		        At Identifier [1341:1351]
-		        Message "Medium identifier found" [1352:1377]
-		    Rule LongIdentifier [1388:1533]
-		      Match Identifier [1418:1434]
-		      Where [1443:1470]
-		        Subject Identifier [1449:1459]
-		        Property length [1460:1466]
-		        Operator > [1467:1468]
-		        Value 5 [1469:1470]
-		      Report [1479:1527]
-		        Severity err [1486:1489]
-		        At Identifier [1493:1503]
-		        Message "Long identifier found" [1504:1527]
-		    Rule VeryLongIdentifier [1538:1693]
-		      Match Identifier [1572:1588]
-		      Where [1597:1625]
-		        Subject Identifier [1603:1613]
-		        Property length [1614:1620]
-		        Operator >= [1621:1623]
-		        Value 6 [1624:1625]
-		      Report [1634:1687]
-		        Severity err [1641:1644]
-		        At Identifier [1648:1658]
-		        Message "Very long identifier found" [1659:1687]
-		    Rule AnyIdentifier [1698:1802]
-		      Match Identifier [1727:1743]
-		      Report [1752:1796]
-		        Severity info [1759:1763]
-		        At Identifier [1767:1777]
-		        Message "Identifier found" [1778:1796]
+		  Syntax [579:908]
+		    Node Word [592:678]
+		      Alternation [612:678]
+		        Reference Identifier [632:642]
+		        Reference KeywordPublic [655:668]
+		    Node WordPair [689:749]
+		      Concatenation [713:749]
+		        Capture left [713:723]
+		          Reference Word [719:723]
+		        Capture right [732:743]
+		          Reference Word [739:743]
+		    Node OptionalWord [754:852]
+		      Capture value [782:852]
+		        Repetition ? [787:852]
+		          Alternation [790:852]
+		            Reference Word [810:814]
+		            Reference KeywordInternal [827:842]
+		    Node WordList [863:900]
+		      Capture values [887:900]
+		        Repetition + [895:900]
+		          Reference Word [895:899]
+		  Rules [909:1974]
+		    Rule PublicIdentifier [921:1077]
+		      Match Identifier [953:969]
+		      Where [978:1011]
+		        Subject Identifier [984:994]
+		        Property text [995:999]
+		        Operator == [1000:1002]
+		        Value "public" [1003:1011]
+		      Report [1020:1071]
+		        Severity warn [1027:1031]
+		        At Identifier [1035:1045]
+		        Message "Public identifier found" [1046:1071]
+		    Rule InternalIdentifier [1082:1244]
+		      Match Identifier [1116:1132]
+		      Where [1141:1176]
+		        Subject Identifier [1147:1157]
+		        Property text [1158:1162]
+		        Operator != [1163:1165]
+		        Value "internal" [1166:1176]
+		      Report [1185:1238]
+		        Severity info [1192:1196]
+		        At Identifier [1200:1210]
+		        Message "Internal identifier found" [1211:1238]
+		    Rule ShortIdentifier [1249:1397]
+		      Match Identifier [1280:1296]
+		      Where [1305:1332]
+		        Subject Identifier [1311:1321]
+		        Property length [1322:1328]
+		        Operator < [1329:1330]
+		        Value 3 [1331:1332]
+		      Report [1341:1391]
+		        Severity info [1348:1352]
+		        At Identifier [1356:1366]
+		        Message "Short identifier found" [1367:1391]
+		    Rule MediumIdentifier [1402:1553]
+		      Match Identifier [1434:1450]
+		      Where [1459:1487]
+		        Subject Identifier [1465:1475]
+		        Property length [1476:1482]
+		        Operator <= [1483:1485]
+		        Value 4 [1486:1487]
+		      Report [1496:1547]
+		        Severity warn [1503:1507]
+		        At Identifier [1511:1521]
+		        Message "Medium identifier found" [1522:1547]
+		    Rule LongIdentifier [1558:1703]
+		      Match Identifier [1588:1604]
+		      Where [1613:1640]
+		        Subject Identifier [1619:1629]
+		        Property length [1630:1636]
+		        Operator > [1637:1638]
+		        Value 5 [1639:1640]
+		      Report [1649:1697]
+		        Severity err [1656:1659]
+		        At Identifier [1663:1673]
+		        Message "Long identifier found" [1674:1697]
+		    Rule VeryLongIdentifier [1708:1863]
+		      Match Identifier [1742:1758]
+		      Where [1767:1795]
+		        Subject Identifier [1773:1783]
+		        Property length [1784:1790]
+		        Operator >= [1791:1793]
+		        Value 6 [1794:1795]
+		      Report [1804:1857]
+		        Severity err [1811:1814]
+		        At Identifier [1818:1828]
+		        Message "Very long identifier found" [1829:1857]
+		    Rule AnyIdentifier [1868:1972]
+		      Match Identifier [1897:1913]
+		      Report [1922:1966]
+		        Severity info [1929:1933]
+		        At Identifier [1937:1947]
+		        Message "Identifier found" [1948:1966]
 	`)
 
 	// Act.
@@ -413,10 +419,25 @@ func fullHappyPathDSL(size int) string {
     Whitespace = (' ' | '\t' | '\n' | '\r')+ skip
 `
 
-	const syntaxBlock = `    node Word = Identifier | KeywordPublic
-    node WordPair = Word Word
-    node OptionalWord = (Word | KeywordInternal)?
-    node WordList = Word+
+	const syntaxBlock = `    node Word {
+        oneOf {
+            Identifier
+            KeywordPublic
+        }
+    }
+    node WordPair {
+        left: Word
+        right: Word
+    }
+    node OptionalWord {
+        value?: oneOf {
+            Word
+            KeywordInternal
+        }
+    }
+    node WordList {
+        values: Word+
+    }
 `
 
 	const rulesBlock = `    rule PublicIdentifier {
@@ -501,10 +522,25 @@ func fullHappyPathBenchmarkDSL(size int) string {
     Whitespace = (' ' | '\t' | '\n' | '\r')+ skip
 `
 
-	const syntaxBlock = `    node Word = Identifier | KeywordPublic
-    node WordPair = Word Word
-    node OptionalWord = (Word | KeywordInternal)?
-    node WordList = Word+
+	const syntaxBlock = `    node Word {
+        oneOf {
+            Identifier
+            KeywordPublic
+        }
+    }
+    node WordPair {
+        left: Word
+        right: Word
+    }
+    node OptionalWord {
+        value?: oneOf {
+            Word
+            KeywordInternal
+        }
+    }
+    node WordList {
+        values: Word+
+    }
 `
 
 	const rulesBlock = `    rule PublicIdentifier {
@@ -671,6 +707,10 @@ func appendDocument(source string, builder *strings.Builder, document ast.Docume
 				matchLabel = "Match node " + rule.Match.Target.Value(source)
 			}
 
+			if rule.Match.RelationKind == ast.RuleMatchRelationAdjacentSibling {
+				matchLabel = "Match " + rule.Match.RelatedTarget.Value(source) + " + " + rule.Match.Target.Value(source)
+			}
+
 			switch rule.Match.ScopeKind {
 			case ast.RuleMatchScopeParent:
 				matchLabel += " parent " + rule.Match.ScopeTarget.Value(source)
@@ -690,9 +730,21 @@ func appendDocument(source string, builder *strings.Builder, document ast.Docume
 			if rule.Where.Span != (location.Span{}) {
 				appendIndentedLine(builder, depth+3, formatLabelWithSpan("Where", rule.Where.Span, includeSpans))
 				appendIndentedLine(builder, depth+4, formatLabelWithSpan("Subject "+rule.Where.Subject.Value(source), rule.Where.Subject.Span, includeSpans))
+				for _, pathSegment := range rule.Where.Path {
+					appendIndentedLine(builder, depth+4, formatLabelWithSpan("Path "+pathSegment.Value(source), pathSegment.Span, includeSpans))
+				}
 				appendIndentedLine(builder, depth+4, formatLabelWithSpan("Property "+rule.Where.Property.Value(source), rule.Where.Property.Span, includeSpans))
 				appendIndentedLine(builder, depth+4, formatLabelWithSpan("Operator "+rule.Where.Operator.Value(source), rule.Where.Operator.Span, includeSpans))
-				appendIndentedLine(builder, depth+4, formatLabelWithSpan("Value "+rule.Where.Value.Value(source), rule.Where.Value.Span, includeSpans))
+
+				if rule.Where.OtherProperty.Value(source) != "" {
+					appendIndentedLine(builder, depth+4, formatLabelWithSpan("Other Subject "+rule.Where.OtherSubject.Value(source), rule.Where.OtherSubject.Span, includeSpans))
+					for _, pathSegment := range rule.Where.OtherPath {
+						appendIndentedLine(builder, depth+4, formatLabelWithSpan("Other Path "+pathSegment.Value(source), pathSegment.Span, includeSpans))
+					}
+					appendIndentedLine(builder, depth+4, formatLabelWithSpan("Other Property "+rule.Where.OtherProperty.Value(source), rule.Where.OtherProperty.Span, includeSpans))
+				} else {
+					appendIndentedLine(builder, depth+4, formatLabelWithSpan("Value "+rule.Where.Value.Value(source), rule.Where.Value.Span, includeSpans))
+				}
 			}
 
 			appendIndentedLine(builder, depth+3, formatLabelWithSpan("Report", rule.Report.Span, includeSpans))
@@ -713,6 +765,10 @@ func appendSyntaxExpression(source string, builder *strings.Builder, expressions
 
 	case ast.SyntaxExpressionAny:
 		appendIndentedLine(builder, depth, formatLabelWithSpan("Any", expression.Span, includeSpans))
+
+	case ast.SyntaxExpressionCapture:
+		appendIndentedLine(builder, depth, formatLabelWithSpan("Capture "+expression.Field.Value(source), expression.Span, includeSpans))
+		appendSyntaxExpression(source, builder, expressions, expressions.Children(expression)[0], depth+1, includeSpans)
 
 	case ast.SyntaxExpressionAlternation:
 		appendIndentedLine(builder, depth, formatLabelWithSpan("Alternation", expression.Span, includeSpans))

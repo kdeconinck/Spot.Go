@@ -64,6 +64,10 @@ func Test_LookupTokenKind(t *testing.T) {
 			inValue: "node",
 			want:    token.TokenNode,
 		},
+		"When using 'oneOf', the correct value is returned.": {
+			inValue: "oneOf",
+			want:    token.TokenOneOf,
+		},
 		"When using 'any', the correct value is returned.": {
 			inValue: "any",
 			want:    token.TokenAny,
@@ -71,6 +75,10 @@ func Test_LookupTokenKind(t *testing.T) {
 		"When using 'not', the correct value is returned.": {
 			inValue: "not",
 			want:    token.TokenNot,
+		},
+		"When using 'startsWith', the correct value is returned.": {
+			inValue: "startsWith",
+			want:    token.TokenStartsWith,
 		},
 		"When using 'rule', the correct value is returned.": {
 			inValue: "rule",
@@ -243,6 +251,10 @@ func Test_TokenKind_String(t *testing.T) {
 			inKind: token.TokenNode,
 			want:   "node",
 		},
+		"When using a oneOf token kind, the returned value is correct.": {
+			inKind: token.TokenOneOf,
+			want:   "oneOf",
+		},
 		"When using an any token kind, the returned value is correct.": {
 			inKind: token.TokenAny,
 			want:   "any",
@@ -370,6 +382,10 @@ func Test_TokenKind_String(t *testing.T) {
 		"When using a not token kind, the returned value is correct.": {
 			inKind: token.TokenNot,
 			want:   "not",
+		},
+		"When using a startsWith token kind, the returned value is correct.": {
+			inKind: token.TokenStartsWith,
+			want:   "startsWith",
 		},
 
 		"When using an unknown token kind, the returned value is correct.": {

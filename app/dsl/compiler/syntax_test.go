@@ -33,11 +33,11 @@ func Test_Compile_Syntax(t *testing.T) {
 				`scope { include "**/*.go" }`,
 				`tokens { Identifier = "id" KeywordPublic = "public" KeywordInternal = "internal" }`,
 				`syntax {`,
-				`    node Word = Identifier | KeywordPublic`,
-				`    node WordPair = Word Word`,
-				`    node OptionalWord = (Word | KeywordInternal)?`,
-				`    node WordList = Word+`,
-				`    node UnknownStatement = any+`,
+				`    node Word { oneOf { Identifier KeywordPublic } }`,
+				`    node WordPair { left: Word right: Word }`,
+				`    node OptionalWord { value?: oneOf { Word KeywordInternal } }`,
+				`    node WordList { values: Word+ }`,
+				`    node UnknownStatement { values: any+ }`,
 				`}`,
 			}, "\n"),
 			wantProgram: normalizeMultilineLiteral(`
@@ -56,20 +56,96 @@ func Test_Compile_Syntax(t *testing.T) {
 				        Token KeywordPublic
 				    Node WordPair
 				      Concatenation
-				        Node Word
-				        Node Word
+				        Capture left
+				          Node Word
+				        Capture right
+				          Node Word
 				    Node OptionalWord
-				      Repetition ?
-				        Group
+				      Capture value
+				        Repetition ?
 				          Alternation
 				            Node Word
 				            Token KeywordInternal
 				    Node WordList
-				      Repetition +
-				        Node Word
+				      Capture values
+				        Repetition +
+				          Node Word
 				    Node UnknownStatement
-				      Repetition +
-				        Any
+				      Capture values
+				        Repetition +
+				          Any
+				  Rules
+			`),
+		},
+		"When compiling syntax nodes with named captures, field metadata is preserved.": {
+			inSource: strings.Join([]string{
+				`scope { include "**/*.go" }`,
+				`tokens { Identifier = "id" }`,
+				`syntax {`,
+				`    node QualifiedIdentifier { Identifier }`,
+				`    node UsingDirective { name: QualifiedIdentifier }`,
+				`}`,
+			}, "\n"),
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				  Syntax
+				    Node QualifiedIdentifier
+				      Token Identifier
+				    Node UsingDirective
+				      Capture name
+				        Node QualifiedIdentifier
+				  Rules
+			`),
+		},
+		"When compiling structured syntax nodes, field captures and oneOf are preserved.": {
+			inSource: strings.Join([]string{
+				`scope { include "**/*.go" }`,
+				`tokens { Identifier = "id" KeywordUsing = "using" Semicolon = ";" }`,
+				`syntax {`,
+				`    node QualifiedIdentifier {`,
+				`        head: Identifier`,
+				`    }`,
+				`    node UsingDirective {`,
+				`        KeywordUsing`,
+				`        name: QualifiedIdentifier`,
+				`        Semicolon`,
+				`    }`,
+				`    node Root {`,
+				`        members*: oneOf {`,
+				`            UsingDirective`,
+				`            any`,
+				`        }`,
+				`    }`,
+				`}`,
+			}, "\n"),
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				    Token KeywordUsing
+				      String "using"
+				    Token Semicolon
+				      String ";"
+				  Syntax
+				    Node QualifiedIdentifier
+				      Capture head
+				        Token Identifier
+				    Node UsingDirective
+				      Concatenation
+				        Token KeywordUsing
+				        Capture name
+				          Node QualifiedIdentifier
+				        Token Semicolon
+				    Node Root
+				      Capture members
+				        Repetition *
+				          Alternation
+				            Node UsingDirective
+				            Any
 				  Rules
 			`),
 		},
@@ -137,42 +213,76 @@ func syntaxDSL(size int) string {
 
 	builder.WriteString("}\n")
 	builder.WriteString("syntax {\n")
-	builder.WriteString("    node Word = Identifier | KeywordPublic\n")
-	builder.WriteString("    node WordPair = Word Word\n")
-	builder.WriteString("    node OptionalWord = (Word | KeywordInternal)?\n")
-	builder.WriteString("    node WordList = Word+\n")
-	builder.WriteString("    node UnknownStatement = any+\n")
+	builder.WriteString("    node Word {\n")
+	builder.WriteString("        oneOf {\n")
+	builder.WriteString("            Identifier\n")
+	builder.WriteString("            KeywordPublic\n")
+	builder.WriteString("        }\n")
+	builder.WriteString("    }\n")
+	builder.WriteString("    node WordPair {\n")
+	builder.WriteString("        left: Word\n")
+	builder.WriteString("        right: Word\n")
+	builder.WriteString("    }\n")
+	builder.WriteString("    node OptionalWord {\n")
+	builder.WriteString("        value?: oneOf {\n")
+	builder.WriteString("            Word\n")
+	builder.WriteString("            KeywordInternal\n")
+	builder.WriteString("        }\n")
+	builder.WriteString("    }\n")
+	builder.WriteString("    node WordList {\n")
+	builder.WriteString("        values: Word+\n")
+	builder.WriteString("    }\n")
+	builder.WriteString("    node UnknownStatement {\n")
+	builder.WriteString("        values: any+\n")
+	builder.WriteString("    }\n")
 
 	for idx := 1; idx <= size; idx++ {
 		builder.WriteString("    node Word")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = Identifier")
-		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" | KeywordPublic")
+		builder.WriteString(" {\n")
+		builder.WriteString("        oneOf {\n")
+		builder.WriteString("            Identifier")
 		builder.WriteString(strconv.Itoa(idx))
 		builder.WriteString("\n")
+		builder.WriteString("            KeywordPublic")
+		builder.WriteString(strconv.Itoa(idx))
+		builder.WriteString("\n")
+		builder.WriteString("        }\n")
+		builder.WriteString("    }\n")
 		builder.WriteString("    node WordPair")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = Word")
-		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" Word")
+		builder.WriteString(" {\n")
+		builder.WriteString("        left: Word")
 		builder.WriteString(strconv.Itoa(idx))
 		builder.WriteString("\n")
+		builder.WriteString("        right: Word")
+		builder.WriteString(strconv.Itoa(idx))
+		builder.WriteString("\n")
+		builder.WriteString("    }\n")
 		builder.WriteString("    node OptionalWord")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = (Word")
+		builder.WriteString(" {\n")
+		builder.WriteString("        value?: oneOf {\n")
+		builder.WriteString("            Word")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" | KeywordInternal")
+		builder.WriteString("\n")
+		builder.WriteString("            KeywordInternal")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(")?\n")
+		builder.WriteString("\n")
+		builder.WriteString("        }\n")
+		builder.WriteString("    }\n")
 		builder.WriteString("    node WordList")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = Word")
+		builder.WriteString(" {\n")
+		builder.WriteString("        values: Word")
 		builder.WriteString(strconv.Itoa(idx))
 		builder.WriteString("+\n")
+		builder.WriteString("    }\n")
 		builder.WriteString("    node UnknownStatement")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = any+\n")
+		builder.WriteString(" {\n")
+		builder.WriteString("        values: any+\n")
+		builder.WriteString("    }\n")
 	}
 
 	builder.WriteString("}")

@@ -107,7 +107,7 @@ func Test_Compile_Rules(t *testing.T) {
 			`),
 		},
 		"When compiling a syntax-node rule, the node match is compiled.": {
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Word = Identifier node Root = Word+ } rules { rule RootRule { match node Root where Root.length > 0 report warn at Root "message" } }`,
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Word { Identifier } node Root { values: Word+ } } rules { rule RootRule { match node Root where Root.length > 0 report warn at Root "message" } }`,
 			wantProgram: normalizeMultilineLiteral(`
 				Program
 				  Tokens
@@ -117,8 +117,9 @@ func Test_Compile_Rules(t *testing.T) {
 				    Node Word
 				      Token Identifier
 				    Node Root
-				      Repetition +
-				        Node Word
+				      Capture values
+				        Repetition +
+				          Node Word
 				  Rules
 				    Rule RootRule
 				      MatchNode Root
@@ -127,7 +128,7 @@ func Test_Compile_Rules(t *testing.T) {
 			`),
 		},
 		"When compiling a syntax-node ancestor constraint, the scope is compiled.": {
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { rule UsingOutsideNamespace { match node Using outside Namespace report warn at Using "message" } }`,
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Using { Identifier } node Namespace { Using } node Root { Namespace } } rules { rule UsingOutsideNamespace { match node Using outside Namespace report warn at Using "message" } }`,
 			wantProgram: normalizeMultilineLiteral(`
 				Program
 				  Tokens
@@ -148,7 +149,7 @@ func Test_Compile_Rules(t *testing.T) {
 			`),
 		},
 		"When compiling a selector rule with a direct parent query, the scope is compiled.": {
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { info "message" : Namespace > Using }`,
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Using { Identifier } node Namespace { Using } node Root { Namespace } } rules { info "message" : Namespace > Using }`,
 			wantProgram: normalizeMultilineLiteral(`
 				Program
 				  Tokens
@@ -169,7 +170,7 @@ func Test_Compile_Rules(t *testing.T) {
 			`),
 		},
 		"When compiling a selector rule with a negated direct parent query, the scope is compiled.": {
-			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { warn "message" : Using:not(Namespace > *) }`,
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Using { Identifier } node Namespace { Using } node Root { Namespace } } rules { warn "message" : Using:not(Namespace > *) }`,
 			wantProgram: normalizeMultilineLiteral(`
 				Program
 				  Tokens
@@ -186,6 +187,27 @@ func Test_Compile_Rules(t *testing.T) {
 				    Rule
 				      MatchNode Using outside parent Namespace
 				      Where none
+				      Report warn at Using "message"
+			`),
+		},
+		"When compiling a selector rule with an adjacent-sibling condition, the comparison is compiled.": {
+			inSource: `scope { include "**/*.go" } tokens { Identifier = "id" } syntax { node Using { Identifier } node Root { values: Using+ } } rules { warn "message" : Using + Using where left.text > right.text }`,
+			wantProgram: normalizeMultilineLiteral(`
+				Program
+				  Tokens
+				    Token Identifier
+				      String "id"
+				  Syntax
+				    Node Using
+				      Token Identifier
+				    Node Root
+				      Capture values
+				        Repetition +
+				          Node Using
+				  Rules
+				    Rule
+				      Match Using + Using
+				      Where left.text > text
 				      Report warn at Using "message"
 			`),
 		},

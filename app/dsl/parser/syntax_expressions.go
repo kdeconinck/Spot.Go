@@ -91,16 +91,14 @@ func (p *parser) parseSyntaxRepetition() (ast.SyntaxExpressionID, error) {
 
 	p.advance()
 
-	return p.addSyntaxExpressionNode(ast.SyntaxExpressionNode{
-		Kind:             ast.SyntaxExpressionRepetition,
-		Operator:         operator,
-		FirstElementIdx:  p.appendSyntaxExpressionChildren(inner),
-		AmountOfElements: 1,
-		Span:             span(p.syntaxExpressionNode(inner).Span.Start, operator.Span.End),
-	}), nil
+	return p.wrapSyntaxExpressionWithRepetition(inner, operator), nil
 }
 
 func (p *parser) parseSyntaxPrimary() (ast.SyntaxExpressionID, error) {
+	if p.isAt(token.TokenIdentifier) && p.next.Kind == token.TokenColon {
+		return p.parseCapturedSyntaxExpression()
+	}
+
 	if p.isAt(token.TokenLeftParen) {
 		return p.parseGroupedSyntaxExpression()
 	}
@@ -125,6 +123,32 @@ func (p *parser) parseSyntaxPrimary() (ast.SyntaxExpressionID, error) {
 		Kind:      ast.SyntaxExpressionReference,
 		Reference: reference,
 		Span:      reference.Span,
+	}), nil
+}
+
+func (p *parser) parseCapturedSyntaxExpression() (ast.SyntaxExpressionID, error) {
+	field, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return 0, err
+	}
+
+	if _, err := p.expect(token.TokenColon); err != nil {
+		return 0, err
+	}
+
+	inner, err := p.parseSyntaxPrimary()
+
+	if err != nil {
+		return 0, err
+	}
+
+	return p.addSyntaxExpressionNode(ast.SyntaxExpressionNode{
+		Kind:             ast.SyntaxExpressionCapture,
+		Field:            field,
+		FirstElementIdx:  p.appendSyntaxExpressionChildren(inner),
+		AmountOfElements: 1,
+		Span:             span(field.Span.Start, p.syntaxExpressionNode(inner).Span.End),
 	}), nil
 }
 
@@ -169,6 +193,26 @@ func (p *parser) addSyntaxExpressionBranch(kind ast.SyntaxExpressionKind, childr
 		FirstElementIdx:  firstElementIdx,
 		AmountOfElements: uint32(len(children)),
 		Span:             exprSpan,
+	})
+}
+
+func (p *parser) wrapSyntaxExpressionWithRepetition(inner ast.SyntaxExpressionID, operator token.Token) ast.SyntaxExpressionID {
+	return p.addSyntaxExpressionNode(ast.SyntaxExpressionNode{
+		Kind:             ast.SyntaxExpressionRepetition,
+		Operator:         operator,
+		FirstElementIdx:  p.appendSyntaxExpressionChildren(inner),
+		AmountOfElements: 1,
+		Span:             span(p.syntaxExpressionNode(inner).Span.Start, operator.Span.End),
+	})
+}
+
+func (p *parser) wrapSyntaxExpressionWithLeadingRepetition(inner ast.SyntaxExpressionID, operator token.Token) ast.SyntaxExpressionID {
+	return p.addSyntaxExpressionNode(ast.SyntaxExpressionNode{
+		Kind:             ast.SyntaxExpressionRepetition,
+		Operator:         operator,
+		FirstElementIdx:  p.appendSyntaxExpressionChildren(inner),
+		AmountOfElements: 1,
+		Span:             span(operator.Span.Start, p.syntaxExpressionNode(inner).Span.End),
 	})
 }
 

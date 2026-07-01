@@ -23,7 +23,7 @@ func Test_Resolve_ReturnsSectionData(t *testing.T) {
 	t.Parallel()
 
 	// Arrange.
-	source := `scope { include "**/*.go" } definitions { letter = 'a' digit = '0' } tokens { Identifier = letter } syntax { node Word = Identifier } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } }`
+	source := `scope { include "**/*.go" } definitions { letter = 'a' digit = '0' } tokens { Identifier = letter } syntax { node Word { Identifier } } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } }`
 	document, parseErr := parser.Parse(source)
 
 	// Act.
@@ -42,7 +42,7 @@ func Test_Resolve_IndexesFirstDeclarations(t *testing.T) {
 	t.Parallel()
 
 	// Arrange.
-	source := `scope { include "**/*.go" } definitions { value = 'a' value = 'b' } tokens { Identifier = "id" Identifier = "other" } syntax { node Word = Identifier node Word = Identifier } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } rule PublicIdentifier { match Identifier report warn at Identifier "x" } }`
+	source := `scope { include "**/*.go" } definitions { value = 'a' value = 'b' } tokens { Identifier = "id" Identifier = "other" } syntax { node Word { Identifier } node Word { Identifier } } rules { rule PublicIdentifier { match Identifier report warn at Identifier "x" } rule PublicIdentifier { match Identifier report warn at Identifier "x" } }`
 	document, parseErr := parser.Parse(source)
 
 	// Act.
@@ -137,16 +137,16 @@ func resolverDSL(size int) string {
 
 		builder.WriteString("    node Word")
 		builder.WriteString(suffix)
-		builder.WriteString(" = Identifier")
+		builder.WriteString(" { Identifier")
 		builder.WriteString(suffix)
-		builder.WriteString("\n")
+		builder.WriteString(" }\n")
 		builder.WriteString("    node WordPair")
 		builder.WriteString(suffix)
-		builder.WriteString(" = Word")
+		builder.WriteString(" { left: Word")
 		builder.WriteString(suffix)
-		builder.WriteString(" Word")
+		builder.WriteString(" right: Word")
 		builder.WriteString(suffix)
-		builder.WriteString("\n")
+		builder.WriteString(" }\n")
 	}
 
 	builder.WriteString("}\n")

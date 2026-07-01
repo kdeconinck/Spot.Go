@@ -33,8 +33,8 @@ func Test_Validate_Syntax(t *testing.T) {
 					KeywordPublic = "public"
 				}
 				syntax {
-					node Word = Identifier | KeywordPublic
-					node WordPair = Word Word
+					node Word { oneOf { Identifier KeywordPublic } }
+					node WordPair { left: Word right: Word }
 				}
 			`),
 			wantDiagnostics: nil,
@@ -48,8 +48,8 @@ func Test_Validate_Syntax(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Word = Identifier
-					node [[Word]] = Identifier
+					node Word { Identifier }
+					node [[Word]] { Identifier }
 				}
 			`),
 			wantDiagnostics: []expectedDiagnostic{
@@ -66,7 +66,7 @@ func Test_Validate_Syntax(t *testing.T) {
 					Name = "name"
 				}
 				syntax {
-					node [[Identifier]] = Name
+					node [[Identifier]] { Name }
 				}
 			`),
 			wantDiagnostics: []expectedDiagnostic{
@@ -82,7 +82,7 @@ func Test_Validate_Syntax(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Word = Identifier
+					node Word { Identifier }
 				}
 			`),
 			wantDiagnostics: nil,
@@ -96,8 +96,8 @@ func Test_Validate_Syntax(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Word = Identifier
-					node WordPair = Word Word
+					node Word { Identifier }
+					node WordPair { left: Word right: Word }
 				}
 			`),
 			wantDiagnostics: nil,
@@ -111,7 +111,7 @@ func Test_Validate_Syntax(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Word = [[Missing]]
+					node Word { [[Missing]] }
 				}
 			`),
 			wantDiagnostics: []expectedDiagnostic{
@@ -127,8 +127,8 @@ func Test_Validate_Syntax(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Word = Identifier | [[Missing]]
-					node Pair = [[Other]] Word
+					node Word { oneOf { Identifier [[Missing]] } }
+					node Pair { left: [[Other]] right: Word }
 				}
 			`),
 			wantDiagnostics: []expectedDiagnostic{
@@ -145,8 +145,8 @@ func Test_Validate_Syntax(t *testing.T) {
 					Unknown = fallback
 				}
 				syntax {
-					node UnknownStatement = Unknown+
-					node Root = UnknownStatement*
+					node UnknownStatement { values: Unknown+ }
+					node Root { values: [[UnknownStatement*]] }
 				}
 			`),
 			wantDiagnostics: nil,
@@ -160,7 +160,7 @@ func Test_Validate_Syntax(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node UnknownStatement = any+
+					node UnknownStatement { values: any+ }
 				}
 			`),
 			wantDiagnostics: nil,
@@ -174,7 +174,7 @@ func Test_Validate_Syntax(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Word = [[Word]]
+					node Word { [[Word]] }
 				}
 			`),
 			wantDiagnostics: []expectedDiagnostic{
@@ -190,8 +190,8 @@ func Test_Validate_Syntax(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Word = Pair
-					node Pair = [[Word]]
+					node Word { Pair }
+					node Pair { [[Word]] }
 				}
 			`),
 			wantDiagnostics: []expectedDiagnostic{
@@ -207,8 +207,8 @@ func Test_Validate_Syntax(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node OptionalWord = Identifier?
-					node WordList = [[OptionalWord*]]
+					node OptionalWord { value?: Identifier }
+					node WordList { values: [[OptionalWord*]] }
 				}
 			`),
 			wantDiagnostics: []expectedDiagnostic{

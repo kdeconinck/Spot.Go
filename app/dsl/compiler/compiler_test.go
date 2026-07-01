@@ -63,22 +63,28 @@ func Test_Compile_DSL(t *testing.T) {
 				        Token KeywordPublic
 				    Node WordPair
 				      Concatenation
-				        Node Word
-				        Node Word
+				        Capture left
+				          Node Word
+				        Capture right
+				          Node Word
 				    Node OptionalWord
-				      Repetition ?
-				        Group
+				      Capture value
+				        Repetition ?
 				          Alternation
 				            Node Word
 				            Token KeywordInternal
 				    Node WordList
-				      Repetition +
-				        Node Word
+				      Capture values
+				        Repetition +
+				          Node Word
 				    Node Root
 				      Concatenation
-				        Node OptionalWord
-				        Node WordPair
-				        Node WordList
+				        Capture optional
+				          Node OptionalWord
+				        Capture pair
+				          Node WordPair
+				        Capture list
+				          Node WordList
 				  Rules
 				    Rule PublicIdentifier
 				      MatchToken Identifier
@@ -199,48 +205,86 @@ func dsl(size int) string {
 
 	sb.WriteString("}\n")
 	sb.WriteString("syntax {\n")
-	sb.WriteString("    node Word = Identifier | KeywordPublic\n")
-	sb.WriteString("    node WordPair = Word Word\n")
-	sb.WriteString("    node OptionalWord = (Word | KeywordInternal)?\n")
-	sb.WriteString("    node WordList = Word+\n")
-	sb.WriteString("    node Root = OptionalWord WordPair WordList\n")
+	sb.WriteString("    node Word {\n")
+	sb.WriteString("        oneOf {\n")
+	sb.WriteString("            Identifier\n")
+	sb.WriteString("            KeywordPublic\n")
+	sb.WriteString("        }\n")
+	sb.WriteString("    }\n")
+	sb.WriteString("    node WordPair {\n")
+	sb.WriteString("        left: Word\n")
+	sb.WriteString("        right: Word\n")
+	sb.WriteString("    }\n")
+	sb.WriteString("    node OptionalWord {\n")
+	sb.WriteString("        value?: oneOf {\n")
+	sb.WriteString("            Word\n")
+	sb.WriteString("            KeywordInternal\n")
+	sb.WriteString("        }\n")
+	sb.WriteString("    }\n")
+	sb.WriteString("    node WordList {\n")
+	sb.WriteString("        values: Word+\n")
+	sb.WriteString("    }\n")
+	sb.WriteString("    node Root {\n")
+	sb.WriteString("        optional: OptionalWord\n")
+	sb.WriteString("        pair: WordPair\n")
+	sb.WriteString("        list: WordList\n")
+	sb.WriteString("    }\n")
 
 	for idx := 1; idx <= size; idx++ {
 		sb.WriteString("    node Word")
 		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" = Identifier")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" | KeywordPublic")
+		sb.WriteString(" {\n")
+		sb.WriteString("        oneOf {\n")
+		sb.WriteString("            Identifier")
 		sb.WriteString(strconv.Itoa(idx))
 		sb.WriteString("\n")
+		sb.WriteString("            KeywordPublic")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("\n")
+		sb.WriteString("        }\n")
+		sb.WriteString("    }\n")
 		sb.WriteString("    node WordPair")
 		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" = Word")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" Word")
+		sb.WriteString(" {\n")
+		sb.WriteString("        left: Word")
 		sb.WriteString(strconv.Itoa(idx))
 		sb.WriteString("\n")
+		sb.WriteString("        right: Word")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("\n")
+		sb.WriteString("    }\n")
 		sb.WriteString("    node OptionalWord")
 		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" = (Word")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" | KeywordInternal")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(")?\n")
-		sb.WriteString("    node WordList")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" = Word")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString("+\n")
-		sb.WriteString("    node Root")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" = OptionalWord")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" WordPair")
-		sb.WriteString(strconv.Itoa(idx))
-		sb.WriteString(" WordList")
+		sb.WriteString(" {\n")
+		sb.WriteString("        value?: oneOf {\n")
+		sb.WriteString("            Word")
 		sb.WriteString(strconv.Itoa(idx))
 		sb.WriteString("\n")
+		sb.WriteString("            KeywordInternal")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("\n")
+		sb.WriteString("        }\n")
+		sb.WriteString("    }\n")
+		sb.WriteString("    node WordList")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" {\n")
+		sb.WriteString("        values: Word")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("+\n")
+		sb.WriteString("    }\n")
+		sb.WriteString("    node Root")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString(" {\n")
+		sb.WriteString("        optional: OptionalWord")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("\n")
+		sb.WriteString("        pair: WordPair")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("\n")
+		sb.WriteString("        list: WordList")
+		sb.WriteString(strconv.Itoa(idx))
+		sb.WriteString("\n")
+		sb.WriteString("    }\n")
 	}
 
 	sb.WriteString("}\n")
@@ -344,7 +388,7 @@ func renderProgram(program ir.Program) string {
 
 		appendIndentedLine(&builder, 2, ruleLabel)
 		appendIndentedLine(&builder, 3, renderRuleMatch(program, rule))
-		appendIndentedLine(&builder, 3, "Where "+renderCondition(rule.Where))
+		appendIndentedLine(&builder, 3, "Where "+renderCondition(program, rule.Where))
 		appendIndentedLine(&builder, 3, "Report "+renderSeverity(rule.Report.Severity)+" at "+renderReportTarget(program, rule.Report)+" "+strconv.Quote(rule.Report.Message))
 	}
 
@@ -353,6 +397,10 @@ func renderProgram(program ir.Program) string {
 
 func renderRuleMatch(program ir.Program, rule ir.Rule) string {
 	label := ""
+
+	if rule.RelationKind == ir.RuleMatchRelationAdjacentSibling {
+		return "Match " + program.SyntaxNodes[rule.RelatedMatchIndex].Name + " + " + program.SyntaxNodes[rule.MatchIndex].Name
+	}
 
 	if rule.MatchKind == ir.RuleMatchSyntaxNode {
 		label = "MatchNode " + program.SyntaxNodes[rule.MatchIndex].Name
@@ -433,6 +481,10 @@ func appendSyntaxExpression(builder *strings.Builder, program ir.Program, expres
 	case ir.SyntaxExpressionAny:
 		appendIndentedLine(builder, depth, "Any")
 
+	case ir.SyntaxExpressionCapture:
+		appendIndentedLine(builder, depth, "Capture "+program.SyntaxFields[expression.FieldID])
+		appendSyntaxExpression(builder, program, firstSyntaxExpressionChild(program.SyntaxExpressions, expression), depth+1)
+
 	case ir.SyntaxExpressionConcatenation:
 		appendIndentedLine(builder, depth, "Concatenation")
 
@@ -490,16 +542,76 @@ func renderRepetition(repetition ir.RepetitionKind) string {
 	}
 }
 
-func renderCondition(condition ir.Condition) string {
-	switch condition.Property {
+func renderCondition(program ir.Program, condition ir.Condition) string {
+	switch condition.LeftProperty {
 	case ir.ConditionPropertyNone:
 		return "none"
 
 	case ir.ConditionPropertyText:
-		return "text " + renderOperator(condition.Operator) + " " + strconv.Quote(condition.String)
+		return renderConditionValue(program, condition.LeftSubject, condition.LeftPath, condition.LeftProperty) + " " + renderOperator(condition.Operator) + " " + renderRightConditionValue(program, condition)
 
 	default:
-		return "length " + renderOperator(condition.Operator) + " " + strconv.Itoa(condition.Integer)
+		return renderConditionValue(program, condition.LeftSubject, condition.LeftPath, condition.LeftProperty) + " " + renderOperator(condition.Operator) + " " + renderRightConditionValue(program, condition)
+	}
+}
+
+func renderConditionValue(program ir.Program, subject ir.ConditionSubjectKind, path []uint32, property ir.ConditionProperty) string {
+	if len(path) == 0 {
+		if subject == ir.ConditionSubjectMatch {
+			return renderConditionProperty(property)
+		}
+
+		return renderConditionSubject(subject) + "." + renderConditionProperty(property)
+	}
+
+	return renderConditionSubject(subject) + "." + strings.Join(renderFieldPath(program, path), ".") + "." + renderConditionProperty(property)
+}
+
+func renderRightConditionValue(program ir.Program, condition ir.Condition) string {
+	if condition.RightSubject != ir.ConditionSubjectNone {
+		return renderConditionValue(program, condition.RightSubject, condition.RightPath, condition.RightProperty)
+	}
+
+	if condition.LeftProperty == ir.ConditionPropertyText {
+		return strconv.Quote(condition.String)
+	}
+
+	return strconv.Itoa(condition.Integer)
+}
+
+func renderFieldPath(program ir.Program, path []uint32) []string {
+	rendered := make([]string, 0, len(path))
+
+	for idx := range path {
+		rendered = append(rendered, program.SyntaxFields[path[idx]])
+	}
+
+	return rendered
+}
+
+func renderConditionSubject(subject ir.ConditionSubjectKind) string {
+	switch subject {
+	case ir.ConditionSubjectRelatedMatch:
+		return "left"
+
+	case ir.ConditionSubjectGap:
+		return "gap"
+
+	default:
+		return "right"
+	}
+}
+
+func renderConditionProperty(property ir.ConditionProperty) string {
+	switch property {
+	case ir.ConditionPropertyText:
+		return "text"
+
+	case ir.ConditionPropertyBlankLines:
+		return "blankLines"
+
+	default:
+		return "length"
 	}
 }
 
@@ -519,6 +631,9 @@ func renderOperator(operator ir.ConditionOperator) string {
 
 	case ir.ConditionOperatorGreater:
 		return ">"
+
+	case ir.ConditionOperatorStartsWith:
+		return "startsWith"
 
 	default:
 		return ">="

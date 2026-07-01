@@ -86,7 +86,7 @@ func Test_Parse_Rules(t *testing.T) {
 			`),
 		},
 		"When parsing a rules block with a syntax-node match, a document is returned.": {
-			inSource: `scope {} syntax { node File = Identifier } rules { rule FileRule { match node File where File.length > 0 report warn at File "File found" } }`,
+			inSource: `scope {} syntax { node File { Identifier } } rules { rule FileRule { match node File where File.length > 0 report warn at File "File found" } }`,
 			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
@@ -108,7 +108,7 @@ func Test_Parse_Rules(t *testing.T) {
 			`),
 		},
 		"When parsing a rules block with a syntax-node ancestor constraint, a document is returned.": {
-			inSource: `scope {} syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { rule UsingOutsideNamespace { match node Using outside Namespace report warn at Using "Using outside namespace" } }`,
+			inSource: `scope {} syntax { node Using { Identifier } node Namespace { Using } node Root { Namespace } } rules { rule UsingOutsideNamespace { match node Using outside Namespace report warn at Using "Using outside namespace" } }`,
 			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
@@ -129,7 +129,7 @@ func Test_Parse_Rules(t *testing.T) {
 			`),
 		},
 		"When parsing a selector rule with a direct parent query, a document is returned.": {
-			inSource: `scope {} syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { info "Using inside namespace" : Namespace > Using }`,
+			inSource: `scope {} syntax { node Using { Identifier } node Namespace { Using } node Root { Namespace } } rules { info "Using inside namespace" : Namespace > Using }`,
 			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
@@ -150,7 +150,7 @@ func Test_Parse_Rules(t *testing.T) {
 			`),
 		},
 		"When parsing a selector rule with a negated direct parent query, a document is returned.": {
-			inSource: `scope {} syntax { node Using = Identifier node Namespace = Using node Root = Namespace } rules { warn "Using outside namespace" : Using:not(Namespace > *) }`,
+			inSource: `scope {} syntax { node Using { Identifier } node Namespace { Using } node Root { Namespace } } rules { warn "Using outside namespace" : Using:not(Namespace > *) }`,
 			wantTree: normalizeMultilineLiteral(`
 				Document
 				  Scope
@@ -168,6 +168,65 @@ func Test_Parse_Rules(t *testing.T) {
 				        Severity warn
 				        At Using
 				        Message "Using outside namespace"
+			`),
+		},
+		"When parsing a selector rule with a where clause over adjacent siblings, a document is returned.": {
+			inSource: `scope {} syntax { node Using { Identifier } node Root { values: Using+ } } rules { warn "Using order" : Using + Using where left.text > right.text }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Syntax
+				    Node Using
+				      Reference Identifier
+				    Node Root
+				      Capture values
+				        Repetition +
+				          Reference Using
+				  Rules
+				    Rule
+				      Match Using + Using
+				      Where
+				        Subject left
+				        Property text
+				        Operator >
+				        Other Subject right
+				        Other Property text
+				      Report
+				        Severity warn
+				        At Using
+				        Message "Using order"
+			`),
+		},
+		"When parsing a selector rule with a named syntax-field path, a document is returned.": {
+			inSource: `scope {} syntax { node QualifiedIdentifier { Identifier } node Using { name: QualifiedIdentifier } node Root { values: Using+ } } rules { warn "Using order" : Using + Using where left.name.text > right.name.text }`,
+			wantTree: normalizeMultilineLiteral(`
+				Document
+				  Scope
+				  Syntax
+				    Node QualifiedIdentifier
+				      Reference Identifier
+				    Node Using
+				      Capture name
+				        Reference QualifiedIdentifier
+				    Node Root
+				      Capture values
+				        Repetition +
+				          Reference Using
+				  Rules
+				    Rule
+				      Match Using + Using
+				      Where
+				        Subject left
+				        Path name
+				        Property text
+				        Operator >
+				        Other Subject right
+				        Other Path name
+				        Other Property text
+				      Report
+				        Severity warn
+				        At Using
+				        Message "Using order"
 			`),
 		},
 		"When the rules opening brace is missing, a diagnostic is returned.": {
@@ -289,8 +348,12 @@ func rulesDSL(size int) string {
 		"    Identifier = 'a'..'z'+\n" +
 		"}\n" +
 		"syntax {\n" +
-		"    node Word = Identifier\n" +
-		"    node Root = Word+\n" +
+		"    node Word {\n" +
+		"        Identifier\n" +
+		"    }\n" +
+		"    node Root {\n" +
+		"        values: Word+\n" +
+		"    }\n" +
 		"}\n" +
 		"rules {\n" +
 		strings.Repeat(
@@ -335,7 +398,11 @@ func rulesDSL(size int) string {
 				"        report warn at Root \"Root found\"\n"+
 				"    }\n"+
 				"    info \"Word inside root\" : Root > Word\n"+
-				"    warn \"Word outside root\" : Word:not(Root > *)\n",
+				"    warn \"Word outside root\" : Word:not(Root > *)\n"+
+				"    warn \"Words must be alphabetical\" : Word + Word\n"+
+				"    where left.text > right.text\n"+
+				"    warn \"Words must be separated by a blank line\" : Word + Word\n"+
+				"    where gap.blankLines == 0\n",
 			size,
 		) +
 		"}"

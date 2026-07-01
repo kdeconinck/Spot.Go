@@ -73,16 +73,16 @@ func Test_Parse(t *testing.T) {
 			wantTree: normalizeMultilineLiteral(`
 				Tree
 				  Node Root [0:7]
-				    Node OptionalWord [0:1]
-				    Node WordPair [1:3]
-				      Node Word [1:2]
-				      Node Word [2:3]
-				    Node WordList [3:6]
-				      Node Word [3:4]
-				      Node Word [4:5]
-				      Node Word [5:6]
-				    Node UnknownStatement [6:7]
-				    Node WordTail [7:7]
+				    optional: Node OptionalWord [0:1]
+				    pair: Node WordPair [1:3]
+				      left: Node Word [1:2]
+				      right: Node Word [2:3]
+				    list: Node WordList [3:6]
+				      values: Node Word [3:4]
+				      values: Node Word [4:5]
+				      values: Node Word [5:6]
+				    unknown: Node UnknownStatement [6:7]
+				    tail: Node WordTail [7:7]
 			`),
 		},
 		"When the root node does not consume the entire token slice, parsing fails.": {
@@ -119,12 +119,12 @@ func Test_Parse(t *testing.T) {
 				`    Unknown = fallback`,
 				`}`,
 				`syntax {`,
-				`    node QualifiedIdentifierTail = Dot Identifier`,
-				`    node QualifiedIdentifier = Identifier QualifiedIdentifierTail*`,
-				`    node UsingDirective = KeywordUsing QualifiedIdentifier Semicolon`,
-				`    node NamespaceBody = LeftBrace (UsingDirective | any)* RightBrace`,
-				`    node NamespaceDeclaration = KeywordNamespace QualifiedIdentifier NamespaceBody`,
-				`    node Root = (UsingDirective | NamespaceDeclaration | any)*`,
+				`    node QualifiedIdentifierTail { Dot Identifier }`,
+				`    node QualifiedIdentifier { head: Identifier tail*: QualifiedIdentifierTail }`,
+				`    node UsingDirective { KeywordUsing name: QualifiedIdentifier Semicolon }`,
+				`    node NamespaceBody { LeftBrace members*: oneOf { UsingDirective any } RightBrace }`,
+				`    node NamespaceDeclaration { KeywordNamespace name: QualifiedIdentifier body: NamespaceBody }`,
+				`    node Root { members*: oneOf { UsingDirective NamespaceDeclaration any } }`,
 				`}`,
 			}, "\n"),
 			inRootNode: "Root",
@@ -140,6 +140,60 @@ func Test_Parse(t *testing.T) {
 				`}`,
 			}, "\n"),
 			wantOK: true,
+		},
+		"When parsing named captures, the tree preserves field labels on child edges.": {
+			inDSL: strings.Join([]string{
+				`scope { include "**/*.go" }`,
+				`tokens { Identifier = "id" Whitespace = ' '+ skip }`,
+				`syntax {`,
+				`    node QualifiedIdentifier { Identifier }`,
+				`    node UsingDirective { name: QualifiedIdentifier }`,
+				`    node Root { values: UsingDirective+ }`,
+				`}`,
+			}, "\n"),
+			inRootNode: "Root",
+			inSource:   "id id",
+			wantOK:     true,
+			wantTree: normalizeMultilineLiteral(`
+				Tree
+				  Node Root [0:2]
+				    values: Node UsingDirective [0:1]
+				      name: Node QualifiedIdentifier [0:1]
+				    values: Node UsingDirective [1:2]
+				      name: Node QualifiedIdentifier [1:2]
+			`),
+		},
+		"When parsing structured syntax nodes, the tree preserves named fields.": {
+			inDSL: strings.Join([]string{
+				`scope { include "**/*.go" }`,
+				`tokens { Identifier = "id" KeywordUsing = "using" Semicolon = ";" Whitespace = ' '+ skip }`,
+				`syntax {`,
+				`    node IdentifierName {`,
+				`        Identifier`,
+				`    }`,
+				`    node QualifiedIdentifier {`,
+				`        head: IdentifierName`,
+				`    }`,
+				`    node UsingDirective {`,
+				`        KeywordUsing`,
+				`        name: QualifiedIdentifier`,
+				`        Semicolon`,
+				`    }`,
+				`    node Root {`,
+				`        members*: UsingDirective`,
+				`    }`,
+				`}`,
+			}, "\n"),
+			inRootNode: "Root",
+			inSource:   "using id;",
+			wantOK:     true,
+			wantTree: normalizeMultilineLiteral(`
+				Tree
+				  Node Root [0:3]
+				    members: Node UsingDirective [0:3]
+				      name: Node QualifiedIdentifier [1:2]
+				        head: Node IdentifierName [1:2]
+			`),
 		},
 	} {
 		t.Run(tcName, func(t *testing.T) {
@@ -182,16 +236,16 @@ func Test_ParseInto(t *testing.T) {
 			wantTree: normalizeMultilineLiteral(`
 				Tree
 				  Node Root [0:7]
-				    Node OptionalWord [0:1]
-				    Node WordPair [1:3]
-				      Node Word [1:2]
-				      Node Word [2:3]
-				    Node WordList [3:6]
-				      Node Word [3:4]
-				      Node Word [4:5]
-				      Node Word [5:6]
-				    Node UnknownStatement [6:7]
-				    Node WordTail [7:7]
+				    optional: Node OptionalWord [0:1]
+				    pair: Node WordPair [1:3]
+				      left: Node Word [1:2]
+				      right: Node Word [2:3]
+				    list: Node WordList [3:6]
+				      values: Node Word [3:4]
+				      values: Node Word [4:5]
+				      values: Node Word [5:6]
+				    unknown: Node UnknownStatement [6:7]
+				    tail: Node WordTail [7:7]
 			`),
 		},
 		"When parsing fails, the reused buffer is cleared.": {
@@ -209,8 +263,8 @@ func Test_ParseInto(t *testing.T) {
 			syntaxParser, parserErr := syntax.New(program, tc.inRootNode)
 			tokens := scanTokens(t, program, tc.inSource)
 			tree := syntax.Tree{
-				Nodes:    make([]syntax.Node, 0, 64),
-				ChildIDs: make([]syntax.NodeID, 0, 64),
+				Nodes:      make([]syntax.Node, 0, 64),
+				ChildEdges: make([]syntax.ChildEdge, 0, 64),
 			}
 
 			// Act.
@@ -226,7 +280,7 @@ func Test_ParseInto(t *testing.T) {
 
 			if !tc.wantOK {
 				claim.Equal(t, tcName, 0, len(tree.Nodes), "Node Count")
-				claim.Equal(t, tcName, 0, len(tree.ChildIDs), "Child Count")
+				claim.Equal(t, tcName, 0, len(tree.ChildEdges), "Child Count")
 			}
 		})
 	}
@@ -265,8 +319,8 @@ func benchmark_ParseInto_Syntax(b *testing.B, size int) {
 	claim.Equal(b, "Syntax benchmark parser error.", error(nil), parserErr, "Parser Error")
 	tokens := scanTokens(b, program, syntaxSource(size))
 	tree := syntax.Tree{
-		Nodes:    make([]syntax.Node, 0, len(tokens)),
-		ChildIDs: make([]syntax.NodeID, 0, len(tokens)),
+		Nodes:      make([]syntax.Node, 0, len(tokens)),
+		ChildEdges: make([]syntax.ChildEdge, 0, len(tokens)),
 	}
 
 	for b.Loop() {
@@ -323,8 +377,28 @@ func appendNode(builder *strings.Builder, program ir.Program, tree syntax.Tree, 
 		"Node "+program.SyntaxNodes[node.Kind].Name+" ["+strconv.Itoa(int(node.FirstTokenIndex))+":"+strconv.Itoa(int(end))+"]",
 	)
 
-	for _, childID := range tree.Children(node) {
-		appendNode(builder, program, tree, childID, depth+1)
+	for _, childEdge := range tree.Children(node) {
+		appendTreeEdge(builder, program, tree, childEdge, depth+1)
+	}
+}
+
+func appendTreeEdge(builder *strings.Builder, program ir.Program, tree syntax.Tree, edge syntax.ChildEdge, depth int) {
+	if edge.FieldID == ^uint32(0) {
+		appendNode(builder, program, tree, edge.ChildID, depth)
+
+		return
+	}
+
+	node := tree.Node(edge.ChildID)
+	end := node.FirstTokenIndex + node.AmountOfTokens
+	appendIndentedLine(
+		builder,
+		depth,
+		program.SyntaxFields[edge.FieldID]+": Node "+program.SyntaxNodes[node.Kind].Name+" ["+strconv.Itoa(int(node.FirstTokenIndex))+":"+strconv.Itoa(int(end))+"]",
+	)
+
+	for _, childEdge := range tree.Children(node) {
+		appendTreeEdge(builder, program, tree, childEdge, depth+1)
 	}
 }
 
@@ -362,13 +436,13 @@ func rootSyntaxDSL() string {
 		`    Whitespace = ' '+ skip`,
 		`}`,
 		`syntax {`,
-		`    node Word = Identifier | KeywordPublic`,
-		`    node WordPair = Word Word`,
-		`    node OptionalWord = (Word | KeywordInternal)?`,
-		`    node UnknownStatement = any+`,
-		`    node WordTail = Word*`,
-		`    node WordList = Word+`,
-		`    node Root = OptionalWord WordPair WordList UnknownStatement? WordTail`,
+		`    node Word { oneOf { Identifier KeywordPublic } }`,
+		`    node WordPair { left: Word right: Word }`,
+		`    node OptionalWord { value?: oneOf { Word KeywordInternal } }`,
+		`    node UnknownStatement { values: any+ }`,
+		`    node WordTail { values*: Word }`,
+		`    node WordList { values: Word+ }`,
+		`    node Root { optional: OptionalWord pair: WordPair list: WordList unknown?: UnknownStatement tail: WordTail }`,
 		`}`,
 	}, "\n")
 }
@@ -384,63 +458,62 @@ func syntaxDSL(size int) string {
 	builder.WriteString("    Whitespace = ' '+ skip\n")
 	builder.WriteString("}\n")
 	builder.WriteString("syntax {\n")
-	builder.WriteString("    node Word = Identifier | KeywordPublic\n")
-	builder.WriteString("    node WordPair = Word Word\n")
-	builder.WriteString("    node OptionalWord = (Word | KeywordInternal)?\n")
-	builder.WriteString("    node UnknownStatement = any+\n")
-	builder.WriteString("    node WordTail = Word*\n")
-	builder.WriteString("    node WordList = Word+\n")
-	builder.WriteString("    node Chunk = OptionalWord WordPair WordList UnknownStatement? WordTail\n")
-	builder.WriteString("    node Root = Chunk+\n")
+	builder.WriteString("    node Word { oneOf { Identifier KeywordPublic } }\n")
+	builder.WriteString("    node WordPair { left: Word right: Word }\n")
+	builder.WriteString("    node OptionalWord { value?: oneOf { Word KeywordInternal } }\n")
+	builder.WriteString("    node UnknownStatement { values: any+ }\n")
+	builder.WriteString("    node WordTail { values*: Word }\n")
+	builder.WriteString("    node WordList { values: Word+ }\n")
+	builder.WriteString("    node Chunk { optional: OptionalWord pair: WordPair list: WordList unknown?: UnknownStatement tail: WordTail }\n")
+	builder.WriteString("    node Root { values*: Chunk }\n")
 
 	for idx := 1; idx <= size; idx++ {
 		builder.WriteString("    node Word")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = Identifier | KeywordPublic\n")
+		builder.WriteString(" { oneOf { Identifier KeywordPublic } }\n")
 		builder.WriteString("    node WordPair")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = Word")
+		builder.WriteString(" { left: Word")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" Word")
+		builder.WriteString(" right: Word")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString("\n")
+		builder.WriteString(" }\n")
 		builder.WriteString("    node OptionalWord")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = (Word")
+		builder.WriteString(" { value?: oneOf { Word")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" | KeywordInternal)?\n")
+		builder.WriteString(" KeywordInternal } }\n")
 		builder.WriteString("    node UnknownStatement")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = any+\n")
+		builder.WriteString(" { values: any+ }\n")
 		builder.WriteString("    node WordTail")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = Word")
+		builder.WriteString(" { values*: Word")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString("*\n")
+		builder.WriteString(" }\n")
 		builder.WriteString("    node WordList")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = Word")
+		builder.WriteString(" { values: Word")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString("+\n")
+		builder.WriteString("+ }\n")
 		builder.WriteString("    node Chunk")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = OptionalWord")
+		builder.WriteString(" { optional: OptionalWord")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" WordPair")
+		builder.WriteString(" pair: WordPair")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" WordList")
+		builder.WriteString(" list: WordList")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" UnknownStatement")
+		builder.WriteString(" unknown?: UnknownStatement")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString("?")
-		builder.WriteString(" WordTail")
+		builder.WriteString(" tail: WordTail")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString("\n")
+		builder.WriteString(" }\n")
 		builder.WriteString("    node Root")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString(" = Chunk")
+		builder.WriteString(" { values*: Chunk")
 		builder.WriteString(strconv.Itoa(idx))
-		builder.WriteString("+\n")
+		builder.WriteString(" }\n")
 	}
 
 	builder.WriteString("}")

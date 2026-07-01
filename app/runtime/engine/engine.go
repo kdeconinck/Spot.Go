@@ -47,16 +47,18 @@ type Options struct {
 
 // Engine evaluates compiled rules over source text.
 type Engine struct {
-	rulesByTokenName map[string][]ir.Rule
-	rulesBySyntaxID  [][]ir.Rule
-	syntaxParser     syntax.Parser
-	hasSyntaxParser  bool
+	rulesByTokenName       map[string][]ir.Rule
+	rulesBySyntaxID        [][]ir.Rule
+	adjacentRulesByRightID [][]ir.Rule
+	syntaxParser           syntax.Parser
+	hasSyntaxParser        bool
 }
 
 // New returns an analysis engine for program.
 func New(program ir.Program) Engine {
 	rulesByTokenName := make(map[string][]ir.Rule, len(program.Tokens))
 	rulesBySyntaxID := make([][]ir.Rule, len(program.SyntaxNodes))
+	adjacentRulesByRightID := make([][]ir.Rule, len(program.SyntaxNodes))
 
 	for idx := range program.Rules {
 		rule := program.Rules[idx]
@@ -64,6 +66,11 @@ func New(program ir.Program) Engine {
 		if rule.MatchKind == ir.RuleMatchToken {
 			tokenName := program.Tokens[rule.MatchIndex].Name
 			rulesByTokenName[tokenName] = append(rulesByTokenName[tokenName], rule)
+			continue
+		}
+
+		if rule.RelationKind == ir.RuleMatchRelationAdjacentSibling {
+			adjacentRulesByRightID[rule.MatchIndex] = append(adjacentRulesByRightID[rule.MatchIndex], rule)
 			continue
 		}
 
@@ -83,10 +90,11 @@ func New(program ir.Program) Engine {
 	}
 
 	return Engine{
-		rulesByTokenName: rulesByTokenName,
-		rulesBySyntaxID:  rulesBySyntaxID,
-		syntaxParser:     syntaxParser,
-		hasSyntaxParser:  hasSyntaxParser,
+		rulesByTokenName:       rulesByTokenName,
+		rulesBySyntaxID:        rulesBySyntaxID,
+		adjacentRulesByRightID: adjacentRulesByRightID,
+		syntaxParser:           syntaxParser,
+		hasSyntaxParser:        hasSyntaxParser,
 	}
 }
 
@@ -119,7 +127,10 @@ func (engine Engine) Analyze(program ir.Program, src string, options Options) []
 		for idx := range rules {
 			rule := rules[idx]
 
-			if !matchesCondition(rule.Where, scannedToken.Text, len(scannedToken.Text)) {
+			if !matchesCondition(rule.Where, conditionContext{
+				matchText:   scannedToken.Text,
+				matchLength: len(scannedToken.Text),
+			}) {
 				continue
 			}
 
@@ -171,7 +182,15 @@ func (engine Engine) evaluateSyntaxNode(program ir.Program, src string, tree syn
 			continue
 		}
 
-		if !matchesCondition(rule.Where, nodeText, len(nodeText)) {
+		if !matchesCondition(rule.Where, conditionContext{
+			program:      program,
+			src:          src,
+			tree:         tree,
+			matchText:    nodeText,
+			matchLength:  len(nodeText),
+			matchNodeID:  nodeID,
+			hasMatchNode: true,
+		}) {
 			continue
 		}
 
@@ -188,8 +207,71 @@ func (engine Engine) evaluateSyntaxNode(program ir.Program, src string, tree syn
 
 	ancestors = append(ancestors, node.Kind)
 
-	for _, childID := range tree.Children(node) {
-		if engine.evaluateSyntaxNode(program, src, tree, childID, ancestors, diagnostics, options) {
+	childEdges := tree.Children(node)
+
+	for _, childEdge := range childEdges {
+		if engine.evaluateSyntaxNode(program, src, tree, childEdge.ChildID, ancestors, diagnostics, options) {
+			return true
+		}
+	}
+
+	for idx := 1; idx < len(childEdges); idx++ {
+		if engine.evaluateAdjacentSyntaxPair(program, src, tree, childEdges[idx-1].ChildID, childEdges[idx].ChildID, ancestors, diagnostics, options) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (engine Engine) evaluateAdjacentSyntaxPair(program ir.Program, src string, tree syntax.Tree, leftID, rightID syntax.NodeID, ancestors []uint32, diagnostics *[]Diagnostic, options Options) bool {
+	leftNode := tree.Node(leftID)
+	rightNode := tree.Node(rightID)
+	rules := engine.adjacentRulesByRightID[rightNode.Kind]
+
+	if len(rules) == 0 {
+		return false
+	}
+
+	leftText, _ := syntaxNodeTextAndSpan(src, tree, leftNode)
+	rightText, rightSpan := syntaxNodeTextAndSpan(src, tree, rightNode)
+	context := conditionContext{
+		program:        program,
+		src:            src,
+		tree:           tree,
+		matchText:      rightText,
+		matchLength:    len(rightText),
+		relatedText:    leftText,
+		relatedLength:  len(leftText),
+		gapBlankLines:  blankLinesBetween(src, tree, leftNode, rightNode),
+		matchNodeID:    rightID,
+		relatedNodeID:  leftID,
+		hasMatchNode:   true,
+		hasRelatedNode: true,
+	}
+
+	for idx := range rules {
+		rule := rules[idx]
+
+		if int(leftNode.Kind) != rule.RelatedMatchIndex {
+			continue
+		}
+
+		if !matchesSyntaxScope(rule, ancestors) {
+			continue
+		}
+
+		if !matchesCondition(rule.Where, context) {
+			continue
+		}
+
+		*diagnostics = append(*diagnostics, Diagnostic{
+			Severity: severity(rule.Report.Severity),
+			Message:  rule.Report.Message,
+			Span:     rightSpan,
+		})
+
+		if options.StopOnFirstDiagnostic {
 			return true
 		}
 	}
@@ -236,17 +318,42 @@ func matchesSyntaxScope(rule ir.Rule, ancestors []uint32) bool {
 	}
 }
 
-func matchesCondition(condition ir.Condition, text string, length int) bool {
-	switch condition.Property {
-	case ir.ConditionPropertyNone:
+type conditionContext struct {
+	program        ir.Program
+	src            string
+	tree           syntax.Tree
+	matchText      string
+	matchLength    int
+	relatedText    string
+	relatedLength  int
+	gapBlankLines  int
+	matchNodeID    syntax.NodeID
+	relatedNodeID  syntax.NodeID
+	hasMatchNode   bool
+	hasRelatedNode bool
+}
+
+func matchesCondition(condition ir.Condition, context conditionContext) bool {
+	if condition.LeftProperty == ir.ConditionPropertyNone {
 		return true
-
-	case ir.ConditionPropertyText:
-		return compareStrings(text, condition.String, condition.Operator)
-
-	default:
-		return compareIntegers(length, condition.Integer, condition.Operator)
 	}
+
+	if condition.RightSubject != ir.ConditionSubjectNone {
+		leftString, leftInteger := conditionValue(context, condition.LeftSubject, condition.LeftPath, condition.LeftProperty)
+		rightString, rightInteger := conditionValue(context, condition.RightSubject, condition.RightPath, condition.RightProperty)
+
+		if condition.LeftProperty == ir.ConditionPropertyText {
+			return compareStrings(leftString, rightString, condition.Operator)
+		}
+
+		return compareIntegers(leftInteger, rightInteger, condition.Operator)
+	}
+
+	if condition.LeftProperty == ir.ConditionPropertyText {
+		return compareStrings(conditionValueString(context, condition.LeftSubject, condition.LeftPath, condition.LeftProperty), condition.String, condition.Operator)
+	}
+
+	return compareIntegers(conditionValueInteger(context, condition.LeftSubject, condition.LeftPath, condition.LeftProperty), condition.Integer, condition.Operator)
 }
 
 func syntaxNodeTextAndSpan(src string, tree syntax.Tree, node syntax.Node) (string, location.Span) {
@@ -279,8 +386,23 @@ func compareStrings(left, right string, operator ir.ConditionOperator) bool {
 	case ir.ConditionOperatorEqual:
 		return left == right
 
-	default:
+	case ir.ConditionOperatorNotEqual:
 		return left != right
+
+	case ir.ConditionOperatorLess:
+		return left < right
+
+	case ir.ConditionOperatorLessEqual:
+		return left <= right
+
+	case ir.ConditionOperatorGreater:
+		return left > right
+
+	case ir.ConditionOperatorGreaterEqual:
+		return left >= right
+
+	default:
+		return len(left) >= len(right) && left[:len(right)] == right
 	}
 }
 
@@ -304,6 +426,127 @@ func compareIntegers(left, right int, operator ir.ConditionOperator) bool {
 	default:
 		return left >= right
 	}
+}
+
+func conditionValue(context conditionContext, subject ir.ConditionSubjectKind, path []uint32, property ir.ConditionProperty) (string, int) {
+	if property == ir.ConditionPropertyText {
+		return conditionValueString(context, subject, path, property), 0
+	}
+
+	return "", conditionValueInteger(context, subject, path, property)
+}
+
+func conditionValueString(context conditionContext, subject ir.ConditionSubjectKind, path []uint32, property ir.ConditionProperty) string {
+	if property != ir.ConditionPropertyText {
+		return ""
+	}
+
+	if len(path) > 0 {
+		node, ok := resolveConditionNode(context, subject, path)
+
+		if !ok {
+			return ""
+		}
+
+		text, _ := syntaxNodeTextAndSpan(context.src, context.tree, node)
+
+		return text
+	}
+
+	switch subject {
+	case ir.ConditionSubjectRelatedMatch:
+		return context.relatedText
+
+	default:
+		return context.matchText
+	}
+}
+
+func conditionValueInteger(context conditionContext, subject ir.ConditionSubjectKind, path []uint32, property ir.ConditionProperty) int {
+	if len(path) > 0 {
+		node, ok := resolveConditionNode(context, subject, path)
+
+		if !ok {
+			return 0
+		}
+
+		if property == ir.ConditionPropertyLength {
+			text, _ := syntaxNodeTextAndSpan(context.src, context.tree, node)
+
+			return len(text)
+		}
+
+		return 0
+	}
+
+	switch subject {
+	case ir.ConditionSubjectGap:
+		return context.gapBlankLines
+
+	case ir.ConditionSubjectRelatedMatch:
+		return context.relatedLength
+
+	default:
+		return context.matchLength
+	}
+}
+
+func resolveConditionNode(context conditionContext, subject ir.ConditionSubjectKind, path []uint32) (syntax.Node, bool) {
+	currentID, ok := conditionNodeID(context, subject)
+
+	if !ok {
+		return syntax.Node{}, false
+	}
+
+	current := context.tree.Node(currentID)
+
+	for idx := range path {
+		childEdge, found := context.tree.ChildByField(current, path[idx])
+
+		if !found {
+			return syntax.Node{}, false
+		}
+
+		current = context.tree.Node(childEdge.ChildID)
+	}
+
+	return current, true
+}
+
+func conditionNodeID(context conditionContext, subject ir.ConditionSubjectKind) (syntax.NodeID, bool) {
+	switch subject {
+	case ir.ConditionSubjectRelatedMatch:
+		return context.relatedNodeID, context.hasRelatedNode
+
+	case ir.ConditionSubjectMatch:
+		return context.matchNodeID, context.hasMatchNode
+
+	default:
+		return 0, false
+	}
+}
+
+func blankLinesBetween(src string, tree syntax.Tree, leftNode, rightNode syntax.Node) int {
+	if leftNode.AmountOfTokens == 0 || rightNode.AmountOfTokens == 0 {
+		return 0
+	}
+
+	leftEnd := tree.Tokens[leftNode.FirstTokenIndex+leftNode.AmountOfTokens-1].Span.End
+	rightStart := tree.Tokens[rightNode.FirstTokenIndex].Span.Start
+	gap := src[leftEnd:rightStart]
+	newlines := 0
+
+	for idx := 0; idx < len(gap); idx++ {
+		if gap[idx] == '\n' {
+			newlines++
+		}
+	}
+
+	if newlines == 0 {
+		return 0
+	}
+
+	return newlines - 1
 }
 
 func severity(value ir.Severity) Severity {

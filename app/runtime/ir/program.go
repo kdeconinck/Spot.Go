@@ -17,6 +17,9 @@ type Program struct {
 	// SyntaxNodes are the compiled syntax node definitions in source order.
 	SyntaxNodes []SyntaxNode
 
+	// SyntaxFields are the named child captures referenced by compiled syntax trees and rule paths.
+	SyntaxFields []string
+
 	// SyntaxExpressions stores compiled syntax node expressions in flat slices.
 	SyntaxExpressions SyntaxExpressionArena
 
@@ -169,6 +172,9 @@ const (
 	// SyntaxExpressionAny matches one emitted token of any kind.
 	SyntaxExpressionAny
 
+	// SyntaxExpressionCapture labels direct child syntax nodes produced by the wrapped expression.
+	SyntaxExpressionCapture
+
 	// SyntaxExpressionConcatenation is a sequence of syntax expressions.
 	SyntaxExpressionConcatenation
 
@@ -230,6 +236,9 @@ type SyntaxExpressionNode struct {
 	// Reference identifies the target token or syntax node in a reference expression.
 	Reference uint32
 
+	// FieldID identifies the named child capture in a capture expression.
+	FieldID uint32
+
 	// FirstElementIdx is the start offset of this node's children in ChildIDs.
 	FirstElementIdx uint32
 
@@ -271,6 +280,17 @@ const (
 	RuleMatchScopeOutside
 )
 
+// RuleMatchRelationKind identifies whether a compiled rule matches one syntax node or a relation between two syntax nodes.
+type RuleMatchRelationKind uint8
+
+const (
+	// RuleMatchRelationNone matches a single token or syntax node.
+	RuleMatchRelationNone RuleMatchRelationKind = iota
+
+	// RuleMatchRelationAdjacentSibling matches two adjacent sibling syntax nodes.
+	RuleMatchRelationAdjacentSibling
+)
+
 // Rule is a compiled diagnostic rule.
 type Rule struct {
 	// Name is the DSL rule name.
@@ -281,6 +301,12 @@ type Rule struct {
 
 	// MatchIndex is the source-order token or syntax node index matched by the rule.
 	MatchIndex int
+
+	// RelationKind identifies whether the rule matches one node or a syntax-node relation.
+	RelationKind RuleMatchRelationKind
+
+	// RelatedMatchIndex is the source-order syntax node index for the related syntax node in a relational match.
+	RelatedMatchIndex int
 
 	// MatchScopeKind identifies whether the syntax-node match constrains ancestor syntax nodes.
 	MatchScopeKind RuleMatchScopeKind
@@ -295,18 +321,38 @@ type Rule struct {
 	Report Report
 }
 
-// ConditionProperty identifies the token property read by a rule condition.
+// ConditionSubjectKind identifies which runtime value a condition reads.
+type ConditionSubjectKind uint8
+
+const (
+	// ConditionSubjectNone marks a rule without a where clause.
+	ConditionSubjectNone ConditionSubjectKind = iota
+
+	// ConditionSubjectMatch reads the primary matched token or syntax node.
+	ConditionSubjectMatch
+
+	// ConditionSubjectRelatedMatch reads the related syntax node in a relational selector.
+	ConditionSubjectRelatedMatch
+
+	// ConditionSubjectGap reads the source gap between two adjacent matched syntax nodes.
+	ConditionSubjectGap
+)
+
+// ConditionProperty identifies the property read from a condition subject.
 type ConditionProperty uint8
 
 const (
 	// ConditionPropertyNone marks a rule without a where clause.
 	ConditionPropertyNone ConditionProperty = iota
 
-	// ConditionPropertyText reads the matched token text.
+	// ConditionPropertyText reads the matched text.
 	ConditionPropertyText
 
-	// ConditionPropertyLength reads the matched token length.
+	// ConditionPropertyLength reads the matched text length.
 	ConditionPropertyLength
+
+	// ConditionPropertyBlankLines reads the number of blank lines in the source gap.
+	ConditionPropertyBlankLines
 )
 
 // ConditionOperator identifies the comparison performed by a rule condition.
@@ -330,20 +376,38 @@ const (
 
 	// ConditionOperatorGreaterEqual compares whether the left value is greater than or equal to the right value.
 	ConditionOperatorGreaterEqual
+
+	// ConditionOperatorStartsWith compares whether the left string starts with the right string.
+	ConditionOperatorStartsWith
 )
 
 // Condition is a compiled rule where clause.
 type Condition struct {
+	// LeftSubject identifies the runtime value read on the left-hand side.
+	LeftSubject ConditionSubjectKind
+
+	// LeftPath is the named syntax-field path traversed from LeftSubject.
+	LeftPath []uint32
+
 	// Property identifies the matched token property read by the condition.
-	Property ConditionProperty
+	LeftProperty ConditionProperty
 
 	// Operator identifies the comparison performed by the condition.
 	Operator ConditionOperator
 
-	// String is the right-hand string value when Property is ConditionPropertyText.
+	// RightSubject identifies the optional runtime value read on the right-hand side.
+	RightSubject ConditionSubjectKind
+
+	// RightPath is the named syntax-field path traversed from RightSubject.
+	RightPath []uint32
+
+	// RightProperty identifies the optional right-hand property.
+	RightProperty ConditionProperty
+
+	// String is the right-hand string value when RightSubject is ConditionSubjectNone and the right-hand side is textual.
 	String string
 
-	// Integer is the right-hand integer value when Property is ConditionPropertyLength.
+	// Integer is the right-hand integer value when RightSubject is ConditionSubjectNone and the right-hand side is numeric.
 	Integer int
 }
 

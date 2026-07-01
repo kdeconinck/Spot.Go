@@ -38,10 +38,23 @@ func Compile(source string, resolution resolver.Resolution) ir.Program {
 		Rules:      make([]ir.Rule, 0, len(ruleList)),
 	}
 
+	fieldIDs := make(map[string]uint32)
+	ensureFieldID := func(name string) uint32 {
+		if id, ok := fieldIDs[name]; ok {
+			return id
+		}
+
+		id := uint32(len(program.SyntaxFields))
+		fieldIDs[name] = id
+		program.SyntaxFields = append(program.SyntaxFields, name)
+
+		return id
+	}
+
 	copy(program.Expressions.ChildIDs, reinterpretExpressionChildren(expressions.ChildIDs))
 	compileExpressionArena(source, resolution, &program.Expressions)
 	copy(program.SyntaxExpressions.ChildIDs, reinterpretSyntaxExpressionChildren(syntaxExpressions.ChildIDs))
-	compileSyntaxExpressionArena(source, resolution, &program.SyntaxExpressions)
+	compileSyntaxExpressionArena(source, resolution, &program.SyntaxExpressions, ensureFieldID)
 
 	for idx := range tokenList {
 		tok := tokenList[idx]
@@ -62,21 +75,27 @@ func Compile(source string, resolution resolver.Resolution) ir.Program {
 	}
 
 	for idx := range ruleList {
-		program.Rules = append(program.Rules, compileRule(source, ruleList[idx], resolution))
+		program.Rules = append(program.Rules, compileRule(source, ruleList[idx], resolution, ensureFieldID))
 	}
 
 	return program
 }
 
-func compileRule(source string, rule ast.Rule, resolution resolver.Resolution) ir.Rule {
+func compileRule(source string, rule ast.Rule, resolution resolver.Resolution, ensureFieldID func(string) uint32) ir.Rule {
 	matchKind := ir.RuleMatchToken
 	matchIndex := 0
+	relationKind := ir.RuleMatchRelationNone
+	relatedMatchIndex := 0
 	matchScopeKind := ir.RuleMatchScopeNone
 	matchScopeIndex := 0
 
 	if rule.Match.Kind == ast.RuleMatchNode {
 		matchKind = ir.RuleMatchSyntaxNode
 		matchIndex, _ = resolution.SyntaxNodeIndex(rule.Match.Target.Value(source))
+		if rule.Match.RelationKind == ast.RuleMatchRelationAdjacentSibling {
+			relationKind = ir.RuleMatchRelationAdjacentSibling
+			relatedMatchIndex, _ = resolution.SyntaxNodeIndex(rule.Match.RelatedTarget.Value(source))
+		}
 
 		switch rule.Match.ScopeKind {
 		case ast.RuleMatchScopeParent:
@@ -100,29 +119,42 @@ func compileRule(source string, rule ast.Rule, resolution resolver.Resolution) i
 	}
 
 	return ir.Rule{
-		Name:            rule.Name.Value(source),
-		MatchKind:       matchKind,
-		MatchIndex:      matchIndex,
-		MatchScopeKind:  matchScopeKind,
-		MatchScopeIndex: matchScopeIndex,
-		Where:           compileCondition(source, rule.Where),
-		Report:          compileReport(source, rule, resolution),
+		Name:              rule.Name.Value(source),
+		MatchKind:         matchKind,
+		MatchIndex:        matchIndex,
+		RelationKind:      relationKind,
+		RelatedMatchIndex: relatedMatchIndex,
+		MatchScopeKind:    matchScopeKind,
+		MatchScopeIndex:   matchScopeIndex,
+		Where:             compileCondition(source, rule.Where, ensureFieldID),
+		Report:            compileReport(source, rule, resolution),
 	}
 }
 
-func compileCondition(source string, condition ast.RuleCondition) ir.Condition {
+func compileCondition(source string, condition ast.RuleCondition, ensureFieldID func(string) uint32) ir.Condition {
 	if condition.Property.Value(source) == "" {
 		return ir.Condition{
-			Property: ir.ConditionPropertyNone,
+			LeftSubject:  ir.ConditionSubjectNone,
+			LeftProperty: ir.ConditionPropertyNone,
 		}
 	}
 
 	compiled := ir.Condition{
-		Property: conditionProperty(source, condition.Property),
-		Operator: conditionOperator(condition.Operator),
+		LeftSubject:  conditionSubject(source, condition.Subject),
+		LeftPath:     compileConditionPath(source, condition.Path, ensureFieldID),
+		LeftProperty: conditionProperty(source, condition.Property),
+		Operator:     conditionOperator(condition.Operator),
 	}
 
-	if compiled.Property == ir.ConditionPropertyText {
+	if condition.OtherProperty.Value(source) != "" {
+		compiled.RightSubject = conditionSubject(source, condition.OtherSubject)
+		compiled.RightPath = compileConditionPath(source, condition.OtherPath, ensureFieldID)
+		compiled.RightProperty = conditionProperty(source, condition.OtherProperty)
+
+		return compiled
+	}
+
+	if compiled.LeftProperty == ir.ConditionPropertyText {
 		compiled.String = stringValue(source, condition.Value)
 
 		return compiled
@@ -201,7 +233,7 @@ func compileExpressionArena(source string, resolution resolver.Resolution, arena
 	}
 }
 
-func compileSyntaxExpressionArena(source string, resolution resolver.Resolution, arena *ir.SyntaxExpressionArena) {
+func compileSyntaxExpressionArena(source string, resolution resolver.Resolution, arena *ir.SyntaxExpressionArena, ensureFieldID func(string) uint32) {
 	expressions := resolution.Document.SyntaxExpressions
 
 	for idx := range expressions.Nodes {
@@ -209,6 +241,7 @@ func compileSyntaxExpressionArena(source string, resolution resolver.Resolution,
 		node := ir.SyntaxExpressionNode{
 			FirstElementIdx:  expression.FirstElementIdx,
 			AmountOfElements: expression.AmountOfElements,
+			FieldID:          ^uint32(0),
 		}
 
 		switch expression.Kind {
@@ -227,6 +260,10 @@ func compileSyntaxExpressionArena(source string, resolution resolver.Resolution,
 		case ast.SyntaxExpressionAny:
 			node.Kind = ir.SyntaxExpressionAny
 
+		case ast.SyntaxExpressionCapture:
+			node.Kind = ir.SyntaxExpressionCapture
+			node.FieldID = ensureFieldID(expression.Field.Value(source))
+
 		case ast.SyntaxExpressionConcatenation:
 			node.Kind = ir.SyntaxExpressionConcatenation
 
@@ -243,6 +280,20 @@ func compileSyntaxExpressionArena(source string, resolution resolver.Resolution,
 
 		arena.Nodes[idx] = node
 	}
+}
+
+func compileConditionPath(source string, path []token.Token, ensureFieldID func(string) uint32) []uint32 {
+	if len(path) == 0 {
+		return nil
+	}
+
+	compiled := make([]uint32, 0, len(path))
+
+	for idx := range path {
+		compiled = append(compiled, ensureFieldID(path[idx].Value(source)))
+	}
+
+	return compiled
 }
 
 func reinterpretExpressionChildren(children []ast.DefinitionExpressionID) []ir.ExpressionID {
@@ -318,7 +369,7 @@ func markReferencedSyntaxNodes(source string, resolution resolver.Resolution, ex
 			markReferencedSyntaxNodes(source, resolution, expressions, childID, referenced)
 		}
 
-	case ast.SyntaxExpressionGroup, ast.SyntaxExpressionRepetition:
+	case ast.SyntaxExpressionCapture, ast.SyntaxExpressionGroup, ast.SyntaxExpressionRepetition:
 		markReferencedSyntaxNodes(source, resolution, expressions, expressions.Children(expression)[0], referenced)
 	}
 }
@@ -341,7 +392,27 @@ func conditionProperty(source string, token token.Token) ir.ConditionProperty {
 		return ir.ConditionPropertyText
 	}
 
+	if token.Value(source) == "blankLines" {
+		return ir.ConditionPropertyBlankLines
+	}
+
 	return ir.ConditionPropertyLength
+}
+
+func conditionSubject(source string, tok token.Token) ir.ConditionSubjectKind {
+	switch tok.Value(source) {
+	case "left":
+		return ir.ConditionSubjectRelatedMatch
+
+	case "right":
+		return ir.ConditionSubjectMatch
+
+	case "gap":
+		return ir.ConditionSubjectGap
+
+	default:
+		return ir.ConditionSubjectMatch
+	}
 }
 
 func conditionOperator(tok token.Token) ir.ConditionOperator {
@@ -360,6 +431,9 @@ func conditionOperator(tok token.Token) ir.ConditionOperator {
 
 	case token.TokenGreater:
 		return ir.ConditionOperatorGreater
+
+	case token.TokenStartsWith:
+		return ir.ConditionOperatorStartsWith
 
 	default:
 		return ir.ConditionOperatorGreaterEqual

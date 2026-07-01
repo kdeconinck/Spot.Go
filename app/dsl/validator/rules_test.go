@@ -104,15 +104,95 @@ func Test_Validate_Rules(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Using = Identifier
-					node Namespace = Using
-					node Root = Namespace
+					node Using { Identifier }
+					node Namespace { Using }
+					node Root { Namespace }
 				}
 				rules {
 					info "Using inside namespace" : Namespace > Using
 				}
 			`),
 			wantDiagnostics: nil,
+		},
+		"When a selector rule compares adjacent node text, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node UsingDirective { Identifier }
+					node Root { values: UsingDirective+ }
+				}
+				rules {
+					warn "not alphabetical" : UsingDirective + UsingDirective
+					where left.text > right.text
+				}
+			`),
+			wantDiagnostics: nil,
+		},
+		"When a selector rule inspects gap blank lines, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node UsingDirective { Identifier }
+					node Root { values: UsingDirective+ }
+				}
+				rules {
+					warn "missing blank line" : UsingDirective + UsingDirective
+					where gap.blankLines == 0
+				}
+			`),
+			wantDiagnostics: nil,
+		},
+		"When a selector rule follows a declared named syntax-field path, no diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node QualifiedIdentifier { Identifier }
+					node UsingDirective { name: QualifiedIdentifier }
+					node Root { values: UsingDirective+ }
+				}
+				rules {
+					warn "not alphabetical" : UsingDirective + UsingDirective
+					where left.name.text > right.name.text
+				}
+			`),
+			wantDiagnostics: nil,
+		},
+		"When a selector rule references an undeclared named syntax field, a diagnostic is returned.": {
+			inSource: markedMultilineLiteral(`
+				scope {
+					include "**/*.go"
+				}
+				tokens {
+					Identifier = "id"
+				}
+				syntax {
+					node QualifiedIdentifier { Identifier }
+					node UsingDirective { name: QualifiedIdentifier }
+					node Root { values: UsingDirective+ }
+				}
+				rules {
+					warn "not alphabetical" : UsingDirective + UsingDirective
+					where left.[[missing]].text > right.name.text
+				}
+			`),
+			wantDiagnostics: []expectedDiagnostic{
+				expectDiagnostic(`Named syntax field "missing" is not declared on the selected syntax path.`, 0),
+			},
 		},
 		"When a rule matches an undeclared token, a diagnostic is returned.": {
 			inSource: markedMultilineLiteral(`
@@ -190,7 +270,7 @@ func Test_Validate_Rules(t *testing.T) {
 			`),
 			wantDiagnostics: nil,
 		},
-		"When a text property uses an ordering operator, a diagnostic is returned.": {
+		"When a text property uses an ordering operator, no diagnostic is returned.": {
 			inSource: markedMultilineLiteral(`
 				scope {
 					include "**/*.go"
@@ -206,9 +286,7 @@ func Test_Validate_Rules(t *testing.T) {
 					}
 				}
 			`),
-			wantDiagnostics: []expectedDiagnostic{
-				expectDiagnostic(`Token property "text" only supports equality operators.`, 0),
-			},
+			wantDiagnostics: nil,
 		},
 		"When a where clause references the length property, no diagnostic is returned.": {
 			inSource: markedMultilineLiteral(`
@@ -317,8 +395,8 @@ func Test_Validate_Rules(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Word = Identifier
-					node Root = Word+
+					node Word { Identifier }
+					node Root { values: Word+ }
 				}
 				rules {
 					rule RootRule {
@@ -339,9 +417,9 @@ func Test_Validate_Rules(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Using = Identifier
-					node Namespace = Using
-					node Root = Namespace
+					node Using { Identifier }
+					node Namespace { Using }
+					node Root { Namespace }
 				}
 				rules {
 					rule UsingInsideNamespace {
@@ -361,7 +439,7 @@ func Test_Validate_Rules(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Namespace = Identifier
+					node Namespace { Identifier }
 				}
 				rules {
 					rule IdentifierRule {
@@ -383,8 +461,8 @@ func Test_Validate_Rules(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Using = Identifier
-					node Root = Using
+					node Using { Identifier }
+					node Root { Using }
 				}
 				rules {
 					rule UsingOutsideNamespace {
@@ -406,9 +484,9 @@ func Test_Validate_Rules(t *testing.T) {
 					Identifier = "id"
 				}
 				syntax {
-					node Word = Identifier
-					node Root = Word
-					node OtherRoot = Identifier
+					node Word { Identifier }
+					node Root { Word }
+					node OtherRoot { Identifier }
 				}
 				[[rules {
 					rule RootRule {

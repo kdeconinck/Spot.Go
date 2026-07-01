@@ -31,8 +31,122 @@ func (p *sizingParser) measureSyntaxNode() {
 	p.capacity.amountOfSyntaxElements++
 	p.expect(token.TokenNode)
 	p.expect(token.TokenIdentifier)
-	p.expect(token.TokenEqual)
-	p.measureSyntaxExpressionCapacity()
+	p.measureStructuredSyntaxNodeExpression()
+}
+
+func (p *sizingParser) measureStructuredSyntaxNodeExpression() {
+	p.expect(token.TokenLeftBrace)
+	p.measureStructuredSyntaxEntry()
+
+	if p.isAt(token.TokenRightBrace) {
+		p.expect(token.TokenRightBrace)
+
+		return
+	}
+
+	childCount := 1
+
+	for !p.isAt(token.TokenRightBrace) && !p.isAt(token.TokenEOF) {
+		p.measureStructuredSyntaxEntry()
+		childCount++
+	}
+
+	p.expect(token.TokenRightBrace)
+	p.countMeasuredSyntaxExpressionNode(childCount)
+}
+
+func (p *sizingParser) measureStructuredSyntaxEntry() {
+	if p.isAt(token.TokenOneOf) {
+		p.measureStructuredSyntaxOneOf()
+
+		return
+	}
+
+	if !p.isAt(token.TokenIdentifier) {
+		p.measureStructuredSyntaxUnnamedEntry()
+
+		return
+	}
+
+	p.expect(token.TokenIdentifier)
+	hasOperator := p.atRepetitionOperator()
+
+	if hasOperator {
+		p.advance()
+	}
+
+	if p.consume(token.TokenColon) {
+		p.measureStructuredSyntaxFieldTarget()
+
+		if hasOperator {
+			p.countMeasuredSyntaxExpressionNode(1)
+		}
+
+		p.countMeasuredSyntaxExpressionNode(1)
+
+		return
+	}
+
+	p.countMeasuredSyntaxExpressionNode(0)
+
+	if hasOperator {
+		p.countMeasuredSyntaxExpressionNode(1)
+	}
+}
+
+func (p *sizingParser) measureStructuredSyntaxUnnamedEntry() {
+	if p.isAt(token.TokenOneOf) {
+		p.measureStructuredSyntaxOneOf()
+
+		return
+	}
+
+	if p.isAt(token.TokenLeftParen) {
+		p.measureGroupedSyntaxExpressionCapacity()
+	} else if p.isAt(token.TokenAny) {
+		p.advance()
+		p.countMeasuredSyntaxExpressionNode(0)
+	} else {
+		p.expect(token.TokenIdentifier)
+		p.countMeasuredSyntaxExpressionNode(0)
+	}
+
+	if p.atRepetitionOperator() {
+		p.advance()
+		p.countMeasuredSyntaxExpressionNode(1)
+	}
+}
+
+func (p *sizingParser) measureStructuredSyntaxFieldTarget() {
+	if p.isAt(token.TokenOneOf) {
+		p.measureStructuredSyntaxOneOf()
+
+		return
+	}
+
+	p.measureStructuredSyntaxUnnamedEntry()
+}
+
+func (p *sizingParser) measureStructuredSyntaxOneOf() {
+	p.expect(token.TokenOneOf)
+	p.expect(token.TokenLeftBrace)
+	p.measureStructuredSyntaxFieldTarget()
+
+	if p.isAt(token.TokenRightBrace) {
+		p.expect(token.TokenRightBrace)
+
+		return
+	}
+
+	childCount := 1
+
+	for !p.isAt(token.TokenRightBrace) && !p.isAt(token.TokenEOF) {
+		p.measureStructuredSyntaxFieldTarget()
+		childCount++
+	}
+
+	p.expect(token.TokenRightBrace)
+	p.countMeasuredSyntaxExpressionNode(childCount)
 }
 
 func (p *sizingParser) measureSyntaxExpressionCapacity() {
@@ -83,6 +197,15 @@ func (p *sizingParser) measureSyntaxRepetitionExpression() {
 }
 
 func (p *sizingParser) measureSyntaxPrimaryExpression() {
+	if p.isAt(token.TokenIdentifier) && p.next.Kind == token.TokenColon {
+		p.expect(token.TokenIdentifier)
+		p.expect(token.TokenColon)
+		p.measureSyntaxPrimaryExpression()
+		p.countMeasuredSyntaxExpressionNode(1)
+
+		return
+	}
+
 	if p.isAt(token.TokenLeftParen) {
 		p.measureGroupedSyntaxExpressionCapacity()
 

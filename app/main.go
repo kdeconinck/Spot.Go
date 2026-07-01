@@ -392,8 +392,28 @@ func appendRuntimeSyntaxNode(builder *strings.Builder, program ir.Program, tree 
 
 	appendIndentedLine(builder, depth, "Node "+program.SyntaxNodes[node.Kind].Name+" ["+strconv.Itoa(int(node.FirstTokenIndex))+":"+strconv.Itoa(int(end))+"]")
 
-	for _, childID := range tree.Children(node) {
-		appendRuntimeSyntaxNode(builder, program, tree, childID, depth+1)
+	for _, childEdge := range tree.Children(node) {
+		appendRuntimeSyntaxEdge(builder, program, tree, childEdge, depth+1)
+	}
+}
+
+func appendRuntimeSyntaxEdge(builder *strings.Builder, program ir.Program, tree syntax.Tree, edge syntax.ChildEdge, depth int) {
+	if edge.FieldID == ^uint32(0) {
+		appendRuntimeSyntaxNode(builder, program, tree, edge.ChildID, depth)
+
+		return
+	}
+
+	node := tree.Node(edge.ChildID)
+	end := node.FirstTokenIndex + node.AmountOfTokens
+	appendIndentedLine(
+		builder,
+		depth,
+		program.SyntaxFields[edge.FieldID]+": Node "+program.SyntaxNodes[node.Kind].Name+" ["+strconv.Itoa(int(node.FirstTokenIndex))+":"+strconv.Itoa(int(end))+"]",
+	)
+
+	for _, childEdge := range tree.Children(node) {
+		appendRuntimeSyntaxEdge(builder, program, tree, childEdge, depth+1)
 	}
 }
 

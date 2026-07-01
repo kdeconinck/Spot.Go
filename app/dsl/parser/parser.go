@@ -101,6 +101,14 @@ func span(start, end location.Position) location.Span {
 	}
 }
 
+func maxPosition(left, right location.Position) location.Position {
+	if left > right {
+		return left
+	}
+
+	return right
+}
+
 func newParser(src string, capacity documentCapacity) parser {
 	return parser{
 		lexer: lexer.New(src),

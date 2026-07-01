@@ -45,6 +45,9 @@ const (
 	// SyntaxExpressionAny matches one emitted token of any kind.
 	SyntaxExpressionAny
 
+	// SyntaxExpressionCapture labels direct child syntax nodes produced by the wrapped expression.
+	SyntaxExpressionCapture
+
 	// SyntaxExpressionConcatenation is a sequence of adjacent syntax expressions.
 	SyntaxExpressionConcatenation
 
@@ -91,6 +94,9 @@ type SyntaxExpressionNode struct {
 
 	// Reference is the referenced token or syntax node name in a reference expression.
 	Reference token.Token
+
+	// Field is the named capture in a capture expression.
+	Field token.Token
 
 	// Operator is the postfix operator token in a repetition expression.
 	Operator token.Token

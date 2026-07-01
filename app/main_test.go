@@ -140,8 +140,8 @@ tokens {
     Identifier = letter+
 }
 syntax {
-    node PackageClause = KeywordPackage Identifier
-    node Root = PackageClause
+    node PackageClause { KeywordPackage Identifier }
+    node Root { PackageClause }
 }
 rules {
 }`), 0o644)

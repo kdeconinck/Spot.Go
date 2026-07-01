@@ -259,8 +259,8 @@ tokens {
     Identifier = "main"
 }
 syntax {
-    node PackageClause = KeywordPackage Identifier
-    node Root = PackageClause
+    node PackageClause { KeywordPackage Identifier }
+    node Root { PackageClause }
 }
 rules {
     rule PackageRule {
@@ -285,10 +285,10 @@ tokens {
     RightBrace = "}"
 }
 syntax {
-    node UsingDirective = KeywordUsing Identifier
-    node NamespaceBody = LeftBrace UsingDirective RightBrace
-    node NamespaceDeclaration = KeywordNamespace Identifier NamespaceBody
-    node Root = NamespaceDeclaration
+    node UsingDirective { KeywordUsing Identifier }
+    node NamespaceBody { LeftBrace UsingDirective RightBrace }
+    node NamespaceDeclaration { KeywordNamespace Identifier NamespaceBody }
+    node Root { NamespaceDeclaration }
 }
 rules {
     rule UsingInsideNamespace {
@@ -312,10 +312,10 @@ tokens {
     RightBrace = "}"
 }
 syntax {
-    node UsingDirective = KeywordUsing Identifier
-    node NamespaceBody = LeftBrace RightBrace
-    node NamespaceDeclaration = KeywordNamespace Identifier NamespaceBody
-    node Root = UsingDirective NamespaceDeclaration
+    node UsingDirective { KeywordUsing Identifier }
+    node NamespaceBody { LeftBrace RightBrace }
+    node NamespaceDeclaration { KeywordNamespace Identifier NamespaceBody }
+    node Root { first: UsingDirective second: NamespaceDeclaration }
 }
 rules {
     rule UsingOutsideNamespace {
@@ -339,10 +339,10 @@ tokens {
     RightBrace = "}"
 }
 syntax {
-    node UsingDirective = KeywordUsing Identifier
-    node NamespaceBody = LeftBrace UsingDirective RightBrace
-    node NamespaceDeclaration = KeywordNamespace Identifier NamespaceBody
-    node Root = NamespaceDeclaration
+    node UsingDirective { KeywordUsing Identifier }
+    node NamespaceBody { LeftBrace UsingDirective RightBrace }
+    node NamespaceDeclaration { KeywordNamespace Identifier NamespaceBody }
+    node Root { NamespaceDeclaration }
 }
 rules {
     info "using under namespace body" : NamespaceBody > UsingDirective
@@ -363,10 +363,10 @@ tokens {
     RightBrace = "}"
 }
 syntax {
-    node UsingDirective = KeywordUsing Identifier
-    node NamespaceBody = LeftBrace RightBrace
-    node NamespaceDeclaration = KeywordNamespace Identifier NamespaceBody
-    node Root = UsingDirective NamespaceDeclaration
+    node UsingDirective { KeywordUsing Identifier }
+    node NamespaceBody { LeftBrace RightBrace }
+    node NamespaceDeclaration { KeywordNamespace Identifier NamespaceBody }
+    node Root { first: UsingDirective second: NamespaceDeclaration }
 }
 rules {
     warn "using outside namespace body" : UsingDirective:not(NamespaceBody > *)
@@ -374,6 +374,83 @@ rules {
 			inSource: "using x namespace x { }",
 			wantDiagnostics: []engine.Diagnostic{
 				diagnostic(engine.SeverityWarn, "using outside namespace body", 0, 7),
+			},
+		},
+		"When an adjacent-sibling text comparison matches, a diagnostic is returned.": {
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Whitespace = (' ' | '\n')+ skip
+    Identifier = "A" | "B"
+}
+syntax {
+    node UsingDirective { Identifier }
+    node Root { values: UsingDirective+ }
+}
+rules {
+    warn "not alphabetical" : UsingDirective + UsingDirective
+    where left.text > right.text
+}`,
+			inSource: "B A",
+			wantDiagnostics: []engine.Diagnostic{
+				diagnostic(engine.SeverityWarn, "not alphabetical", 2, 3),
+			},
+		},
+		"When an adjacent-sibling named-field comparison matches, a diagnostic is returned.": {
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Whitespace = ' '+ skip
+    Identifier = "A" | "B"
+}
+syntax {
+    node QualifiedIdentifier { Identifier }
+    node UsingDirective { name: QualifiedIdentifier }
+    node Root { values: UsingDirective+ }
+}
+rules {
+    warn "not alphabetical" : UsingDirective + UsingDirective
+    where left.name.text > right.name.text
+}`,
+			inSource: "B A",
+			wantDiagnostics: []engine.Diagnostic{
+				diagnostic(engine.SeverityWarn, "not alphabetical", 2, 3),
+			},
+		},
+		"When an adjacent-sibling blank-line comparison matches, a diagnostic is returned.": {
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Whitespace = (' ' | '\n')+ skip
+    Identifier = "A" | "B"
+}
+syntax {
+    node UsingDirective { Identifier }
+    node Root { values: UsingDirective+ }
+}
+rules {
+    warn "missing blank line" : UsingDirective + UsingDirective
+    where gap.blankLines == 0
+}`,
+			inSource: "A\nB",
+			wantDiagnostics: []engine.Diagnostic{
+				diagnostic(engine.SeverityWarn, "missing blank line", 2, 3),
+			},
+		},
+		"When a startsWith comparison matches, a diagnostic is returned.": {
+			inDSL: `scope { include "**/*.go" }
+tokens {
+    Whitespace = ' '+ skip
+    Identifier = "Other" | "System.IO"
+}
+syntax {
+    node UsingDirective { Identifier }
+    node Root { values: UsingDirective+ }
+}
+rules {
+    warn "system using found" : UsingDirective + UsingDirective
+    where right.text startsWith "System"
+}`,
+			inSource: "Other System.IO",
+			wantDiagnostics: []engine.Diagnostic{
+				diagnostic(engine.SeverityWarn, "system using found", 6, 15),
 			},
 		},
 	} {
@@ -443,10 +520,10 @@ tokens {
     Number = digit+
 }
 syntax {
-    node NumberNode = Number
-    node IdentifierNode = Identifier
-    node Statement = IdentifierNode NumberNode
-    node Root = Statement+
+    node NumberNode { Number }
+    node IdentifierNode { Identifier }
+    node Statement { IdentifierNode NumberNode }
+    node Root { values: Statement+ }
 }
 rules {
     rule PublicIdentifier {

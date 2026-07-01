@@ -66,6 +66,10 @@ func (p *sizingParser) measureSelectorRule() {
 	p.expect(token.TokenString)
 	p.expect(token.TokenColon)
 	p.measureSelectorMatch()
+
+	if p.startsWhereClause() {
+		p.measureWhereClause()
+	}
 }
 
 func (p *sizingParser) measureSelectorMatch() {
@@ -83,6 +87,13 @@ func (p *sizingParser) measureSelectorMatch() {
 
 		p.expect(token.TokenStar)
 		p.expect(token.TokenRightParen)
+
+		return
+	}
+
+	if p.isAt(token.TokenPlus) {
+		p.advance()
+		p.expect(token.TokenIdentifier)
 
 		return
 	}
@@ -124,6 +135,15 @@ func (p *sizingParser) measureWhereClause() {
 	p.expect(token.TokenDot)
 	p.expect(token.TokenIdentifier)
 	p.expectComparisonOperatorToken()
+
+	if p.isAt(token.TokenIdentifier) {
+		p.advance()
+		p.expect(token.TokenDot)
+		p.expect(token.TokenIdentifier)
+
+		return
+	}
+
 	p.expectConditionLiteralToken()
 }
 
@@ -138,7 +158,7 @@ func (p *sizingParser) expectComparisonOperatorToken() {
 }
 
 func (p *sizingParser) atComparisonOperator() bool {
-	return p.isAt(token.TokenEqualEqual) || p.isAt(token.TokenBangEqual) || p.isAt(token.TokenLess) || p.isAt(token.TokenLessEqual) || p.isAt(token.TokenGreater) || p.isAt(token.TokenGreaterEqual)
+	return p.isAt(token.TokenEqualEqual) || p.isAt(token.TokenBangEqual) || p.isAt(token.TokenLess) || p.isAt(token.TokenLessEqual) || p.isAt(token.TokenGreater) || p.isAt(token.TokenGreaterEqual) || p.isAt(token.TokenStartsWith)
 }
 
 func (p *sizingParser) atConditionLiteral() bool {

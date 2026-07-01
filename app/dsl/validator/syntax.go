@@ -68,7 +68,7 @@ func validateSyntaxExpression(source string, expressionID ast.SyntaxExpressionID
 			diagnostics = validateSyntaxExpression(source, childID, resolution, diagnostics)
 		}
 
-	case ast.SyntaxExpressionGroup, ast.SyntaxExpressionRepetition:
+	case ast.SyntaxExpressionCapture, ast.SyntaxExpressionGroup, ast.SyntaxExpressionRepetition:
 		children := expressions.Children(expression)
 		diagnostics = validateSyntaxExpression(source, children[0], resolution, diagnostics)
 
@@ -143,7 +143,7 @@ func validateSyntaxExpressionCycle(source string, expressionID ast.SyntaxExpress
 			diagnostics = validateSyntaxExpressionCycle(source, childID, resolution, states, diagnostics)
 		}
 
-	case ast.SyntaxExpressionGroup, ast.SyntaxExpressionRepetition:
+	case ast.SyntaxExpressionCapture, ast.SyntaxExpressionGroup, ast.SyntaxExpressionRepetition:
 		children := expressions.Children(expression)
 		diagnostics = validateSyntaxExpressionCycle(source, children[0], resolution, states, diagnostics)
 	}
@@ -195,7 +195,7 @@ func syntaxExpressionMatchesEmpty(source string, expressionID ast.SyntaxExpressi
 
 		return false
 
-	case ast.SyntaxExpressionGroup:
+	case ast.SyntaxExpressionCapture, ast.SyntaxExpressionGroup:
 		return syntaxExpressionMatchesEmpty(source, children[0], resolution, depth)
 
 	case ast.SyntaxExpressionRepetition:

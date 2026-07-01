@@ -136,15 +136,22 @@ func (p *parser) parseSelectorRule() (ast.Rule, error) {
 		return ast.Rule{}, err
 	}
 
+	where, err := p.parseOptionalRuleCondition()
+
+	if err != nil {
+		return ast.Rule{}, err
+	}
+
 	return ast.Rule{
 		Match: match,
+		Where: where,
 		Report: ast.RuleReport{
 			Severity: severity,
 			Target:   match.Target,
 			Message:  message,
 			Span:     span(severity.Span.Start, message.Span.End),
 		},
-		Span: span(severity.Span.Start, match.Span.End),
+		Span: span(severity.Span.Start, maxPosition(match.Span.End, where.Span.End)),
 	}, nil
 }
 
@@ -159,6 +166,10 @@ func (p *parser) parseSelectorRuleMatch() (ast.RuleMatch, error) {
 		return p.parseNegatedSelectorMatch(first)
 	}
 
+	if p.isAt(token.TokenPlus) {
+		return p.parseAdjacentSiblingSelectorMatch(first)
+	}
+
 	if p.isAt(token.TokenGreater) || p.isAt(token.TokenIdentifier) {
 		return p.parseRelatedSelectorMatch(first)
 	}
@@ -167,6 +178,24 @@ func (p *parser) parseSelectorRuleMatch() (ast.RuleMatch, error) {
 		Kind:   ast.RuleMatchNode,
 		Target: first,
 		Span:   first.Span,
+	}, nil
+}
+
+func (p *parser) parseAdjacentSiblingSelectorMatch(relatedTarget token.Token) (ast.RuleMatch, error) {
+	p.advance()
+
+	target, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return ast.RuleMatch{}, err
+	}
+
+	return ast.RuleMatch{
+		Kind:          ast.RuleMatchNode,
+		RelationKind:  ast.RuleMatchRelationAdjacentSibling,
+		Target:        target,
+		RelatedTarget: relatedTarget,
+		Span:          span(relatedTarget.Span.Start, target.Span.End),
 	}, nil
 }
 
@@ -304,17 +333,7 @@ func (p *parser) parseRuleCondition() (ast.RuleCondition, error) {
 
 	p.advance()
 
-	subject, err := p.expect(token.TokenIdentifier)
-
-	if err != nil {
-		return ast.RuleCondition{}, err
-	}
-
-	if _, err := p.expect(token.TokenDot); err != nil {
-		return ast.RuleCondition{}, err
-	}
-
-	property, err := p.expect(token.TokenIdentifier)
+	subject, path, property, err := p.parseRuleConditionAccess()
 
 	if err != nil {
 		return ast.RuleCondition{}, err
@@ -326,19 +345,75 @@ func (p *parser) parseRuleCondition() (ast.RuleCondition, error) {
 		return ast.RuleCondition{}, err
 	}
 
-	value, err := p.expectConditionLiteral()
+	otherSubject := token.Token{}
+	var otherPath []token.Token
+	otherProperty := token.Token{}
+	value := token.Token{}
+	end := operator
 
-	if err != nil {
-		return ast.RuleCondition{}, err
+	if p.isAt(token.TokenIdentifier) {
+		otherSubject, otherPath, otherProperty, err = p.parseRuleConditionAccess()
+
+		if err != nil {
+			return ast.RuleCondition{}, err
+		}
+
+		end = otherProperty
+	} else {
+		value, err = p.expectConditionLiteral()
+
+		if err != nil {
+			return ast.RuleCondition{}, err
+		}
+
+		end = value
 	}
 
 	return ast.RuleCondition{
-		Subject:  subject,
-		Property: property,
-		Operator: operator,
-		Value:    value,
-		Span:     span(start.Span.Start, value.Span.End),
+		Subject:       subject,
+		Path:          path,
+		Property:      property,
+		Operator:      operator,
+		OtherSubject:  otherSubject,
+		OtherPath:     otherPath,
+		OtherProperty: otherProperty,
+		Value:         value,
+		Span:          span(start.Span.Start, end.Span.End),
 	}, nil
+}
+
+func (p *parser) parseRuleConditionAccess() (token.Token, []token.Token, token.Token, error) {
+	subject, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return token.Token{}, nil, token.Token{}, err
+	}
+
+	if _, err := p.expect(token.TokenDot); err != nil {
+		return token.Token{}, nil, token.Token{}, err
+	}
+
+	firstSegment, err := p.expect(token.TokenIdentifier)
+
+	if err != nil {
+		return token.Token{}, nil, token.Token{}, err
+	}
+
+	segments := []token.Token{firstSegment}
+
+	for p.isAt(token.TokenDot) {
+		p.advance()
+
+		segment, err := p.expect(token.TokenIdentifier)
+
+		if err != nil {
+			return token.Token{}, nil, token.Token{}, err
+		}
+
+		segments = append(segments, segment)
+	}
+
+	return subject, segments[:len(segments)-1], segments[len(segments)-1], nil
 }
 
 func (p *parser) parseRuleReport() (ast.RuleReport, error) {
@@ -384,7 +459,8 @@ func (p *parser) expectComparisonOperator() (token.Token, error) {
 		p.isAt(token.TokenLess) ||
 		p.isAt(token.TokenLessEqual) ||
 		p.isAt(token.TokenGreater) ||
-		p.isAt(token.TokenGreaterEqual) {
+		p.isAt(token.TokenGreaterEqual) ||
+		p.isAt(token.TokenStartsWith) {
 		tok := p.current
 		p.advance()
 
