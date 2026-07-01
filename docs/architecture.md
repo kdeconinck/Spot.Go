@@ -278,7 +278,7 @@ Non-responsibilities:
 
 The syntax parser answers the question:
 
-> Which syntax nodes can be built from this token stream?
+> What runtime syntax tree can be built from this token stream?
 
 Implementation notes:
 
@@ -292,6 +292,7 @@ Input:
 ```text
 Compiled rules
 Token stream
+Runtime syntax tree
 ```
 
 Output:
@@ -302,7 +303,8 @@ Diagnostics
 
 Responsibilities:
 
-* Evaluate rules.
+* Evaluate token rules over the token stream.
+* Evaluate syntax-node rules over the runtime syntax tree.
 * Apply rule conditions.
 * Produce diagnostics.
 
@@ -386,6 +388,19 @@ Properties:
 * Source span.
 
 Tokens should be treated as immutable after creation.
+
+## Runtime Syntax Tree
+
+Represents syntax nodes matched from one source file's token stream.
+
+Properties:
+
+* Stores nodes in flat slices rather than as pointer-linked objects.
+* Stores parent-child relationships as child-index ranges.
+* Stores token coverage as token-index ranges.
+* Is optimized for repeated read-only traversal by the rule engine.
+
+The runtime syntax tree exists to let execution stages query syntax structure without reparsing the token stream.
 
 ## Diagnostic
 

@@ -40,8 +40,18 @@ tokens {
 }
 
 syntax {
-    node FileHeader
-    node PackageClause
+    node PackageName {
+        Identifier
+    }
+
+    node PackageClause {
+        KeywordPackage
+        name: PackageName
+    }
+
+    node Root {
+        package: PackageClause
+    }
 }
 
 rules {
@@ -113,11 +123,18 @@ The following words are reserved and therefore cannot be used as user-defined na
 * `rules`
 * `syntax`
 * `node`
+* `oneOf`
+* `any`
+* `not`
+* `startsWith`
 * `rule`
 * `match`
 * `where`
+* `inside`
+* `outside`
 * `report`
 * `skip`
+* `fallback`
 * `info`
 * `warn`
 * `err`
@@ -373,6 +390,22 @@ Whitespace = (' ' | '\t' | '\r' | '\n')+ skip
 
 Skipped tokens are recognized by the scanner but are not emitted into the token stream.
 
+A token may also be declared as a fallback token.
+
+```spot
+Unknown = fallback
+```
+
+Fallback tokens do not use normal token expressions. A fallback token consumes exactly one byte of source text only
+when no other token matches at the current byte offset.
+
+Fallback tokens follow these rules:
+
+* At most one fallback token may be declared.
+* A fallback token loses to every normal token.
+* A fallback token always consumes exactly one byte.
+* A fallback token may be combined with `skip`.
+
 ## Token Expressions
 
 Token expressions may contain:
@@ -392,6 +425,7 @@ Identifier = identifierStart identifierPart*
 Number = digit+
 Equals = "="
 Whitespace = (' ' | '\t' | '\r' | '\n')+ skip
+Unknown = fallback
 ```
 
 ## Repetition
@@ -421,7 +455,8 @@ Selection rules:
 
 1. The longest match wins.
 2. If multiple tokens match the same length, the token declared first wins.
-3. If no token matches, scanning fails with a diagnostic.
+3. If no token matches and a fallback token exists, the fallback token consumes one byte.
+4. If no token matches and no fallback token exists, scanning fails with a diagnostic.
 
 This makes tokenization deterministic.
 
@@ -459,6 +494,7 @@ A token has:
 The source span is represented using byte offsets.
 Line and column information may be derived later for diagnostic rendering.
 Skipped tokens are not included in the token stream.
+A fallback token is only emitted when no regular token matches at the current byte offset.
 
 # Rules Section
 
@@ -486,23 +522,45 @@ The `syntax` section declares syntax node kinds and their structure for future s
 
 ```spot
 syntax {
-    node Word = Identifier | KeywordPublic
-    node WordPair = Word Word
-    node OptionalWord = (Word | KeywordInternal)?
-    node WordList = Word+
+    node Word {
+        oneOf {
+            Identifier
+            KeywordPublic
+        }
+    }
+
+    node WordPair {
+        left: Word
+        right: Word
+    }
+
+    node WordList {
+        items*: oneOf {
+            Word
+            any
+        }
+    }
 }
 ```
 
-Each declaration introduces one syntax node kind together with a syntax expression:
+Each declaration introduces one syntax node kind.
+The preferred surface form is block-shaped and describes the resulting tree directly:
 
 ```spot
-node UsingStatement = KeywordUsing QualifiedIdentifier Semicolon
+node UsingStatement {
+    KeywordUsing
+    name: QualifiedIdentifier
+    Semicolon
+}
 ```
 
 Syntax expressions may contain:
 
 * Token references.
 * Syntax node references.
+* Named child captures.
+* `oneOf { ... }` variant blocks in structured syntax nodes.
+* `any`, which matches one emitted token of any kind.
 * Grouping.
 * Concatenation.
 * Alternation.
@@ -511,11 +569,49 @@ Syntax expressions may contain:
 Examples:
 
 ```spot
-node Word = Identifier | KeywordPublic
-node WordPair = Word Word
-node OptionalWord = (Word | KeywordInternal)?
-node WordList = Word+
+node Word {
+    oneOf {
+        Identifier
+        KeywordPublic
+    }
+}
+
+node WordPair {
+    left: Word
+    right: Word
+}
+
+node UsingDirective {
+    KeywordUsing
+    name: QualifiedIdentifier
+    Semicolon
+}
 ```
+
+`any` is useful when the syntax section models only the node kinds that matter to the current rules. It consumes one
+emitted token regardless of token name, so a file can still be fully materialized even when the grammar is only
+partially described.
+
+A named child capture labels the direct child syntax nodes produced by one syntax expression:
+
+```spot
+node UsingDirective {
+    KeywordUsing
+    name: QualifiedIdentifier
+    Semicolon
+}
+```
+
+Here `name` becomes a stable field on `UsingDirective`. Rules may later navigate through that field with
+`UsingDirective.name`.
+
+Structured syntax nodes support:
+
+* Unnamed required entries such as `KeywordUsing`.
+* Named child fields such as `name: QualifiedIdentifier`.
+* Optional fields such as `value?: Expression`.
+* Repeated fields such as `members*: Statement`.
+* Variant blocks such as `oneOf { A B C }`.
 
 Syntax expressions use the following precedence, from highest to lowest:
 
@@ -531,23 +627,33 @@ Use grouping when alternation should be part of a sequence: `Word (KeywordIntern
 
 Today, the `syntax` section is intentionally limited:
 
-* It only describes syntax node structure.
+* It describes syntax node structure.
 * It can be compiled and matched against token streams.
-* It does not yet introduce AST-based rules.
-
-This means the section is parsed, validated, compiled, and consumable by the runtime syntax parser today, but Spot's
-rule engine does not yet evaluate rules over runtime syntax trees.
+* Rules may match syntax nodes and inspect `text`, `length`, and captured child paths.
+* It does not yet model semantic information such as name resolution or types.
 
 # Rule Match
 
-The current rule model matches a single token.
+Spot supports two rule styles:
+
+* Block rules, which spell out `match`, optional `where`, and `report`.
+* Selector rules, which use a compact query-like syntax for syntax-node matches.
+
+Block rules match either a single token or a single syntax node.
 
 ```spot
 match Identifier
 ```
 
-This binds the matched token to its token name.
-The matched token may then be referenced in `where` and `report`.
+```spot
+match node PackageClause
+```
+
+```spot
+match node UsingDirective outside NamespaceDeclaration
+```
+
+The matched token or syntax node is then referenced by name in `where` and `report`.
 
 Example:
 
@@ -557,39 +663,120 @@ rule PublicIdentifier {
     where Identifier.text == "public"
     report warning at Identifier "Public identifier found"
 }
+
+rule PackageClauseRule {
+    match node PackageClause
+    where PackageClause.text == "package main"
+    report warn at PackageClause "Package clause found"
+}
+
+rule UsingOutsideNamespace {
+    match node UsingDirective outside NamespaceDeclaration
+    report warn at UsingDirective "Using directive must live inside a namespace"
+}
 ```
 
-Multi-token patterns are intentionally outside the current DSL.
+When a rule matches a syntax node, Spot first builds one full-file syntax tree and then evaluates the rule against
+every node of the requested kind in that tree.
+
+Syntax-node matches may optionally constrain ancestor nodes:
+
+* `inside NamespaceDeclaration` means the matched node must have a `NamespaceDeclaration` ancestor.
+* `outside NamespaceDeclaration` means the matched node must not have a `NamespaceDeclaration` ancestor.
+
+Ancestor constraints are only valid on `match node ...` rules.
+
+Selector rules are syntax-node rules written in a compact form:
+
+```spot
+warn "Using directive is outside a namespace."
+    : UsingDirective:not(NamespaceDeclaration > *)
+
+info "Using directive is inside a namespace."
+    : NamespaceDeclaration > UsingDirective
+```
+
+Selector rules currently support:
+
+* `Node`, which matches every node of that kind.
+* `Ancestor Node`, which matches `Node` anywhere inside `Ancestor`.
+* `Parent > Node`, which matches `Node` only when its direct parent is `Parent`.
+* `Left + Right`, which matches `Right` when it is the adjacent sibling of `Left`.
+* `Node:not(Ancestor *)`, which matches `Node` only when it is outside `Ancestor`.
+* `Node:not(Parent > *)`, which matches `Node` only when its direct parent is not `Parent`.
+
+Selector rules are always syntax-node rules. They do not currently support token matches, but they may use `where`
+clauses.
+
+For adjacent-sibling rules, the `where` clause may reference:
+
+* `left`, which is the left adjacent sibling.
+* `right`, which is the matched node on the right.
+* `gap`, which is the source text between `left` and `right`.
+
+Supported generic properties are:
+
+* `text`
+* `length`
+* `blankLines`
+
+When a syntax node declares named child captures, a `where` clause may navigate through them before reading a
+property:
+
+```spot
+where left.name.text > right.name.text
+```
+
+Each path segment must match a named capture declared by the syntax node reached at the previous step.
+
+Examples:
+
+```spot
+warn "Using directives must be alphabetical."
+    : UsingDirective + UsingDirective
+    where left.text > right.text
+
+warn "A blank line must separate using groups."
+    : UsingDirective + UsingDirective
+    where gap.blankLines == 0
+```
+
+The current DSL does not yet support boolean operators such as `and` or `or`, so multi-part ordering rules must still
+be expressed as separate rules.
 
 # Rule Conditions
 
-A `where` clause filters matched tokens.
+A `where` clause filters the matched token or syntax node.
 
 ```spot
 where Identifier.text == "public"
 ```
 
-The current condition model supports comparisons against token properties.
-.
-Supported token properties:
+The current condition model supports comparisons against match properties.
 
-| Property | Meaning                             |
-| -------- | ----------------------------------- |
-| `text`   | The exact source text of the token. |
-| `length` | The byte length of the token text.  |
+Supported match properties:
+
+| Property | Meaning                                   |
+| -------- | ----------------------------------------- |
+| `text`   | The exact source text covered by the match. |
+| `length` | The byte length of the matched source text. |
 
 Supported comparison operators depend on the property:
 
 | Property | Operators                        |
 | -------- | -------------------------------- |
-| `text`   | `==`, `!=`                       |
+| `text`   | `==`, `!=`, `<`, `<=`, `>`, `>=`, `startsWith` |
 | `length` | `==`, `!=`, `<`, `<=`, `>`, `>=` |
+| `blankLines` | `==`, `!=`, `<`, `<=`, `>`, `>=` |
 
 Examples:
 
 ```spot
 where Identifier.text == "public"
-where Whitespace.length > 1
+where PackageClause.length > 0
+where left.text > right.text
+where left.name.text > right.name.text
+where gap.blankLines == 1
 ```
 
 Only one `where` clause is supported for now.
@@ -606,7 +793,7 @@ report warning at Identifier "Public identifier found"
 Report syntax:
 
 ```spot
-report severity at tokenName "message"
+report severity at matchName "message"
 ```
 
 Supported severities:
@@ -615,8 +802,8 @@ Supported severities:
 * Warning (`warn`).
 * Error (`err`).
 
-The `at` target must reference a token matched by the rule.
-The diagnostic span is the span of the referenced token.
+The `at` target must reference the same token or syntax node matched by the rule.
+The diagnostic span is the span of that matched token or syntax node.
 
 # Complete Example
 
@@ -671,6 +858,8 @@ A valid DSL file must satisfy all validation rules.
 * Referenced definitions must exist.
 * Referenced tokens must exist.
 * Referenced syntax expressions must resolve to a declared token or syntax node.
+* Tokens may contain at most one fallback token.
+* Syntax rules require exactly one root syntax node for the file-level syntax tree.
 
 ## Definition Validation
 
@@ -690,6 +879,7 @@ definitions {
 
 * Token expressions must not match empty input.
 * `skip` may only appear at the end of a token declaration.
+* A fallback token consumes one otherwise-unmatched byte and is checked only after all normal tokens fail.
 
 Invalid:
 
@@ -704,15 +894,22 @@ because it can match an empty string.
 ## Syntax Validation
 
 * Syntax node references must resolve to declared tokens or syntax nodes.
+* `any` always matches exactly one emitted token.
 * Recursive syntax nodes are invalid.
 * A syntax repetition expression must not repeat something that can match empty input.
+* Named syntax-field paths in rules must follow declared captures.
 
 Invalid:
 
 ```spot
 syntax {
-    node Word = Identifier?
-    node WordList = Word*
+    node Word {
+        value?: Identifier
+    }
+
+    node WordList {
+        values: Word*
+    }
 }
 ```
 
@@ -720,12 +917,21 @@ because `Word` can match empty input, so repeating it is ambiguous and not execu
 
 ## Rule Validation
 
-* A rule must contain exactly one `match`.
-* A rule must contain exactly one `report`.
-* A `where` clause may only reference the matched token.
+* A block rule must contain exactly one `match`.
+* A block rule must contain exactly one `report`.
+* A token-rule `where` clause may only reference the matched token.
 * A `report` target must reference the matched token.
 * A token property must exist.
 * A comparison must use compatible value types.
+* A syntax rule must match a declared syntax node.
+* A syntax rule's `where` clause may only reference the matched syntax node, `left`, `right`, or `gap` as allowed by the selector kind.
+* A syntax-rule path segment must reference a declared named child capture on the selected syntax path.
+* A syntax rule's `report` target must reference the matched syntax node.
+* A syntax node property must exist.
+* A syntax-node comparison must use compatible value types.
+* Only syntax-node rules may use `inside` or `outside`.
+* An `inside` or `outside` constraint must reference a declared syntax node.
+* Selector rules may only reference declared syntax nodes.
 
 # Current Non-Goals
 
@@ -744,8 +950,8 @@ The current DSL does not include:
 * Autofix support.
 * Configuration inheritance.
 
-The DSL now includes syntax node structure declarations, but runtime syntax-tree construction and AST-based rule
-evaluation are still outside the current scope.
+The DSL now includes syntax node structure declarations, named child captures, and syntax-tree-based rule evaluation,
+but semantic analysis and richer AST-style queries are still outside the current scope.
 
 These may be added later if justified by concrete requirements.
 

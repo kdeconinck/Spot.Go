@@ -1,0 +1,81 @@
+scope {
+    include "**/*.go"
+    exclude "vendor/**"
+}
+
+definitions {
+    letter = 'a'..'z' | 'A'..'Z'
+    digit = '0'..'9'
+    identifierStart = letter | '_'
+    identifierPart = identifierStart | digit
+    number = digit+
+}
+
+tokens {
+    Whitespace = (' ' | '\t' | '\n' | '\r')+ skip
+    KeywordPackage = "package"
+    KeywordFunc = "func"
+    KeywordVar = "var"
+    Identifier = identifierStart identifierPart*
+    Number = number
+    LeftParen = "("
+    RightParen = ")"
+    LeftBrace = "{"
+    RightBrace = "}"
+    Assign = "="
+}
+
+syntax {
+    node PackageName {
+        Identifier
+    }
+
+    node ValueName {
+        Identifier
+    }
+
+    node FunctionName {
+        Identifier
+    }
+
+    node PackageClause {
+        KeywordPackage
+        name: PackageName
+    }
+
+    node VariableDeclaration {
+        KeywordVar
+        name: ValueName
+        Assign
+        value: Number
+    }
+
+    node FunctionDeclaration {
+        KeywordFunc
+        name: FunctionName
+        LeftParen
+        RightParen
+        LeftBrace
+        body: VariableDeclaration
+        RightBrace
+    }
+
+    node Root {
+        package: PackageClause
+        function: FunctionDeclaration
+    }
+}
+
+rules {
+    rule PackageClauseFound {
+        match node PackageClause
+        where PackageClause.text == "package main"
+        report warn at PackageClause "Package clause found"
+    }
+
+    rule PublicValueIdentifier {
+        match Identifier
+        where Identifier.text == "publicValue"
+        report info at Identifier "Public value identifier found"
+    }
+}

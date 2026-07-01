@@ -64,6 +64,14 @@ DSL Configuration
         ↓
 Parser
         ↓
+Syntax Tree
+        ↓
+Resolver
+        ↓
+Resolved Syntax
+        ↓
+Validator
+        ↓
 Validated Configuration
         ↓
 Compiler
@@ -73,6 +81,10 @@ Compiled Definitions
 Scanner
         ↓
 Token Stream
+        ↓
+Syntax Parser
+        ↓
+Runtime Syntax Tree
         ↓
 Rule Engine
         ↓
@@ -154,12 +166,25 @@ The project currently focuses on the following capabilities:
 * Configuration validation.
 * Definition compilation.
 * Token definition compilation.
+* Syntax definition compilation.
 * Source scanning.
 * Token stream generation.
+* Token-stream to syntax-tree parsing.
 * Token-based rule evaluation.
 * Diagnostic generation and rendering.
 
-Advanced features such as semantic analysis, AST construction, and cross-file reasoning are outside the current scope.
+## CLI
+
+Spot is executed as:
+
+```text
+spot [-print-ast] <dsl-file> <directory>
+```
+
+Use `-print-ast` to print the generated runtime syntax tree for each analyzed file that matches the configured scope.
+
+Advanced features such as semantic analysis, syntax-tree-based rule evaluation, and cross-file reasoning are outside the
+current scope.
 
 ## Agent Guidance
 
@@ -209,6 +234,7 @@ When contributing to Spot:
 | Token Definition | A declaration describing how source text becomes a token.                              |
 | Token            | A scanner output with associated source location information.                          |
 | Scanner          | Component responsible for converting source text into tokens.                          |
+| Syntax Parser    | Component responsible for converting token streams into runtime syntax trees.          |
 | Rule             | Analysis logic executed against a token stream.                                        |
 | Diagnostic       | A warning, error, or informational message produced by analysis.                       |
 | Span             | A byte range within a source file.                                                     |

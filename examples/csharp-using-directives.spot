@@ -1,0 +1,163 @@
+  scope {
+      include "**/*.cs"
+      exclude "bin/**"
+      exclude "obj/**"
+  }
+
+  definitions {
+      lower = 'a'..'z'
+      upper = 'A'..'Z'
+      digit = '0'..'9'
+      identifierStart = lower | upper | '_'
+      identifierPart = identifierStart | digit
+  }
+
+  tokens {
+      Whitespace = (' ' | '\t' | '\n' | '\r')+ skip
+      KeywordGlobal = "global"
+      KeywordSystem = "System"
+      KeywordUsing = "using"
+      KeywordNamespace = "namespace"
+      Identifier = identifierStart identifierPart*
+      Dot = "."
+      Semicolon = ";"
+      LeftBrace = "{"
+      RightBrace = "}"
+      Unknown = fallback
+  }
+
+syntax {
+    node QualifiedIdentifierTail {
+        Dot
+        name: Identifier
+    }
+
+    node QualifiedIdentifier {
+        head: Identifier
+        tail*: QualifiedIdentifierTail
+    }
+
+    node SystemQualifiedIdentifierTail {
+        Dot
+        name: Identifier
+    }
+
+    node SystemQualifiedIdentifier {
+        head: KeywordSystem
+        tail*: SystemQualifiedIdentifierTail
+    }
+
+    node GlobalUsingDirective {
+        KeywordGlobal
+        KeywordUsing
+        name: QualifiedIdentifier
+        Semicolon
+    }
+
+    node SystemUsingDirective {
+        KeywordUsing
+        name: SystemQualifiedIdentifier
+        Semicolon
+    }
+
+    node OtherUsingDirective {
+        KeywordUsing
+        name: QualifiedIdentifier
+        Semicolon
+    }
+
+    node BlockNamespaceBody {
+        LeftBrace
+        members*: oneOf {
+            GlobalUsingDirective
+            SystemUsingDirective
+            OtherUsingDirective
+            any
+        }
+        RightBrace
+    }
+
+    node BlockNamespaceDeclaration {
+        KeywordNamespace
+        name: QualifiedIdentifier
+        body: BlockNamespaceBody
+    }
+
+    node FileScopedNamespaceDeclaration {
+        KeywordNamespace
+        name: QualifiedIdentifier
+        Semicolon
+        members*: oneOf {
+            GlobalUsingDirective
+            SystemUsingDirective
+            OtherUsingDirective
+            any
+        }
+    }
+
+    node NamespaceDeclaration {
+        oneOf {
+            BlockNamespaceDeclaration
+            FileScopedNamespaceDeclaration
+        }
+    }
+
+    node Root {
+        members*: oneOf {
+            GlobalUsingDirective
+            SystemUsingDirective
+            OtherUsingDirective
+            NamespaceDeclaration
+            any
+        }
+    }
+}
+
+rules {
+    warn "System using directive is outside a namespace."
+        : SystemUsingDirective:not(NamespaceDeclaration *)
+
+    warn "Other using directive is outside a namespace."
+        : OtherUsingDirective:not(NamespaceDeclaration *)
+
+    warn "Global using directives must come before non-global using directives."
+        : SystemUsingDirective + GlobalUsingDirective
+
+    warn "Global using directives must come before non-global using directives."
+        : OtherUsingDirective + GlobalUsingDirective
+
+    warn "System using directives must come before other using directives."
+        : OtherUsingDirective + SystemUsingDirective
+
+    warn "Global using directives must be sorted alphabetically."
+        : GlobalUsingDirective + GlobalUsingDirective
+        where left.name.text > right.name.text
+
+    warn "System using directives must be sorted alphabetically."
+        : SystemUsingDirective + SystemUsingDirective
+        where left.name.text > right.name.text
+
+    warn "Other using directives must be sorted alphabetically."
+        : OtherUsingDirective + OtherUsingDirective
+        where left.name.text > right.name.text
+
+    warn "Global and System using groups must be separated by one blank line."
+        : GlobalUsingDirective + SystemUsingDirective
+        where gap.blankLines != 1
+
+    warn "System and other using groups must be separated by one blank line."
+        : SystemUsingDirective + OtherUsingDirective
+        where gap.blankLines != 1
+
+    warn "Using directives inside the same group must not be separated by blank lines."
+        : GlobalUsingDirective + GlobalUsingDirective
+        where gap.blankLines != 0
+
+    warn "Using directives inside the same group must not be separated by blank lines."
+        : SystemUsingDirective + SystemUsingDirective
+        where gap.blankLines != 0
+
+    warn "Using directives inside the same group must not be separated by blank lines."
+        : OtherUsingDirective + OtherUsingDirective
+        where gap.blankLines != 0
+}
